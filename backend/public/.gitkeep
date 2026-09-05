@@ -1,0 +1,9 @@
+Este directorio recibe el build estatico del frontend (frontend/dist)
+justo antes de `docker build ./backend` -- ver el Jenkinsfile raiz
+(stage "Build, test y analisis SonarQube" / buildAndTest) y
+docs/ARQUITECTURA.md ("Build de la imagen: frontend + backend en un
+solo Dockerfile"). Su contenido real NUNCA se versiona (ver
+.gitignore); este archivo solo asegura que el directorio exista en el
+checkout para que `docker build` (contexto fijo = ./backend, impuesto
+por corePipeline.groovy) tenga algo que copiar incluso antes del primer
+build real del frontend.

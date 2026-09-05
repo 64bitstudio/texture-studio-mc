@@ -1,0 +1,38 @@
+import express from 'express';
+import path from 'node:path';
+import { healthRouter } from './routes/health.js';
+import { baseAssetsRouter } from './routes/baseAssets.js';
+
+// Directorio del build estatico del frontend (ver Dockerfile: el stage
+// runtime copia frontend/dist aqui). Configurable via env var solo para
+// tests/dev; en despliegue real siempre es el default (WORKDIR /app ->
+// /app/public).
+const FRONTEND_DIST_DIR = process.env.FRONTEND_DIST_DIR ?? path.resolve(process.cwd(), 'public');
+
+/**
+ * Backend deliberadamente minimo (ver docs/ARQUITECTURA.md): sin auth,
+ * sin persistencia, sin logica de negocio real. Solo expone el asset
+ * base del Esqueleto y sirve el build estatico del frontend.
+ */
+export function createApp() {
+  const app = express();
+  app.disable('x-powered-by');
+
+  app.use(healthRouter);
+  app.use(baseAssetsRouter);
+
+  // En dev local esta carpeta normalmente no existe (el frontend corre
+  // con su propio servidor de Vite -- ver docs/README.md); express.static
+  // simplemente no encuentra archivos y el catch-all de abajo responde
+  // 404, sin romper el arranque del backend.
+  app.use(express.static(FRONTEND_DIST_DIR));
+  app.get('/*splat', (_req, res) => {
+    res.sendFile(path.join(FRONTEND_DIST_DIR, 'index.html'), (err) => {
+      if (err) {
+        res.status(404).send('Not found');
+      }
+    });
+  });
+
+  return app;
+}
