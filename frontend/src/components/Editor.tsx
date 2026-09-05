@@ -9,6 +9,7 @@ import { GridToggle } from './GridToggle';
 import { ImportTextureControl } from './ImportTextureControl';
 import { PasteImageControls } from './PasteImageControls';
 import { PasteImageOverlay } from './PasteImageOverlay';
+import { ExportControls } from './ExportControls';
 import { decodeImageFileToImageData, decodePngDataUrlToImageData } from '../decodeTexture';
 import { useCanvasTexture } from '../hooks/useCanvasTexture';
 import { bresenhamLine, TextureBuffer, type PixelPoint, type PixelSource, type RGBA } from '../textureBuffer';
@@ -570,6 +571,11 @@ export function Editor({ data }: EditorProps) {
             onConfirm={handleConfirmPaste}
             onCancel={handleCancelPaste}
           />
+        </section>
+
+        <section>
+          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Exportar</h2>
+          <ExportControls buffer={buffer} />
         </section>
       </aside>
     </div>
