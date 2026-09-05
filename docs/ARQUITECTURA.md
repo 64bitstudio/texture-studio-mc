@@ -254,3 +254,19 @@ El ticket exigia explicitamente (item 4 del alcance) que ambos exports lean siem
 ### Verificacion en vivo (Claude in Chrome)
 
 Ver el resultado completo en el reporte de cierre del ticket 006 -- resumen: se pinto un pixel distintivo en la textura, se exporto el PNG y se confirmo (inspeccionando el archivo descargado) que el PNG resultante es 64x32 y contiene exactamente ese pixel en la posicion esperada; se exporto el ZIP y se confirmo, descomprimiendolo, que contiene `pack.mcmeta` (con los 3 campos `pack_format`/`min_format`/`max_format` en 75) y `assets/minecraft/textures/entity/skeleton/skeleton.png` con el mismo contenido que el PNG exportado por separado.
+
+## Ticket 007 -- Poblar el asset vanilla real en el pipeline de despliegue
+
+No requirio extraer nada nuevo: ya existia un `skeleton.png` vanilla real (64x32, formato legado, extraido legitimamente de un client `.jar` instalado) cacheado en `~/tools/minecraft-texture-pack/vanilla-cache/skeleton.png` por el pipeline hermano `minecraft-texture-pack-pipeline` -- mismo mecanismo que ya describia el ticket 001 (`docs/ARQUITECTURA.md`, "Textura base del Esqueleto: placeholder vs. asset real"). Este ticket solo tuvo que conectarlo al despliegue real.
+
+### Decision: un directorio compartido, no uno por ambiente
+
+El asset es la textura publica vanilla de Mojang -- identica en dev/qa/prod, no es un secreto ni varia por ambiente (a diferencia de `/home/ubuntu/secrets/<repo>/.env.*`). Se creo un directorio nuevo en la VM, separado del arbol de secrets a proposito: `/home/ubuntu/vanilla-assets/texture-studio-mc/skeleton.png`, montado **read-only** (`:ro`) en `/app/vanilla-assets` de los 3 `docker-compose.*.yml` -- mismo path que ya esperaba `VANILLA_ASSETS_DIR` desde el ticket 001, sin cambios en el backend.
+
+### Decision de producto (VoBo explicito de Marco, no asumido): exponer el asset real en los 3 ambientes, incluido el publico sin auth
+
+El documento de definicion (`docs/definiciones/editor-3d-texturas-esqueleto.md`, riesgo "Acceso publico sin auth") habia aceptado el riesgo de exposicion publica asumiendo que el backend solo servia un placeholder procedural -- montar el asset real cambia eso: cualquier visitante publico (HU-13, sin auth todavia) puede ver/exportar la textura vanilla real de Mojang sin modificar, via el visor 3D o el boton "Exportar PNG"/"Exportar pack (.zip)" (ticket 006). Se le senalo esto explicitamente a Marco antes de montar el asset -- confirmo montarlo tal cual en los 3 ambientes (no solo DEV), aceptando ese nivel de exposicion.
+
+### Verificado en vivo
+
+Copiado el archivo a `/home/ubuntu/vanilla-assets/texture-studio-mc/skeleton.png` en la VM (`chown ubuntu:ubuntu`, `chmod 644`), agregado el volumen a `docker-compose.{dev,qa,prod}.yml`, desplegado a DEV -- `GET /api/base-assets/skeleton` responde `isPlaceholder: false` y el visor 3D muestra la textura real del Esqueleto vanilla (huesos visibles, sin el placeholder gris con grid).

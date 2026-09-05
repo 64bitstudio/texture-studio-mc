@@ -31,6 +31,15 @@ services:
       PORT: "3000"
     ports:
       - "8087:3000"
+    volumes:
+      # Ticket 007: asset vanilla real del Esqueleto (extraido de un
+      # client .jar legitimo, mismo mecanismo que
+      # ~/tools/minecraft-texture-pack/vanilla-cache/ del pipeline
+      # hermano minecraft-texture-pack-pipeline). Compartido entre los 3
+      # ambientes (mismo asset publico de Mojang, no es un secreto por
+      # ambiente) -- ver docs/ARQUITECTURA.md para como se puebla
+      # /home/ubuntu/vanilla-assets/texture-studio-mc/ en la VM.
+      - /home/ubuntu/vanilla-assets/texture-studio-mc:/app/vanilla-assets:ro
     networks:
       - edge
     healthcheck:
