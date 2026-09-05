@@ -1,12 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Viewer3D } from './Viewer3D';
 import { TextureEditor } from './TextureEditor';
 import { ColorPicker } from './ColorPicker';
 import { HistoryControls } from './HistoryControls';
+import { SymmetryControls } from './SymmetryControls';
+import { ZoomControls } from './ZoomControls';
+import { GridToggle } from './GridToggle';
 import { decodePngDataUrlToImageData } from '../decodeTexture';
 import { useCanvasTexture } from '../hooks/useCanvasTexture';
 import { bresenhamLine, TextureBuffer, type PixelPoint, type RGBA } from '../textureBuffer';
 import { PaintHistory, type Stroke } from '../history';
+import { computeUVBoxRects, mirrorPointHorizontal } from '../symmetry';
+import { ZOOM_DEFAULT } from '../zoom';
 import type { SkeletonBaseAssetsResponse } from '../types/baseAssets';
 
 /** Color inicial seleccionado al abrir el editor (tono "hueso" de la paleta). */
@@ -48,6 +53,22 @@ export function Editor({ data }: EditorProps) {
   const [history] = useState(() => new PaintHistory());
   const [, setHistoryTick] = useState(0);
 
+  // Simetria de pintura (ticket 004, HU-6). `uvBoxes` se deriva de la
+  // geometria servida por el backend (fuente de verdad, no
+  // hardcodeada aca) -- ver `frontend/src/symmetry.ts` para la
+  // justificacion completa de por que se ofrece un unico eje
+  // (horizontal, dentro de la caja UV completa de cada parte).
+  const [symmetryEnabled, setSymmetryEnabled] = useState(false);
+  const uvBoxes = useMemo(() => computeUVBoxRects(geometry), [geometry]);
+
+  // Zoom y cuadricula del editor de textura (ticket 004, HU-7). Estado
+  // subido aca (no local a `TextureEditor`) porque los controles
+  // (`ZoomControls`/`GridToggle`) viven como hermanos del canvas en el
+  // panel lateral, no anidados dentro de el -- mismo patron ya usado
+  // para `color`/`buffer`/`history`.
+  const [zoom, setZoom] = useState(ZOOM_DEFAULT);
+  const [showGrid, setShowGrid] = useState(true);
+
   // Carga inicial: decodifica el PNG (real o placeholder) que ya vino
   // en la respuesta de `GET /api/base-assets/skeleton` (ver App.tsx) y
   // lo vuelca al buffer compartido. A partir de aca el buffer vive solo
@@ -73,40 +94,86 @@ export function Editor({ data }: EditorProps) {
     };
   }, [buffer, baseTexture.dataUrl, baseTexture.width, baseTexture.height]);
 
-  // `setPixel`/`paintLine` capturan el color "antes" de escribir y lo
-  // registran en el trazo en curso de `history` -- ver
-  // docs/ARQUITECTURA.md, "Ticket 003", sobre por que `paintLine`
-  // calcula sus propios `cells`/`befores` en vez de que
-  // `TextureBuffer.paintLine` los exponga (mantiene `TextureBuffer` sin
-  // conocimiento de historial).
+  // Escritura unificada de pixeles con soporte de simetria opcional
+  // (ticket 004). Reemplaza la version del ticket 003 que llamaba
+  // directo a `buffer.setPixel`/`buffer.paintLine`: con simetria
+  // activa, cada pixel "primario" (el que el usuario pinto de verdad)
+  // puede tener una contraparte espejada (`mirrorPointHorizontal`) que
+  // tambien hay que escribir -- y ambas escrituras deben quedar en el
+  // MISMO trazo de `history` (un trazo simetrico sigue siendo una sola
+  // unidad de undo, criterio explicito del ticket).
+  //
+  // Orden critico para que el "antes" del historial quede correcto:
+  // 1) junta TODOS los puntos a escribir (primarios + sus espejos, sin
+  //    duplicados -- un punto puede coincidir con su propio espejo, o
+  //    el espejo de un punto puede coincidir con OTRO punto primario
+  //    del mismo trazo/linea), 2) lee el color "antes" de cada uno
+  //    ANTES de escribir ninguno, 3) recien entonces escribe y
+  //    registra en `history`. Si se escribiera y leyera intercalado,
+  //    un pixel cuyo "antes" se lee despues de que su espejo ya se
+  //    escribio (caso: la linea de arrastre cruza la columna central
+  //    de espejo) capturaria un "antes" incorrecto (el valor ya
+  //    pintado, no el original).
+  //
+  // Por que ya no se usa `TextureBuffer.paintLine` desde aca: esa
+  // funcion escribe y no expone el "antes" de cada celda (ver
+  // docs/ARQUITECTURA.md, "Ticket 003") -- el ticket 003 lo resolvia
+  // duplicando el mismo `bresenhamLine`+`inBounds` para leer el "antes"
+  // en un paso separado ANTES de llamar a `buffer.paintLine`. Con
+  // simetria, ese paso separado de lectura ya es indispensable
+  // (arriba), asi que este helper hace la escritura el mismo con
+  // `buffer.setPixel` en vez de tambien invocar `buffer.paintLine` --
+  // evita escribir dos veces (una vez dentro de `buffer.paintLine`,
+  // otra si hiciera falta ajustar algo) y mantiene una sola pasada.
+  // `TextureBuffer.paintLine` sigue siendo la interfaz publica
+  // documentada para HU-12 (otras fuentes de escritura futuras que no
+  // necesiten simetria), solo que `Editor.tsx` ya no es quien la
+  // invoca.
+  const applyPixelsWithSymmetry = useCallback(
+    (primaryPoints: PixelPoint[], rgba: RGBA) => {
+      const primaryInBounds = primaryPoints.filter((p) => buffer.inBounds(p.x, p.y));
+
+      const pointKey = (p: PixelPoint) => `${p.x},${p.y}`;
+      const uniquePoints = new Map<string, PixelPoint>();
+      primaryInBounds.forEach((p) => uniquePoints.set(pointKey(p), p));
+
+      if (symmetryEnabled) {
+        for (const p of primaryInBounds) {
+          const mirror = mirrorPointHorizontal(p, uvBoxes);
+          if (mirror && buffer.inBounds(mirror.x, mirror.y)) {
+            uniquePoints.set(pointKey(mirror), mirror);
+          }
+        }
+      }
+
+      const points = Array.from(uniquePoints.values());
+      if (points.length === 0) return;
+
+      const befores = points.map((p) => buffer.getPixel(p.x, p.y));
+      let changed = false;
+      points.forEach((p, i) => {
+        if (buffer.setPixel(p.x, p.y, rgba)) {
+          history.recordChange(p.x, p.y, befores[i], rgba);
+          changed = true;
+        }
+      });
+      if (changed) setVersion((v) => v + 1);
+    },
+    [buffer, history, symmetryEnabled, uvBoxes],
+  );
+
   const setPixel = useCallback(
     (x: number, y: number, rgba: RGBA) => {
-      const before = buffer.inBounds(x, y) ? buffer.getPixel(x, y) : null;
-      if (buffer.setPixel(x, y, rgba)) {
-        if (before) history.recordChange(x, y, before, rgba);
-        setVersion((v) => v + 1);
-      }
+      applyPixelsWithSymmetry([{ x, y }], rgba);
     },
-    [buffer, history],
+    [applyPixelsWithSymmetry],
   );
 
   const paintLine = useCallback(
     (from: PixelPoint, to: PixelPoint, rgba: RGBA) => {
-      // `cells` replica exactamente el filtro interno de
-      // `TextureBuffer.paintLine` (mismo `bresenhamLine` + mismo
-      // predicado `inBounds` que usa `setPixel`) -- garantiza que
-      // coincide en orden y contenido con el `painted` que devuelve
-      // `buffer.paintLine` mas abajo, sin duplicar la logica de
-      // pintado en si.
-      const cells = bresenhamLine(from.x, from.y, to.x, to.y).filter((p) => buffer.inBounds(p.x, p.y));
-      const befores = cells.map((p) => buffer.getPixel(p.x, p.y));
-      const painted = buffer.paintLine(from.x, from.y, to.x, to.y, rgba);
-      if (painted.length > 0) {
-        painted.forEach((p, i) => history.recordChange(p.x, p.y, befores[i], rgba));
-        setVersion((v) => v + 1);
-      }
+      applyPixelsWithSymmetry(bresenhamLine(from.x, from.y, to.x, to.y), rgba);
     },
-    [buffer, history],
+    [applyPixelsWithSymmetry],
   );
 
   const onStrokeStart = useCallback(() => {
@@ -211,8 +278,21 @@ export function Editor({ data }: EditorProps) {
         </section>
 
         <section>
+          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Simetria</h2>
+          <SymmetryControls enabled={symmetryEnabled} onToggle={setSymmetryEnabled} />
+        </section>
+
+        <section>
           <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Color</h2>
           <ColorPicker color={color} onChange={setColor} />
+        </section>
+
+        <section>
+          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Vista</h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <ZoomControls zoom={zoom} onChange={setZoom} />
+            <GridToggle visible={showGrid} onToggle={setShowGrid} />
+          </div>
         </section>
 
         <section>
@@ -223,6 +303,9 @@ export function Editor({ data }: EditorProps) {
             buffer={buffer}
             version={version}
             color={color}
+            zoom={zoom}
+            onZoomChange={setZoom}
+            showGrid={showGrid}
             onSetPixel={setPixel}
             onPaintLine={paintLine}
             onStrokeStart={onStrokeStart}
