@@ -6,7 +6,7 @@ Ver `docs/definiciones/editor-3d-texturas-esqueleto.md` para el alcance completo
 
 ## Stack
 
-- **Frontend** (`frontend/`): React + Vite + TypeScript, `three.js` vía `@react-three/fiber`/`drei` (visor 3D), `<canvas>` 2D nativo (editor de textura pixel a pixel — ticket 002+), `JSZip` (export de resource pack — ticket 006, 100% en el navegador).
+- **Frontend** (`frontend/`): React + Vite + TypeScript, `three.js` vía `@react-three/fiber`/`drei` (visor 3D), `<canvas>` 2D nativo (editor de textura pixel a pixel — ticket 002), `TextureBuffer` compartido con sync en vivo al modelo 3D (ticket 002), `JSZip` (export de resource pack — ticket 006, 100% en el navegador).
 - **Backend** (`backend/`): Node.js + Express + TypeScript, deliberadamente mínimo — sirve el build estático del frontend y el asset vanilla base (fuera de git, ver `docs/ARQUITECTURA.md`). Sin base de datos ni autenticación.
 - **Despliegue**: VM Ampere de Marco, mismo patrón que `auth-core-mc`/`mail-core-mc` (Jenkinsfile + Shared Library de `platform`, Traefik, `dev`/`qa`/`prod`).
 
@@ -52,7 +52,8 @@ npm test          # o npm run test:cov para cobertura (usada por SonarQube en CI
 
 cd ../frontend
 npm run lint
-npm run build     # el frontend aun no tiene tests unitarios propios (ticket 001) -- build + lint es la validación disponible
+npm test          # Vitest -- cubre la lógica pura de TextureBuffer (ticket 002), ver docs/COMPONENTES.md
+npm run build
 ```
 
 ## Estructura del repo

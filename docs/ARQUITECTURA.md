@@ -71,3 +71,45 @@ El primer build real en la rama `dev` (build #2) confirmó dos pasos manuales qu
 ### `vanilla-assets/` (fuera de alcance de este ticket)
 
 Este ticket define el path de contenedor (`/app/vanilla-assets`) pero no agrega el volumen de host a `deploy/docker-compose.*.yml` — eso es alcance explícito del ticket 007. Hasta que corra ese ticket, todos los ambientes sirven el placeholder (comportamiento esperado, no un bug).
+
+## Ticket 002 — Editor de textura pixel a pixel + sincronía en vivo con el 3D
+
+### `TextureBuffer`: núcleo puro, sin React/DOM/three.js
+
+Decisión de diseño (HU-12: arquitectura extensible hacia fuentes de escritura futuras): `frontend/src/textureBuffer.ts` es una clase que envuelve un `Uint8ClampedArray` RGBA plano, sin ninguna dependencia de React, del DOM ni de three.js — salvo `toImageData()`, el único método que construye un `ImageData` real (exclusivo del navegador). Esto permite:
+
+- Testear con Vitest en `environment: 'node'` (sin jsdom) la lógica que realmente importa: `setPixel`, `paintLine` (interpolación de línea del modo brocha), `loadFromImageData` — ver `frontend/test/textureBuffer.spec.ts`.
+- Que cualquier fuente de escritura futura (importar PNG del ticket 005, pegar/ajustar imagen del ticket 005, una eventual generación por IA de HU-12) escriba a través de la misma interfaz (`setPixel`/`paintLine`/`loadFromImageData`), sin volver a acoplar lógica de pintado al manejo de eventos de mouse de `TextureEditor`.
+
+`setPixel`/`paintLine` tratan las coordenadas fuera de rango como no-op seguro (devuelven `false`/lista vacía, nunca lanzan) porque el modo brocha puede generar celdas fuera de la cuadrícula si el cursor sale del `<canvas>` mientras se arrastra (el pointer capture del editor sigue entregando eventos `pointermove` aun fuera de los límites visuales). `getPixel` sí lanza fuera de rango — es una lectura puntual explícita, no una escritura derivada de un evento de UI.
+
+### Modo brocha: interpolación con Bresenham, no solo "pintar la celda actual"
+
+El criterio de aceptación de HU-2 exige que arrastrar el mouse pinte "todas las celdas recorridas", incluyendo cuando el cursor se mueve más rápido que la frecuencia de eventos `pointermove` del navegador (a mayor velocidad de arrastre, más se espacian los eventos, y una implementación naive que solo pinta `(x,y)` de cada evento deja huecos). `bresenhamLine` (algoritmo de Bresenham, solo aritmética entera) interpola la línea completa entre la última celda pintada y la celda actual; `TextureEditor` llama `TextureBuffer.paintLine(last, current, color)` en cada `pointermove` en vez de `setPixel` suelto. Verificado con tests para líneas diagonales, predominantemente horizontales/verticales y con extremos fuera de rango (recorte seguro).
+
+### Sincronía con el visor 3D: `THREE.CanvasTexture`, no `THREE.DataTexture`
+
+El ticket sugiere "una `ImageData`/buffer... que también es la fuente de la `THREE.Texture`". Se evaluaron dos formas de conectar el `TextureBuffer` (un `Uint8ClampedArray` plano) a three.js:
+
+1. `THREE.DataTexture` directamente sobre el mismo array — evita una copia/`putImageData` extra.
+2. `THREE.CanvasTexture` sobre un `<canvas>` offscreen al que se le hace `ctx.putImageData(buffer.toImageData(), 0, 0)` en cada cambio — una copia extra, pero mismo tipo de objeto (`THREE.Texture`) que ya usaba `useLoader(TextureLoader, dataUrl)` en el ticket 001.
+
+Se eligió la opción 2 (`useCanvasTexture`, ver `frontend/src/hooks/useCanvasTexture.ts`) porque `THREE.DataTexture` trae `flipY = false` por default, mientras que `THREE.Texture`/`CanvasTexture` traen `flipY = true` — y el mapeo UV de `applyBoxUV.ts` (ticket 001) ya fue derivado, calibrado y **verificado visualmente** asumiendo ese `flipY = true` (la convención `pyToV = 1 - py/textureHeight` da por hecho que three.js voltea la imagen al subirla a GPU, igual que hacía `TextureLoader` con la imagen del `dataUrl`). Usar `DataTexture` sin corregir `flipY` habría invertido verticalmente el modelo ya validado en el ticket 001, un regreso silencioso a un bug ya resuelto. El costo de la copia extra (`putImageData` de 64×32 = 2048 pixels) es insignificante en cada escritura.
+
+`useCanvasTexture` crea el `<canvas>` y la `CanvasTexture` una sola vez por sesión (inicializadores perezosos de `useState`, no lectura de refs durante el render — evita el warning `react(refs)` de `oxlint`) y las resincroniza (`ctx.putImageData` + `texture.needsUpdate = true`) en un `useEffect` con `version` en las dependencias. `version` es un contador que `Editor.tsx` incrementa solo cuando una escritura al buffer realmente cambió algo (`setPixel`/`paintLine` devuelven si hubo cambio real), evitando resincronizaciones innecesarias.
+
+### Carga inicial: la textura base se decodifica ANTES de pasar a estado "ready"
+
+`Editor.tsx` solo se monta cuando `App.tsx` ya resolvió `GET /api/base-assets/skeleton` (igual que en el ticket 001), pero el `dataUrl` (PNG) todavía necesita decodificarse a pixeles crudos (`ImageData`) para poblar el `TextureBuffer` — un paso asíncrono (`Image.onload`) que no existía en el ticket 001 (ahí `useLoader`+`Suspense` de three.js absorbían esa espera). Decisión: ese decode ocurre dentro de `Editor.tsx` (no bloquea el estado `loading` de `App.tsx`, que ya terminó) — mientras decodifica, el buffer arranca en ceros (transparente) y el visor 3D/editor se ven brevemente en blanco hasta que el `useEffect` de carga inicial termina y sube `version`. Se consideró bloquear todo el árbol tras un segundo estado de carga en `App.tsx`, pero el decode de un PNG de 64×32 es prácticamente instantáneo (unos pocos milisegundos) — no se justificó la complejidad extra de una segunda máquina de estados de carga para una ventana de tiempo imperceptible en la práctica.
+
+### Alpha fijo en 255 (sin herramienta de transparencia/borrador en este ticket)
+
+HU-5 pide que el color pintado sea exacto "incluyendo alpha si aplica". El ticket 002 no pide un borrador ni control de opacidad, y `<input type="color">` nativo no expone canal alfa — decisión: tanto la paleta predefinida como el selector libre producen siempre `alpha = 255` (`colors.ts`, `hexToRgba`). El requisito de HU-5 se cumple trivialmente (el alpha usado es siempre exactamente el que corresponde, 255, no hay caso donde debiera ser otro en el alcance de este ticket). Una herramienta de borrador/transparencia queda fuera de alcance — no estaba pedida y se habría sido over-engineering agregarla sin un ticket/HU que la cubra explícitamente.
+
+### Escala de presentación fija (×10), sin controles de zoom
+
+`TextureEditor` renderiza el `<canvas>` con backing store real de 64×32 (mismas dimensiones que el buffer, para que cada pixel del canvas sea exactamente un pixel de textura) y lo escala por CSS a 640×320 con `image-rendering: pixelated` (equivalente CSS de `imageSmoothingEnabled = false` para el escalado de *presentación* — el contexto 2D también fija `imageSmoothingEnabled = false` por si en el futuro se agrega algún `drawImage` escalado). El factor ×10 es una constante fija (`DISPLAY_SCALE`) — zoom/grid ajustable es alcance explícito del ticket 004, no se construyó ningún control de zoom aquí para no adelantarse a ese ticket.
+
+### `Viewer3D`: cambio de contrato (ya no hace fetch/decode propio)
+
+El ticket 001 le pasaba a `Viewer3D` la respuesta completa (`data: SkeletonBaseAssetsResponse`) y el propio componente decodificaba el `dataUrl` vía `useLoader(TextureLoader, ...)` + `Suspense`. Desde el ticket 002, `Viewer3D` recibe `texture: THREE.Texture` y `geometry: SkeletonGeometry` ya resueltos — la textura viene de `useCanvasTexture` en `Editor.tsx`, compartida con `TextureEditor` a través del mismo `TextureBuffer`. Es un cambio de contrato interno del frontend (no de la API HTTP, que no cambió) — documentado aquí porque un ticket futuro que reintroduzca `Viewer3D` en otro contexto (ej. previsualizar otro mob) debe seguir este mismo patrón en vez de volver a acoplar fetch+decode+render en un solo componente.

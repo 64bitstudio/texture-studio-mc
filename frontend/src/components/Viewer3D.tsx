@@ -1,9 +1,9 @@
-import { Suspense, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import * as THREE from 'three';
-import { Canvas, useLoader } from '@react-three/fiber';
+import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { applyBoxUV } from '../geometry/applyBoxUV';
-import type { SkeletonBaseAssetsResponse, SkeletonBoxPart } from '../types/baseAssets';
+import type { SkeletonGeometry, SkeletonBoxPart } from '../types/baseAssets';
 
 interface SkeletonPartMeshProps {
   part: SkeletonBoxPart;
@@ -34,44 +34,30 @@ function SkeletonPartMesh({ part, textureWidth, textureHeight, material }: Skele
 }
 
 interface SkeletonModelProps {
-  data: SkeletonBaseAssetsResponse;
+  texture: THREE.Texture;
+  geometry: SkeletonGeometry;
 }
 
-function SkeletonModel({ data }: SkeletonModelProps) {
-  // useLoader suspende hasta que la textura (data URL base64 devuelta
-  // por el backend) termina de decodificarse -- ver el <Suspense> en
-  // Viewer3D.
-  const texture = useLoader(THREE.TextureLoader, data.texture.dataUrl);
-
-  useEffect(() => {
-    // Pixel-art nitido, sin blur ni mipmaps -- HU-1/diseño técnico
-    // (ticket 001): magFilter Y minFilter en Nearest (no solo magFilter,
-    // que por si solo no evita el blur al alejar la camara).
-    //
-    // oxlint (react/immutability) marca esto como "modificar el retorno
-    // de un hook" -- es una regla generica que no conoce la API de
-    // three.js: configurar sampler settings sobre una THREE.Texture ya
-    // cargada (mutarla in-place) es el patron idiomatico de three.js/
-    // @react-three/fiber (no existe una forma de "clonar con otro
-    // filtro" mas barata). Suprimido a proposito, no un silencio de un
-    // bug real.
-    // oxlint-disable-next-line react/immutability
-    texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = THREE.NearestFilter;
-    texture.generateMipmaps = false;
-    texture.needsUpdate = true;
-  }, [texture]);
-
+/**
+ * Geometria + material del modelo. La `texture` ya viene lista (creada
+ * y sincronizada por `useCanvasTexture` en `Editor.tsx` a partir del
+ * `TextureBuffer` compartido) -- este componente ya no la carga/decodifica
+ * el mismo (ver ticket 001 para la version anterior con `useLoader` +
+ * `Suspense`, reemplazada en el ticket 002 porque ahora la textura vive
+ * en memoria desde el momento en que el asset base termina de
+ * decodificarse en `Editor.tsx`, no en un fetch de imagen aparte).
+ */
+function SkeletonModel({ texture, geometry }: SkeletonModelProps) {
   const material = useMemo(
     () =>
       // MeshBasicMaterial (sin luces): el objetivo es previsualizar la
       // textura tal cual, sin sombreado que altere los colores -- clave
-      // para el editor de pixeles de los tickets siguientes.
+      // para el editor de pixeles.
       new THREE.MeshBasicMaterial({ map: texture, side: THREE.FrontSide }),
     [texture],
   );
 
-  const { parts, textureWidth, textureHeight } = data.geometry;
+  const { parts, textureWidth, textureHeight } = geometry;
 
   return (
     <group>
@@ -89,7 +75,8 @@ function SkeletonModel({ data }: SkeletonModelProps) {
 }
 
 export interface Viewer3DProps {
-  data: SkeletonBaseAssetsResponse;
+  texture: THREE.Texture;
+  geometry: SkeletonGeometry;
 }
 
 /**
@@ -97,7 +84,7 @@ export interface Viewer3DProps {
  * clasico 64x32, controles de camara orbit/zoom/pan via drei
  * `OrbitControls`. Ver docs/COMPONENTES.md.
  */
-export function Viewer3D({ data }: Viewer3DProps) {
+export function Viewer3D({ texture, geometry }: Viewer3DProps) {
   return (
     <div
       role="img"
@@ -106,9 +93,7 @@ export function Viewer3D({ data }: Viewer3DProps) {
     >
       <Canvas camera={{ position: [45, 40, 65], fov: 40, near: 0.1, far: 1000 }}>
         <color attach="background" args={['#2b2d36']} />
-        <Suspense fallback={null}>
-          <SkeletonModel data={data} />
-        </Suspense>
+        <SkeletonModel texture={texture} geometry={geometry} />
         <OrbitControls target={[0, 16, 0]} enableDamping />
       </Canvas>
     </div>
