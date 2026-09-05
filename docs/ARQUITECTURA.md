@@ -59,7 +59,15 @@ Este proyecto no tiene persistencia server-side (ver `docs/BASE_DE_DATOS.md`) �
 
 Puertos de host reservados por este proyecto (coordinado con `auth-core-mc`: 8080/8081/8082, y `mail-core-mc`: 8083/8084/8085 — ver `auth-core-mc/docs/ARQUITECTURA.md`, "Convenciones de la VM"): **PROD 8086 / DEV 8087 / QA 8088**.
 
-### Pendiente de verificar antes de que el CI real corra en verde (no bloqueante para abrir el PR, sí para el merge)
+### Bootstrap manual real hecho en la VM (build #2 de `dev`, 2026-09-05)
 
-- **Registro de este proyecto en SonarQube** (`sonar.projectKey=texture-studio-mc`, servidor `sonarqube-vm`, webhook Sonar→Jenkins): el `Jenkinsfile` invoca `withSonarQubeEnv('sonarqube-vm')` + `waitForQualityGate abortPipeline: true` asumiendo que el proyecto ya está dado de alta (como indica la descripción del skill `bootstrap-proyecto`) — no se encontró en este repo evidencia directa (archivo de config, ticket cerrado) de que ese paso ya se ejecutó para `texture-studio-mc` específicamente. Si no está registrado/con el webhook conectado, el stage "Quality Gate de SonarQube" se cuelga hasta el timeout (5 min) en vez de fallar rápido. Confirmar con Marco/DevOps antes del primer build real en Jenkins.
-- **Volumen de `vanilla-assets/`**: este ticket define el path de contenedor (`/app/vanilla-assets`) pero no agrega el volumen de host a `deploy/docker-compose.*.yml` — eso es alcance explícito del ticket 007. Hasta que corra ese ticket, todos los ambientes sirven el placeholder (comportamiento esperado, no un bug).
+El primer build real en la rama `dev` (build #2) confirmó dos pasos manuales que todo proyecto nuevo necesita una sola vez, ninguno cubierto automáticamente por `sync-vm-infra` (ver `platform/.github/workflows/ci.yml`, comentario "cubierto en cuanto Marco cree su carpeta de secrets, sin tocar este workflow" — es deliberado, no un hueco):
+
+1. **`/home/ubuntu/secrets/texture-studio-mc/.env.{dev,qa,prod}`**: sin este archivo, `docker compose --env-file ... up -d` falla con `couldn't find env file`. Este proyecto no tiene secretos reales (ver "Sin base de datos" arriba), así que los 3 archivos solo llevan un comentario explicativo — creados con el mismo `chown ubuntu:ubuntu` + `chmod 750`/`640` que ya usan `auth-core-mc`/`mail-core-mc`.
+2. **Registros DNS** (`texture-studio`, `texture-studio-qa`, `texture-studio-dev` . `64bitstudio.com`, tipo A → `159.54.153.37`, sin proxy de Cloudflare, mismo patrón que `auth`/`mailcore`/`sonarqube`): sin ellos, `certbot --nginx` falla con `NXDOMAIN` (el pipeline lo trata como advertencia no bloqueante, pero sin DNS nunca hay HTTPS real). Creados vía la API de Cloudflare con el `CLOUDFLARE_API_TOKEN` ya existente en `~/dev-infra/.env` (mismo token que gestiona el resto del DNS de `64bitstudio.com`), con VoBo explícito de Marco antes de tocar el dominio compartido.
+
+**Confirmado, no era un riesgo real**: `texture-studio-mc` sí quedó registrado en SonarQube (`waitForQualityGate` resolvió `SUCCESS`/`OK` en segundos en el build #2, no colgó hasta el timeout) — el punto de duda que dejó el ticket 001 queda cerrado.
+
+### `vanilla-assets/` (fuera de alcance de este ticket)
+
+Este ticket define el path de contenedor (`/app/vanilla-assets`) pero no agrega el volumen de host a `deploy/docker-compose.*.yml` — eso es alcance explícito del ticket 007. Hasta que corra ese ticket, todos los ambientes sirven el placeholder (comportamiento esperado, no un bug).
