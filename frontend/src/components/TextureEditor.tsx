@@ -17,6 +17,10 @@ export interface TextureEditorProps {
   color: string;
   onSetPixel: (x: number, y: number, color: RGBA) => void;
   onPaintLine: (from: PixelPoint, to: PixelPoint, color: RGBA) => void;
+  /** Marca el inicio de un trazo (pointerdown) -- unidad de historial de undo/redo (ticket 003). */
+  onStrokeStart: () => void;
+  /** Marca el fin de un trazo (pointerup/pointercancel) -- ticket 003. */
+  onStrokeEnd: () => void;
 }
 
 /**
@@ -31,7 +35,15 @@ export interface TextureEditorProps {
  * (`TextureBuffer.paintLine`) para no saltarse celdas con movimientos
  * rapidos del cursor.
  */
-export function TextureEditor({ buffer, version, color, onSetPixel, onPaintLine }: TextureEditorProps) {
+export function TextureEditor({
+  buffer,
+  version,
+  color,
+  onSetPixel,
+  onPaintLine,
+  onStrokeStart,
+  onStrokeEnd,
+}: TextureEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const isPaintingRef = useRef(false);
   const lastCellRef = useRef<PixelPoint | null>(null);
@@ -63,6 +75,7 @@ export function TextureEditor({ buffer, version, color, onSetPixel, onPaintLine 
     e.currentTarget.setPointerCapture(e.pointerId);
     isPaintingRef.current = true;
     lastCellRef.current = cell;
+    onStrokeStart();
     onSetPixel(cell.x, cell.y, hexToRgba(color));
   }
 
@@ -82,12 +95,18 @@ export function TextureEditor({ buffer, version, color, onSetPixel, onPaintLine 
   }
 
   function stopPainting(e: ReactPointerEvent<HTMLCanvasElement>) {
+    const wasPainting = isPaintingRef.current;
     isPaintingRef.current = false;
     lastCellRef.current = null;
     const canvas = canvasRef.current;
     if (canvas?.hasPointerCapture(e.pointerId)) {
       canvas.releasePointerCapture(e.pointerId);
     }
+    // Solo cierra un trazo si realmente habia uno en curso -- evita un
+    // `commitStroke` espurio ante un pointerup/pointercancel sin
+    // pointerdown previo (PaintHistory ya es defensivo ante esto, pero
+    // no hace falta ni siquiera llamarlo).
+    if (wasPainting) onStrokeEnd();
   }
 
   return (
