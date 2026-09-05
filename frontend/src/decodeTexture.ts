@@ -33,3 +33,59 @@ export function decodePngDataUrlToImageData(dataUrl: string, width: number, heig
     img.src = dataUrl;
   });
 }
+
+/**
+ * Decodifica un `File`/`Blob` arbitrario (import de PNG del ticket 005,
+ * HU-8, o imagen pegada/subida de HU-9) a `ImageData`, a diferencia de
+ * `decodePngDataUrlToImageData` -- que fuerza el `drawImage` a un
+ * tamaño fijo (64x32, siempre correcto para la textura base ya
+ * validada) -- esta funcion dibuja a la resolucion NATURAL de la
+ * imagen (`img.naturalWidth/Height`), sin forzar ningun tamaño. Es
+ * deliberado: HU-8 necesita conocer las dimensiones reales para
+ * rechazar un PNG que no mida exactamente 64x32 (`validateImportDimensions`
+ * en `importImage.ts`) -- si se forzara aca el tamaño a 64x32, la
+ * validacion de dimensiones se volveria imposible (cualquier imagen se
+ * "encajaria" silenciosamente, estirada, perdiendo la señal de error).
+ *
+ * Contrato de `previewUrl`: esta funcion CREA el `object URL` (para
+ * poder cargarlo en un `Image`) pero NO lo revoca en el camino exitoso
+ * -- lo devuelve para que el llamador decida su ciclo de vida (HU-9 lo
+ * mantiene vivo mientras el overlay de "pegar imagen" esta en pantalla,
+ * como `src` del `<img>` de vista previa, y lo revoca recien al
+ * confirmar/cancelar -- ver `components/Editor.tsx`; HU-8 no necesita
+ * vista previa, y lo revoca inmediatamente tras decodificar). En los
+ * caminos de error SI se revoca aca mismo, porque nunca llega a
+ * entregarse a un llamador que pueda hacerse cargo.
+ */
+export function decodeImageFileToImageData(source: File | Blob): Promise<{ imageData: ImageData; previewUrl: string }> {
+  return new Promise((resolve, reject) => {
+    const previewUrl = URL.createObjectURL(source);
+    const img = new Image();
+    img.onload = () => {
+      const width = img.naturalWidth;
+      const height = img.naturalHeight;
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        URL.revokeObjectURL(previewUrl);
+        reject(new Error('No se pudo obtener el contexto 2D del canvas de decodificacion.'));
+        return;
+      }
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(img, 0, 0);
+      try {
+        resolve({ imageData: ctx.getImageData(0, 0, width, height), previewUrl });
+      } catch (err) {
+        URL.revokeObjectURL(previewUrl);
+        reject(err instanceof Error ? err : new Error('No se pudieron leer los pixeles de la imagen.'));
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(previewUrl);
+      reject(new Error('No se pudo decodificar el archivo como imagen.'));
+    };
+    img.src = previewUrl;
+  });
+}
