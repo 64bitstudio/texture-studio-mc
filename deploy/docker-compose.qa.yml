@@ -17,6 +17,10 @@ services:
       PORT: "3000"
     ports:
       - "8088:3000"
+    volumes:
+      # Ticket 007: mismo asset compartido que DEV/PROD -- ver
+      # docker-compose.dev.yml y docs/ARQUITECTURA.md.
+      - /home/ubuntu/vanilla-assets/texture-studio-mc:/app/vanilla-assets:ro
     networks:
       - edge
     healthcheck:
