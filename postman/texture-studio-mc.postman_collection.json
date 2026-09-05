@@ -1,0 +1,22 @@
+{
+  "info": {
+    "name": "texture-studio-mc",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/health"
+      }
+    },
+    {
+      "name": "Base assets - Skeleton",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/base-assets/skeleton"
+      }
+    }
+  ]
+}

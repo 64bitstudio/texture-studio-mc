@@ -1,0 +1,23 @@
+# Node / TypeScript
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+# Mismo patrón que auth-core-mc/mail-core-mc: los .env reales de
+# DEV/QA/PROD viven SOLO en la VM, nunca en el checkout de git.
+!deploy/.env.dev.example
+!deploy/.env.qa.example
+!deploy/.env.prod.example
+
+# Asset vanilla de Mojang -- NUNCA se versiona (ver docs/ARQUITECTURA.md):
+# se sirve desde un directorio fuera de git, poblado por Marco desde un
+# client .jar legitimo. Este patrón es una red de seguridad por si algún
+# día se crea localmente dentro del repo por error.
+vanilla-assets/
