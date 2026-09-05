@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+# vanilla-assets/ nunca se empaqueta en la imagen -- se monta como
+# volumen de host en despliegue real (ver docker-compose.*.yml).
+vanilla-assets

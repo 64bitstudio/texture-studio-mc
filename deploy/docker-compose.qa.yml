@@ -1,0 +1,37 @@
+# Ticket 001: stack QA en la VM -- alcanzado por el merge MANUAL de
+# Marco de `dev` a `qa` (nunca automatico). Recibe la MISMA imagen ya
+# validada en DEV, nunca reconstruida (corePipeline resuelve el SHA real
+# via el label org.opencontainers.image.revision del tag
+# texture-studio-mc-dev:current). Ver docker-compose.dev.yml para el
+# resto del contexto (puertos reservados, por que no hay Postgres/Redis,
+# por que no hay DB_PASSWORD).
+#
+# "Bajo demanda" igual que DEV.
+name: texture-studio-mc-qa
+
+services:
+  app:
+    image: texture-studio-mc-qa:${IMAGE_TAG:?falta IMAGE_TAG (sha del commit a promover)}
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+    ports:
+      - "8088:3000"
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=edge"
+      - "traefik.http.routers.texture-studio-mc-qa.rule=Host(`texture-studio-qa.64bitstudio.com`)"
+      - "traefik.http.routers.texture-studio-mc-qa.entrypoints=web"
+      - "traefik.http.services.texture-studio-mc-qa.loadbalancer.server.port=3000"
+
+networks:
+  edge:
+    external: true
