@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Viewer3D } from './components/Viewer3D';
+import { Editor } from './components/Editor';
 import { fetchSkeletonBaseAssets } from './api/baseAssets';
 import type { SkeletonBaseAssetsResponse } from './types/baseAssets';
 
@@ -42,19 +42,15 @@ function App() {
   }
 
   return (
-    <main style={{ width: '100vw', height: '100vh', position: 'relative' }}>
+    <main style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <header
         style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 1,
-          padding: '12px 16px',
+          flexShrink: 0,
+          padding: '10px 16px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          pointerEvents: 'none',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
         }}
       >
         <h1 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Texture Studio MC — Esqueleto</h1>
@@ -66,7 +62,6 @@ function App() {
               background: 'var(--panel-bg)',
               padding: '4px 8px',
               borderRadius: 4,
-              pointerEvents: 'auto',
             }}
           >
             Textura placeholder (asset vanilla real pendiente — ver ticket 007)
@@ -74,22 +69,24 @@ function App() {
         )}
       </header>
 
-      {state.status === 'loading' && (
-        <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%' }}>
-          <p>Cargando modelo del Esqueleto…</p>
-        </div>
-      )}
+      <div style={{ flex: 1, minHeight: 0 }}>
+        {state.status === 'loading' && (
+          <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%' }}>
+            <p>Cargando modelo del Esqueleto…</p>
+          </div>
+        )}
 
-      {state.status === 'error' && (
-        <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%', gap: 12 }}>
-          <p role="alert">No se pudo cargar el modelo: {state.message}</p>
-          <button type="button" onClick={handleRetry}>
-            Reintentar
-          </button>
-        </div>
-      )}
+        {state.status === 'error' && (
+          <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%', gap: 12 }}>
+            <p role="alert">No se pudo cargar el modelo: {state.message}</p>
+            <button type="button" onClick={handleRetry}>
+              Reintentar
+            </button>
+          </div>
+        )}
 
-      {state.status === 'ready' && <Viewer3D data={state.data} />}
+        {state.status === 'ready' && <Editor data={state.data} />}
+      </div>
     </main>
   );
 }
