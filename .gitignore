@@ -6,6 +6,13 @@ coverage/
 *.tsbuildinfo
 npm-debug.log*
 
+# backend/public/ recibe el build estatico del frontend (frontend/dist)
+# justo antes de `docker build ./backend` -- ver Jenkinsfile raiz y
+# docs/ARQUITECTURA.md. Nunca se versiona (es codigo generado, no
+# fuente) salvo el .gitkeep que mantiene el directorio en el checkout.
+/backend/public/*
+!/backend/public/.gitkeep
+
 # Env / secrets
 .env
 .env.*

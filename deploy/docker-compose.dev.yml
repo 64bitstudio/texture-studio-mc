@@ -1,0 +1,55 @@
+# Ticket 001: stack DEV en la VM -- mismo patron que
+# mail-core-mc/deploy/docker-compose.dev.yml (ticket 011), simplificado:
+# este proyecto NO tiene base de datos ni cache (ver
+# docs/BASE_DE_DATOS.md, "N/A en el MVP") -- un solo servicio "app", sin
+# Postgres/Redis, y sin DB_PASSWORD (por eso el Jenkinsfile raiz pasa
+# `skipVaultSecrets: true` a corePipeline: no hay ningun secreto propio
+# que buscar en Vault para este proyecto).
+#
+# "Bajo demanda" -- igual que auth-core-mc/mail-core-mc (ver
+# deploy/env-ctl.sh de esos repos si se necesita el mismo control aqui;
+# no incluido en este ticket por no ser parte del alcance).
+#
+# Puertos de host reservados por texture-studio-mc (coordinado con
+# auth-core-mc: 8080/8081/8082, y mail-core-mc: 8083/8084/8085 -- ver
+# auth-core-mc/docs/ARQUITECTURA.md, "Convenciones de la VM"):
+# PROD 8086 / DEV 8087 / QA 8088.
+#
+# vanilla-assets/skeleton.png: directorio NO versionado, montado como
+# volumen en /app/vanilla-assets dentro del contenedor (ver
+# docs/ARQUITECTURA.md) -- el volumen real lo agrega el ticket 007
+# (todavia no existe el mecanismo de poblado); sin el, el backend sirve
+# automaticamente el placeholder procedural (comportamiento ya probado,
+# nunca falla).
+name: texture-studio-mc-dev
+
+services:
+  app:
+    image: texture-studio-mc-dev:${IMAGE_TAG:?falta IMAGE_TAG (sha del commit a desplegar)}
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+    ports:
+      - "8087:3000"
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    # Ingress compartido de la VM (Traefik) -- enruta
+    # texture-studio-dev.64bitstudio.com hacia este contenedor. El
+    # puerto de host (8087) sigue publicado ademas, sin Traefik de por
+    # medio.
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=edge"
+      - "traefik.http.routers.texture-studio-mc-dev.rule=Host(`texture-studio-dev.64bitstudio.com`)"
+      - "traefik.http.routers.texture-studio-mc-dev.entrypoints=web"
+      - "traefik.http.services.texture-studio-mc-dev.loadbalancer.server.port=3000"
+
+networks:
+  edge:
+    external: true

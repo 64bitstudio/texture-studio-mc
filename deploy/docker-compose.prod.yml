@@ -1,0 +1,33 @@
+# Ticket 001: stack PROD en la VM -- recibe la MISMA imagen ya validada
+# en QA (promovida por corePipeline, nunca reconstruida). Siempre activo
+# (a diferencia de DEV/QA). El merge `qa -> prod` es exclusivo de Marco
+# (gate manual en corePipeline, submitter 'marco'). Ver
+# docker-compose.dev.yml para el resto del contexto.
+name: texture-studio-mc-prod
+
+services:
+  app:
+    image: texture-studio-mc-prod:${IMAGE_TAG:?falta IMAGE_TAG (sha del commit a promover)}
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+    ports:
+      - "8086:3000"
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=edge"
+      - "traefik.http.routers.texture-studio-mc-prod.rule=Host(`texture-studio.64bitstudio.com`)"
+      - "traefik.http.routers.texture-studio-mc-prod.entrypoints=web"
+      - "traefik.http.services.texture-studio-mc-prod.loadbalancer.server.port=3000"
+
+networks:
+  edge:
+    external: true
