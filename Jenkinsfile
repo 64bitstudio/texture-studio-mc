@@ -55,6 +55,11 @@ corePipeline(
             dir('frontend') {
                 sh 'npm ci'
                 sh 'npm run lint'
+                // Ticket 002: primer runner de tests del frontend
+                // (Vitest, solo logica pura de TextureBuffer -- ver
+                // docs/COMPONENTES.md). Antes de este ticket no habia
+                // ningun `npm test` de frontend que correr aqui.
+                sh 'npm test'
                 sh 'npm run build'
             }
 
