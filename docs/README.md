@@ -52,7 +52,7 @@ npm test          # o npm run test:cov para cobertura (usada por SonarQube en CI
 
 cd ../frontend
 npm run lint
-npm test          # Vitest -- cubre la lógica pura de TextureBuffer (ticket 002), ver docs/COMPONENTES.md
+npm test          # Vitest -- cubre la lógica pura de TextureBuffer (ticket 002) y PaintHistory/undo-redo (ticket 003), ver docs/COMPONENTES.md
 npm run build
 ```
 

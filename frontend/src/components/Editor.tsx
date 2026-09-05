@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { Viewer3D } from './Viewer3D';
 import { TextureEditor } from './TextureEditor';
 import { ColorPicker } from './ColorPicker';
+import { HistoryControls } from './HistoryControls';
 import { decodePngDataUrlToImageData } from '../decodeTexture';
 import { useCanvasTexture } from '../hooks/useCanvasTexture';
-import { TextureBuffer, type PixelPoint, type RGBA } from '../textureBuffer';
+import { bresenhamLine, TextureBuffer, type PixelPoint, type RGBA } from '../textureBuffer';
+import { PaintHistory, type Stroke } from '../history';
 import type { SkeletonBaseAssetsResponse } from '../types/baseAssets';
 
 /** Color inicial seleccionado al abrir el editor (tono "hueso" de la paleta). */
@@ -35,6 +37,17 @@ export function Editor({ data }: EditorProps) {
   const [color, setColor] = useState(DEFAULT_COLOR);
   const [initError, setInitError] = useState<string | null>(null);
 
+  // Historial de deshacer/rehacer (ticket 003, HU-4). `PaintHistory` es
+  // un objeto mutable (igual que `buffer`) -- `historyTick` no se lee
+  // en ningun lado, solo su setter, para forzar un re-render cuando
+  // cambia `canUndo`/`canRedo` (push/undo/redo/commit mutan el objeto
+  // sin que React lo note por si solo). Ver docs/ARQUITECTURA.md,
+  // "Ticket 003", para la justificacion de mantenerlo como modulo puro
+  // separado de TextureBuffer en vez de mezclar la logica de historial
+  // dentro del buffer.
+  const [history] = useState(() => new PaintHistory());
+  const [, setHistoryTick] = useState(0);
+
   // Carga inicial: decodifica el PNG (real o placeholder) que ya vino
   // en la respuesta de `GET /api/base-assets/skeleton` (ver App.tsx) y
   // lo vuelca al buffer compartido. A partir de aca el buffer vive solo
@@ -60,20 +73,98 @@ export function Editor({ data }: EditorProps) {
     };
   }, [buffer, baseTexture.dataUrl, baseTexture.width, baseTexture.height]);
 
+  // `setPixel`/`paintLine` capturan el color "antes" de escribir y lo
+  // registran en el trazo en curso de `history` -- ver
+  // docs/ARQUITECTURA.md, "Ticket 003", sobre por que `paintLine`
+  // calcula sus propios `cells`/`befores` en vez de que
+  // `TextureBuffer.paintLine` los exponga (mantiene `TextureBuffer` sin
+  // conocimiento de historial).
   const setPixel = useCallback(
     (x: number, y: number, rgba: RGBA) => {
-      if (buffer.setPixel(x, y, rgba)) setVersion((v) => v + 1);
+      const before = buffer.inBounds(x, y) ? buffer.getPixel(x, y) : null;
+      if (buffer.setPixel(x, y, rgba)) {
+        if (before) history.recordChange(x, y, before, rgba);
+        setVersion((v) => v + 1);
+      }
     },
-    [buffer],
+    [buffer, history],
   );
 
   const paintLine = useCallback(
     (from: PixelPoint, to: PixelPoint, rgba: RGBA) => {
+      // `cells` replica exactamente el filtro interno de
+      // `TextureBuffer.paintLine` (mismo `bresenhamLine` + mismo
+      // predicado `inBounds` que usa `setPixel`) -- garantiza que
+      // coincide en orden y contenido con el `painted` que devuelve
+      // `buffer.paintLine` mas abajo, sin duplicar la logica de
+      // pintado en si.
+      const cells = bresenhamLine(from.x, from.y, to.x, to.y).filter((p) => buffer.inBounds(p.x, p.y));
+      const befores = cells.map((p) => buffer.getPixel(p.x, p.y));
       const painted = buffer.paintLine(from.x, from.y, to.x, to.y, rgba);
-      if (painted.length > 0) setVersion((v) => v + 1);
+      if (painted.length > 0) {
+        painted.forEach((p, i) => history.recordChange(p.x, p.y, befores[i], rgba));
+        setVersion((v) => v + 1);
+      }
+    },
+    [buffer, history],
+  );
+
+  const onStrokeStart = useCallback(() => {
+    history.beginStroke();
+  }, [history]);
+
+  const onStrokeEnd = useCallback(() => {
+    history.commitStroke();
+    setHistoryTick((t) => t + 1);
+  }, [history]);
+
+  const applyStroke = useCallback(
+    (stroke: Stroke, pick: (change: Stroke[number]) => RGBA) => {
+      for (const change of stroke) {
+        buffer.setPixel(change.x, change.y, pick(change));
+      }
+      setVersion((v) => v + 1);
     },
     [buffer],
   );
+
+  const handleUndo = useCallback(() => {
+    const stroke = history.undo();
+    if (!stroke) return;
+    applyStroke(stroke, (c) => c.before);
+    setHistoryTick((t) => t + 1);
+  }, [history, applyStroke]);
+
+  const handleRedo = useCallback(() => {
+    const stroke = history.redo();
+    if (!stroke) return;
+    applyStroke(stroke, (c) => c.after);
+    setHistoryTick((t) => t + 1);
+  }, [history, applyStroke]);
+
+  // Atajos de teclado estandar (HU-4): Ctrl/Cmd+Z deshace,
+  // Ctrl/Cmd+Shift+Z o Ctrl+Y rehace. Listener a nivel de `window` (no
+  // requiere foco en un elemento particular de la pagina) -- el ticket
+  // no pide manejar el caso de foco dentro de un input de texto de
+  // forma especial, salvo el propio `<input type="color">` si
+  // interfiere (verificado en vivo que no interfiere, ver checklist de
+  // cierre).
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      const isMod = e.ctrlKey || e.metaKey;
+      if (!isMod) return;
+      const key = e.key.toLowerCase();
+      if (key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if (key === 'y' || (key === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        handleRedo();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo]);
 
   const texture = useCanvasTexture(buffer, version);
 
@@ -115,6 +206,11 @@ export function Editor({ data }: EditorProps) {
         }}
       >
         <section>
+          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Historial</h2>
+          <HistoryControls canUndo={history.canUndo} canRedo={history.canRedo} onUndo={handleUndo} onRedo={handleRedo} />
+        </section>
+
+        <section>
           <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Color</h2>
           <ColorPicker color={color} onChange={setColor} />
         </section>
@@ -123,7 +219,15 @@ export function Editor({ data }: EditorProps) {
           <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>
             Textura ({buffer.width}×{buffer.height})
           </h2>
-          <TextureEditor buffer={buffer} version={version} color={color} onSetPixel={setPixel} onPaintLine={paintLine} />
+          <TextureEditor
+            buffer={buffer}
+            version={version}
+            color={color}
+            onSetPixel={setPixel}
+            onPaintLine={paintLine}
+            onStrokeStart={onStrokeStart}
+            onStrokeEnd={onStrokeEnd}
+          />
         </section>
       </aside>
     </div>
