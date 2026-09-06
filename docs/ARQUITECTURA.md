@@ -1404,3 +1404,27 @@ El ícono "apachurrado" no era un problema de estilo (relleno vs. trazo, ya corr
 Cuadrícula extendida y fondo verde confirmados con recorte ampliado en "Nuevo proyecto" (la cuadrícula ahora cubre la mayor parte del panel, con perspectiva real hacia un horizonte visible) Y en el Editor (mismo componente compartido, `Viewer3D.tsx`, sin errores de consola). Ícono de Configuración confirmado simétrico con recorte ampliado (8 dientes iguales, agujero central limpio).
 
 `npm run lint`, `npm test` (197, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde.
+
+## Ticket 050 -- Visor 3D como caja cuadriculada + ícono de Configuración correcto
+
+Quinta pasada de corrección visual. Marco adjuntó una imagen de referencia DIRECTA del ícono de Configuración esta vez (no un mockup completo) y pidió que la cuadrícula del visor simule las 3 caras internas de una caja (piso + pared izquierda + pared derecha), no solo un piso.
+
+### `IconSettings` -- tercera reconstrucción, ahora con geometría verificada contra referencia real
+
+Las dos revisiones anteriores (046: relleno con agujero por `evenodd`; 049: relleno con 8 dientes rectangulares) se equivocaron de estilo -- ninguna se verificó contra una imagen de referencia real del ícono en sí, solo contra suposiciones sobre "cómo se ve un engranaje". Esta vez Marco adjuntó el ícono exacto: un recorte ampliado con Python/PIL (muestreo de píxeles, `img.crop().resize(nearest)`) confirmó que es un **contorno de 6 pétalos redondeados, trazo fino (sin relleno)**, con un aro pequeño SUELTO en el centro (sin radios que lo conecten a los pétalos).
+
+El contorno se generó paramétricamente (no a mano): una curva polar `r(θ) = R_prom + R_amp·cos(6θ)` (el `cos(Nθ)` con N=6 produce exactamente 6 lóbulos por construcción matemática), muestreada cada 7.5° (48 puntos), renderizada como `<polygon>` con `strokeLinejoin="round"` -- a este tamaño de ícono, un polígono de 48 puntos con esquinas redondeadas es visualmente indistinguible de una curva bezier real. Mismo criterio de "geometría reproducible, no precisión manual" ya aplicado a los dientes del ticket 049 -- esta vez para una curva suave en vez de dientes rectos.
+
+### Visor 3D como "caja" (piso + 2 paredes)
+
+Marco: "imagina que el mob esta dentro de una caja y lo vemos justo desde la perspectiva que esta actualmente, entonces falta la pared de la izquierda y de la derecha". Se agregaron 2 instancias más de `<Grid>` (mismo componente que el piso del ticket 048/049, ahora extraído a una constante compartida `BOX_GRID_PROPS` para que los 3 planos combinen en color/escala), cada una rotada 90° sobre el eje Z para pasar de plano horizontal (piso, XZ) a plano vertical (pared, YZ), desplazadas ±40 unidades en X.
+
+**Hallazgo real durante la implementación**: las paredes, ya con la rotación correcta, no se veían -- resultaron invisibles incluso orbitando la cámara. Causa real: `<Grid>` de drei usa `side: THREE.BackSide` por defecto (pensado para un piso visto desde arriba, donde esa cara resulta ser la "correcta"). Al rotar el mismo plano 90° para convertirlo en pared, la cara que queda mirando hacia la cámara pasa a ser la cara CONTRARIA a la que `BackSide` renderiza, así que quedaba culleada (invisible) sin ningún error en consola que lo delatara. Fix: `side: THREE.DoubleSide` en `BOX_GRID_PROPS` -- renderiza ambas caras sin importar la orientación relativa a la cámara, más robusto que calcular a mano qué signo de rotación necesitaría cada pared para calzar con `BackSide`.
+
+**Verde más sutil** (pedido explícito de Marco sobre el piso, aplicado a los 3 planos): `cellColor`/`sectionColor` bajan de `#3a6b4d`/`#5b9e77` (ticket 049) a `#274435`/`#3c6b4f` -- más cerca del fondo de la escena (`#122015`), menos contraste.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Ícono de Configuración confirmado con recorte ampliado -- coincide con la imagen de referencia (6 pétalos, trazo fino, aro central suelto). Efecto de "caja" confirmado en "Nuevo proyecto" (orbitando la cámara para descartar que las paredes solo se vieran desde otro ángulo antes del fix de `DoubleSide`) Y en el Editor (mismo componente compartido, sin errores de consola).
+
+`npm run lint`, `npm test` (197, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde.

@@ -15,6 +15,37 @@ interface MobPartMeshProps {
 
 const DEG_TO_RAD = Math.PI / 180;
 
+/**
+ * Props compartidas de los 3 planos de la "caja" del visor (piso + 2
+ * paredes, ver `Viewer3D`) -- mismos colores/tamaños de celda en los
+ * 3 para que combinen entre sí. Ticket 050 (pedido de Marco: "el piso
+ * debe ser un verde mas sutil"): tonos más apagados que la revisión
+ * anterior del ticket 049 (`cellColor`/`sectionColor` más cerca del
+ * fondo de la escena, menos contraste).
+ *
+ * `side: THREE.DoubleSide` (el `<Grid>` de drei por default usa
+ * `THREE.BackSide`, pensado para un piso visto desde arriba) --
+ * hallazgo real al agregar las paredes: con `BackSide`, una pared
+ * rotada 90° respecto al piso queda con la cara "visible" mirando
+ * para el lado contrario a la cámara según la posición/rotación
+ * exactas, así que se renderiza invisible (cara trasera). `DoubleSide`
+ * la hace visible sin importar la orientación relativa a la cámara --
+ * más simple y robusto que calcular a mano qué signo de rotación le
+ * toca a cada pared.
+ */
+const BOX_GRID_PROPS = {
+  cellSize: 4,
+  cellThickness: 0.7,
+  cellColor: '#274435',
+  sectionSize: 20,
+  sectionThickness: 1.2,
+  sectionColor: '#3c6b4f',
+  fadeDistance: 220,
+  fadeStrength: 1,
+  side: THREE.DoubleSide,
+  infiniteGrid: true,
+} as const;
+
 /** Una caja del modelo (cabeza/cuerpo/brazo/pierna) con su UV clasico ya aplicado. */
 function MobPartMesh({ part, textureWidth, textureHeight, material }: MobPartMeshProps) {
   const geometry = useMemo(() => {
@@ -149,32 +180,33 @@ export function Viewer3D({ texture, geometry, mobLabel }: Viewer3DProps) {
             docs/ARQUITECTURA.md, "Ticket 048"). `position={[0, 0, 0]}`
             asume pies en y=0 (cierto para los 4 mobs actuales, ver
             comentario de `computeGeometryCenter`/`geometryBounds.ts`).
-            Ticket 049 (hallazgo real, corrección de Marco: "solo se ve
-            como si fuera un piso cuadriculado" -- se veía como un parche
-            chico bajo los pies, no un piso extenso): `args` pasó de
-            `[10, 10]` a `[300, 300]` -- ese valor es el tamaño FÍSICO real
-            del plano (aunque `infiniteGrid` desvanezca la cuadrícula
-            "al infinito" con un shader, el plano en sí sigue siendo del
-            tamaño de `args`; a la escala de esta escena -- cámara a
-            ~90 unidades del origen, modelos de decenas de unidades -- un
-            plano de 10x10 quedaba MUY por debajo del área visible dentro
-            del frustum de la cámara, cortando la cuadrícula mucho antes
-            de que pudiera desvanecerse de forma natural). `fadeDistance`
-            subió de 110 a 220 para que el desvanecido ocurra recién cerca
-            del horizonte visible, no antes. */}
-        <Grid
-          position={[0, 0, 0]}
-          args={[300, 300]}
-          cellSize={4}
-          cellThickness={0.8}
-          cellColor="#3a6b4d"
-          sectionSize={20}
-          sectionThickness={1.4}
-          sectionColor="#5b9e77"
-          fadeDistance={220}
-          fadeStrength={1}
-          infiniteGrid
-        />
+            `args={[300, 300]}` (ticket 049, no `[10, 10]`) -- ese valor es
+            el tamaño FÍSICO real del plano (aunque `infiniteGrid`
+            desvanezca la cuadrícula "al infinito" con un shader, el plano
+            en sí sigue siendo del tamaño de `args`; a la escala de esta
+            escena -- cámara a ~90 unidades del origen -- un plano de
+            10x10 quedaba MUY por debajo del área visible, cortando la
+            cuadrícula antes de que pudiera desvanecerse de forma
+            natural).
+            Ticket 050 (pedido de Marco: "imagina que el mob esta dentro
+            de una caja... falta la pared de la izquierda y de la
+            derecha, pero esta debe ser igual cuadriculada como el piso"):
+            2 planos verticales más, mismo `<Grid>`, rotados 90° para
+            pasar de piso (plano XZ) a pared (planos YZ) -- ver el
+            comentario de cada uno abajo para la matemática de la
+            rotación. Colores más sutiles que la revisión anterior (pedido
+            explícito de Marco sobre el piso, aplicado a los 3 planos para
+            que combinen entre sí). */}
+        <Grid position={[0, 0, 0]} args={[300, 300]} {...BOX_GRID_PROPS} />
+        {/* Pared "izquierda": mismo plano, rotado 90° alrededor del eje
+            Z (`rotation={[0, 0, Math.PI / 2]}`) -- un punto del piso
+            (x, 0, z) pasa a (0, x, z) en mundo, es decir, el ancho del
+            piso (eje X) se vuelve ALTURA (eje Y) y queda fijo en
+            mundo-X=0 antes de trasladarlo -- `position={[-40, 0, 0]}`
+            lo desplaza a un costado real del modelo. */}
+        <Grid position={[-40, 0, 0]} rotation={[0, 0, Math.PI / 2]} args={[300, 300]} {...BOX_GRID_PROPS} />
+        {/* Pared "derecha": mismo plano rotado, reflejado al otro lado. */}
+        <Grid position={[40, 0, 0]} rotation={[0, 0, Math.PI / 2]} args={[300, 300]} {...BOX_GRID_PROPS} />
         <MobModel texture={texture} geometry={geometry} />
         <OrbitControls target={target} enableDamping />
       </Canvas>

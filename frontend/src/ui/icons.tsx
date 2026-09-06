@@ -1,4 +1,4 @@
-import { useId, type ReactNode, type SVGProps } from 'react';
+import type { ReactNode, SVGProps } from 'react';
 
 // Set de íconos (ticket 046) -- dibujados a mano, SIN librería externa
 // (decisión explícita de Marco, ver `docs/ARQUITECTURA.md`, "Ticket
@@ -109,37 +109,30 @@ export function IconMoon(props: IconProps) {
 }
 
 /**
- * "Configuración" (topbar) -- FORMA RELLENA (engranaje sólido con
- * agujero central), no trazo fino.
+ * "Configuración" (topbar) -- trazo fino (`LineIcon`), NO relleno
+ * sólido.
  *
- * Ticket 049 (corrección de Marco: "el ícono de configuración se ve
- * apachurrado"): la revisión anterior era un único `<path>` con
- * coordenadas escritas a mano -- fácil de desalinear sin querer
- * (exactamente lo que pasó, quedó asimétrico/aplastado). Reemplazado
- * por una construcción GEOMÉTRICA repetible: un círculo central +
- * 8 dientes idénticos (rectángulos redondeados) rotados en incrementos
- * exactos de 45° alrededor del centro (`transform="rotate(...)"`) --
- * garantiza simetría perfecta por construcción, no por precisión de
- * dedo. El agujero central se logra con una `<mask>` real (blanco
- * visible, negro oculto) en vez de "pintar" un círculo del color del
- * fondo -- funciona sin importar qué haya detrás del ícono.
+ * Ticket 050 (corrección de Marco, esta vez con una imagen de
+ * referencia directa -- ver `docs/ARQUITECTURA.md`, "Ticket 050"): las
+ * dos revisiones anteriores (046: relleno con agujero por `evenodd`;
+ * 049: relleno con 8 dientes rectangulares) se equivocaron de estilo
+ * -- la referencia real es un contorno de 6 pétalos REDONDEADOS
+ * (trazo fino, sin relleno) con un aro chico suelto en el centro, sin
+ * radios que lo conecten a los pétalos.
+ *
+ * El contorno se generó PARAMÉTRICAMENTE (Python, no a mano): una
+ * curva polar `r(θ) = R_prom + R_amp·cos(6θ)` (6 = número de pétalos)
+ * muestreada cada 7.5° (48 puntos) -- una flor de 6 lóbulos perfecta
+ * por construcción matemática, con `strokeLinejoin="round"` para que
+ * el trazo grueso suavice los segmentos rectos entre puntos en algo
+ * visualmente indistinguible de una curva real a este tamaño.
  */
-export function IconSettings({ size = 20, ...rest }: IconProps) {
-  const maskId = useId();
-  const teeth = [0, 45, 90, 135, 180, 225, 270, 315];
+export function IconSettings(props: IconProps) {
   return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true" {...rest}>
-      <mask id={maskId} maskUnits="userSpaceOnUse">
-        <rect x={0} y={0} width={24} height={24} fill="white" />
-        <circle cx={12} cy={12} r={3.1} fill="black" />
-      </mask>
-      <g mask={`url(#${maskId})`}>
-        <circle cx={12} cy={12} r={6.3} />
-        {teeth.map((angle) => (
-          <rect key={angle} x={10.35} y={1.1} width={3.3} height={4.6} rx={1.2} transform={`rotate(${angle} 12 12)`} />
-        ))}
-      </g>
-    </svg>
+    <LineIcon strokeWidth={1.9} strokeLinejoin="round" {...props}>
+      <polygon points="20.95,12.00 20.42,13.11 19.15,13.92 17.82,14.41 17.07,14.93 17.00,15.84 17.23,17.23 17.17,18.74 16.48,19.75 15.25,19.85 13.92,19.15 12.82,18.25 12.00,17.85 11.18,18.25 10.08,19.15 8.75,19.85 7.53,19.75 6.83,18.74 6.77,17.23 7.00,15.84 6.93,14.93 6.18,14.41 4.85,13.92 3.58,13.11 3.05,12.00 3.58,10.89 4.85,10.08 6.18,9.59 6.93,9.08 7.00,8.16 6.77,6.77 6.83,5.26 7.52,4.25 8.75,4.15 10.08,4.85 11.18,5.75 12.00,6.15 12.82,5.75 13.92,4.85 15.25,4.15 16.48,4.25 17.17,5.26 17.23,6.77 17.00,8.16 17.07,9.07 17.82,9.59 19.15,10.08 20.42,10.89" />
+      <circle cx={12} cy={12} r={1.35} />
+    </LineIcon>
   );
 }
 
