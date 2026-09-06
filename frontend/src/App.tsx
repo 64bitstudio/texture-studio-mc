@@ -5,12 +5,12 @@ import { ProjectControls } from './components/ProjectControls';
 import { MisProyectos } from './components/MisProyectos';
 import { Recientes } from './components/Recientes';
 import { Proyecto } from './components/Proyecto';
+import { AgregarMobs } from './components/AgregarMobs';
 import { AppShell } from './components/AppShell';
 import type { NavView } from './components/Sidebar';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Avatar } from './components/Avatar';
 import { Settings } from './components/Settings';
-import { PlaceholderScreen } from './components/PlaceholderScreen';
 import { NuevoProyecto } from './components/NuevoProyecto';
 import { getUserPrefs } from './userPrefs';
 import { getTheme, type Theme } from './theme';
@@ -26,12 +26,11 @@ import { Button, LoadingOverlay, Menu } from './ui';
  * 'editor'` del ticket 027 por los 7 destinos del mockup de navegación
  * nueva. Sigue sin router (mismo criterio del ticket 027: sin
  * necesidad de URLs compartibles/marcables para este flujo de sesión
- * única) -- estado interno de React, no rutas reales. `'proyecto'`/
- * `'agregar-mobs'` todavía no son alcanzables desde ninguna UI en este
- * ticket (los tickets 041/042 los conectan) -- existen en el tipo
- * desde ya porque el ticket lo pide explícitamente ("el union type más
- * grande"), con `PlaceholderScreen` cubriendo el contenido mientras
- * tanto (ver docs/definiciones/proyectos-y-navegacion.md).
+ * única) -- estado interno de React, no rutas reales. Los 7 destinos
+ * ya tienen contenido real desde el ticket 042 (el último,
+ * `'agregar-mobs'`, cierra el epic -- `PlaceholderScreen.tsx`, que
+ * cubría los que faltaban desde el ticket 037, se eliminó por completo
+ * al quedar sin consumidores, ver docs/ARQUITECTURA.md, "Ticket 042").
  */
 type View = 'nuevo-proyecto' | 'mis-proyectos' | 'recientes' | 'proyecto' | 'agregar-mobs' | 'editor' | 'configuracion';
 
@@ -63,13 +62,11 @@ function App() {
   // toggle rapido, que tenia su propio `useState` desincronizado).
   const [theme, setTheme] = useState<Theme>(() => getTheme());
 
-  // Ticket 038 (adelanta una pieza minima del ticket 041, "vista de
-  // detalle de Proyecto"): cual proyecto esta activo ahora mismo --
-  // poblado al crearlo (`handleProjectCreated` mas abajo). El ticket
-  // 041 construye el contenido REAL de la vista `'proyecto'` sobre este
-  // mismo estado (sin cambiar su forma) -- por ahora solo alcanza para
-  // que el `PlaceholderScreen` de esa vista muestre el nombre del
-  // proyecto recien creado, en vez de un texto generico.
+  // Ticket 038: cual proyecto esta activo ahora mismo -- poblado al
+  // crearlo (`handleProjectCreated`), abrirlo (`handleProjectActivated`)
+  // o agregarle mobs (`handleMobsAdded`). Fuente de verdad que usan
+  // `Proyecto.tsx` (041) y `AgregarMobs.tsx` (042); el ticket 043 la usa
+  // tambien para restringir el selector de mob del editor.
   const [activeProject, setActiveProject] = useState<{ name: string; mobIds: string[] } | null>(null);
 
   // Catalogo de mobs (ticket 018, HU-1) -- `GET /api/mobs`. El menu no
@@ -246,6 +243,20 @@ function App() {
     setView('mis-proyectos');
   }
 
+  // Ticket 042: `AgregarMobs.tsx` ya llamo a `saveProject` con exito
+  // ANTES de este callback (mismo orden que el resto de acciones de
+  // proyecto) -- suma los ids recien agregados a `activeProject.mobIds`
+  // (sin duplicar si por alguna razon ya estaban) y vuelve a la vista
+  // de detalle.
+  function handleMobsAdded(addedMobIds: string[]) {
+    setActiveProject((prev) => (prev ? { ...prev, mobIds: Array.from(new Set([...prev.mobIds, ...addedMobIds])) } : prev));
+    setView('proyecto');
+  }
+
+  function handleCancelAddMobs() {
+    setView('proyecto');
+  }
+
   // Ticket 019 (HU-4, "el mob actualmente activo se actualiza de
   // inmediato"): `ProjectControls` ya dejo el buffer restaurado de cada
   // mob del proyecto en `bufferCache` (mutacion directa del `Map`,
@@ -360,7 +371,16 @@ function App() {
             onProjectDeleted={handleProjectDeleted}
           />
         )}
-        {view === 'agregar-mobs' && <PlaceholderScreen title="Agregar mobs" ticket={42} />}
+        {/* Ticket 042: "Agregar mobs" ya tiene contenido real. */}
+        {view === 'agregar-mobs' && activeProject && mobsState.status === 'ready' && (
+          <AgregarMobs
+            projectName={activeProject.name}
+            mobs={mobsState.mobs}
+            existingMobIds={activeProject.mobIds}
+            onMobsAdded={handleMobsAdded}
+            onCancel={handleCancelAddMobs}
+          />
+        )}
       </AppShell>
     );
   }
