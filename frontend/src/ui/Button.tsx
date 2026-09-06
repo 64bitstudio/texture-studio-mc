@@ -8,8 +8,16 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
    * destructiva ya confirmada en línea (ej. "Sí, eliminar" -- ticket
    * 026, reemplaza el `dangerButtonStyle` ad-hoc que tenía
    * `ProjectControls.tsx`).
+   *
+   * `'icon-square'` (ticket 046): caja cuadrada de tamaño fijo con SOLO
+   * el ícono visible (topbar: tema/Configuración, mockup de
+   * referencia) -- a diferencia de `'icon'` (ícono + texto SIEMPRE
+   * visible, ticket 032), este variant asume que quien lo usa oculta el
+   * texto visualmente con la clase `.sr-only` (nunca lo omite del DOM
+   * -- el botón sigue necesitando un nombre accesible real, mismo
+   * criterio de ticket 032, solo que ya no se ve en pantalla).
    */
-  variant?: 'secondary' | 'primary' | 'icon' | 'danger';
+  variant?: 'secondary' | 'primary' | 'icon' | 'icon-square' | 'danger';
 }
 
 /**

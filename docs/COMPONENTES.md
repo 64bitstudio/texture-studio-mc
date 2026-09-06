@@ -269,3 +269,16 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 
 - **`components/ProjectControls.tsx`** — **eliminado** (`git rm`) — menú "💾 Proyecto" del editor (guardar/cargar/eliminar un proyecto directo, independiente de `activeProject`); reemplazado por completo por el flujo `NuevoProyecto`/`MisProyectos`/`Recientes`/`Proyecto`/`AgregarMobs` (038-042).
 - **`App.tsx`** — retira el import/render de `ProjectControls` y el `<Menu>` que lo alojaba; retira el estado `geometryCache` (compartido de sesión, sin consumidores tras la migración de 038/042 a Maps locales) y `loadGeneration`/`handleProjectLoaded` (solo existían para el remount que forzaba `ProjectControls`); `key` de `<Editor>` vuelve a ser `selectedMobId` a secas.
+
+### Ticket 046 -- Rediseño visual: topbar, sidebar y "Nuevo proyecto"
+
+- **`ui/icons.tsx`** (nuevo) — set de íconos SVG dibujados a mano (`IconPlus`/`IconFolder`/`IconClock`/`IconSun`/`IconMoon`/`IconSettings`/`IconCube`/`IconEye`/`IconCheck`/`IconInfo`/`IconX`/`IconGrassBlockLogo`), sin librería externa.
+- **`assets/mob-icons/{creeper,skeleton,zombie,spider}.png`** (nuevo) — renders oficiales de Minecraft Wiki, importados como assets estáticos de Vite.
+- **`mobIcons.ts`** (nuevo) — `MOB_ICONS`/`MOB_DESCRIPTIONS` (`Record<string, string>`), contenido presentacional del frontend.
+- **`ui/Button.tsx`** — nuevo `variant="icon-square"` (caja 40x40, solo ícono, texto accesible vía `.sr-only`).
+- **`index.css`** — tema oscuro más oscuro, `--accent` afinado a `#34d399`, nuevos `--accent-soft`/`--accent-soft-strong`/`--radius-lg`/`--font-lg`/`--font-xl`, clases `.ui-button--icon-square`/`.sr-only`.
+- **`components/Sidebar.tsx`** — rediseño completo: bloque de marca (ícono + título + subtítulo), nav con ícono en caja + estado activo (relleno/borde de acento), tarjeta de marca al pie con fondo decorativo.
+- **`components/AppShell.tsx`** — topbar con 3 controles cuadrados; nuevo botón "Configuración" propio (antes solo alcanzable haciendo click en el avatar).
+- **`components/Avatar.tsx`** — 40px (antes 28px), ya no envuelto en un botón que abría Configuración.
+- **`components/ThemeToggle.tsx`** — `variant="icon-square"` + `IconSun`/`IconMoon` (antes emoji + texto visible).
+- **`components/NuevoProyecto.tsx`** — tarjetas de mob con miniatura oficial real + badge de check, encabezados de sección con ícono, badge "Minecraft Java Edition", tarjeta informativa del mob elegido, callout con ícono, campo de nombre con botón "limpiar".
