@@ -346,3 +346,11 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`hooks/useProjectActions.ts`** (nuevo) — lógica compartida de Renombrar/Duplicar/Exportar/Eliminar, consumida por `ProjectCard.tsx` (refactorizado, sin cambio de comportamiento) y `Proyecto.tsx`.
 - **`components/Proyecto.tsx`** — breadcrumb, portada subible, título/descripción editables inline, badge fijo "Minecraft Java Edition", botones de header, panel lateral "Información del proyecto" + "Acciones". Nuevo prop `onBackToList`.
 - **`components/App.tsx`** — pasa `onBackToList={() => setView('mis-proyectos')}` a `Proyecto`.
+
+### Ticket 057 -- Rediseño de tarjetas de mob dentro de "Proyecto"
+
+- **`ui/SearchSortToggleBar.tsx`** (nuevo) — buscar + orden opcional + toggle grid/lista, extraído de `MisProyectos.tsx`.
+- **`projectMobFilter.ts`** (nuevo, puro) — `filterAndSortProjectMobs`: filtra mobs de un proyecto por nombre, siempre ordenado alfabéticamente (sin `updatedAt` propio por mob).
+- **`components/MobEntryCard.tsx`** (nuevo) — tarjeta de mob con miniatura 2D, archivo/dimensiones/escala derivados, "Editar textura" (mismo destino de siempre) y modal de vista previa ampliada (ícono de ojo). Reemplaza a `MobThumbnail2D` (ticket 055, retirado).
+- **`components/Proyecto.tsx`** — su grid de mobs monta `SearchSortToggleBar` + `MobEntryCard` en vez del grid simple del ticket 041.
+- **`components/MisProyectos.tsx`** — refactorizado para consumir `SearchSortToggleBar` (sin cambio de comportamiento).

@@ -62,3 +62,40 @@ explícito con Marco, no es negociable en este ticket.
   con al menos un proyecto de varios mobs.
 
 ## Hecho
+
+Implementado tal como se definió. Todos los criterios de aceptación
+cumplidos y verificados en vivo (Claude in Chrome, dark y light theme,
+proyecto real de 4 mobs).
+
+- `frontend/src/ui/SearchSortToggleBar.tsx` (nuevo): extraído de
+  `MisProyectos.tsx` -- orden opcional (`sortOptions`), omitido en
+  `Proyecto.tsx` porque el único orden real de mobs es alfabético
+  siempre (sin `updatedAt` por mob).
+- `frontend/src/projectMobFilter.ts` (nuevo, puro):
+  `filterAndSortProjectMobs`.
+- `frontend/src/components/MobEntryCard.tsx` (nuevo): tarjeta grid/lista
+  con miniatura 2D, info derivada (archivo/dimensiones/escala, sin
+  storage nuevo), "Editar textura", modal de vista previa (ícono de
+  ojo, overlay propio sin diálogo nativo).
+- `frontend/src/components/Proyecto.tsx`: usa `SearchSortToggleBar` +
+  `MobEntryCard`; se retira `MobThumbnail2D` (ticket 055, superado).
+- `frontend/src/components/MisProyectos.tsx`: refactorizado para
+  consumir `SearchSortToggleBar` (sin cambio de comportamiento,
+  verificado en vivo).
+- `frontend/test/projectMobFilter.spec.ts`: 4 tests nuevos.
+
+Tests: 216 pasan (212 + 4 nuevos). `npx tsc --noEmit`, `npm run lint`,
+`npm run build` en verde.
+
+**Confirmado explícito**: "Editar textura" navega al editor actual
+(`Editor.tsx`) exactamente igual que antes de este ticket -- verificado
+en vivo, layout del editor sin ningún cambio.
+
+**Nota**: la Araña sigue mostrando la limitación conocida del ticket
+055 (patas sin rotar, ver ese ticket) tanto en la miniatura de la
+tarjeta como en el modal de vista previa ampliada -- comportamiento
+esperado, no un hallazgo nuevo de este ticket.
+
+Con este ticket se completa el rediseño de "Proyecto" de 3 partes
+(055/056/057) definido en
+`docs/definiciones/preview-2d-y-rediseno-proyecto.md`.

@@ -1599,3 +1599,31 @@ Breadcrumb ("Mis proyectos › Nombre", nuevo prop `onBackToList` desde `App.tsx
 Confirmado dark y light theme: breadcrumb navega a "Mis proyectos"; título y descripción editables inline y persisten sin recargar; "Duplicar proyecto" desde el panel crea la copia al instante (mismo resultado que desde "Mis proyectos") y muestra confirmación inline; "Eliminar proyecto" muestra la confirmación inline y "Cancelar" no borra nada. Sin errores de consola. (Subir portada no se probó end-to-end en esta verificación -- abre el selector de archivos nativo del SO, fuera del alcance de la automatización del navegador; el código sigue el mismo patrón `FileReader` ya usado y probado en el resto de la app.)
 
 `npm run lint`, `npx tsc --noEmit`, `npm test` (212 -- 6 tests nuevos de `updateProjectDescription`/`updateProjectCover`), `npm run build` en verde.
+
+## Ticket 057 -- Rediseño de tarjetas de mob dentro de "Proyecto"
+
+Tercera y última pieza del rediseño definido en `docs/definiciones/preview-2d-y-rediseno-proyecto.md` (VoBo de Marco obtenido). Reemplaza el grid simple de mobs de `Proyecto.tsx` (imagen cruda + nombre, toda la tarjeta clicable, sin tocar desde el ticket 041) por tarjetas reales con buscador, toggle grid/lista, miniatura 2D (motor del ticket 055), info derivada, y un botón "Editar textura" que sigue llevando al editor actual SIN NINGÚN CAMBIO -- confirmado explícito con Marco.
+
+### `ui/SearchSortToggleBar.tsx` (nuevo) -- extraído de "Mis proyectos"
+
+`MisProyectos.tsx` (ticket 053) tenía la barra de buscar+orden+toggle grid/lista escrita inline. Se extrae a un componente compartido genérico -- el orden (`sortOptions`) es OPCIONAL: los mobs de un proyecto no tienen un `updatedAt` propio (solo el proyecto completo lo tiene, ver `ProjectMobEntry`), así que el único orden real posible es alfabético por nombre, siempre -- un `<select>` de una sola opción no aportaría nada, así que `Proyecto.tsx` simplemente no pasa `sortOptions` y el componente omite ese control. `MisProyectos.tsx` se refactorizó para consumir este componente (sin cambio de comportamiento, verificado en vivo).
+
+### `projectMobFilter.ts` (nuevo, puro) -- mismo criterio que `projectFilter.ts`
+
+`filterAndSortProjectMobs(mobIds, mobs, searchText)`: filtra por substring del nombre legible (case-insensitive) y ordena alfabéticamente siempre (ver el porqué arriba). Sin releer `localStorage` -- opera sobre el array de `mobIds` que ya tiene `Proyecto.tsx`.
+
+### `components/MobEntryCard.tsx` (nuevo) -- reemplaza a `MobThumbnail2D` (ticket 055)
+
+Tarjeta grid/lista con: miniatura 2D (reusa `useMobFrontSprite2D` del ticket 055, mismo `geometryCache` compartido por pantalla), info derivada SIN storage nuevo -- nombre de archivo vanilla (`${mobId}.png`, mismo convenio que `entityTexturePngPath` de `exportPack.ts`, ticket 044), dimensiones (`geometry.textureWidth/Height × resolution`), escala (`resolution` tal cual). El campo "Modelo: X" de la imagen de referencia se omite (documento de definición: sin soporte de múltiples skins por mob, ese dato es 100% redundante con el nombre ya mostrado).
+
+**Modal de vista previa** (ícono de ojo): overlay propio en el DOM (mismo criterio "sin diálogos nativos" del resto de la app, ver memoria `texture-studio-mc-sin-dialogos-nativos`) con la misma miniatura 2D ampliada -- cierra con Escape, click afuera, o el botón "Cerrar". No navega al editor.
+
+`MobThumbnail2D` (la integración mínima de prueba del ticket 055) se retira de `Proyecto.tsx` -- `MobEntryCard` cubre el mismo rol (y más) de forma definitiva.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Confirmado con un proyecto real de 4 mobs, dark y light theme: buscador filtra por nombre (probado con "cree" -> solo Creeper); toggle grid/lista cambia el layout de verdad; cada tarjeta muestra la miniatura 2D + `spider.png · 64×32 px · x1` (formato real, no inventado); "Vista previa" abre el modal (incluida la Araña, que muestra la limitación conocida del ticket 055 -- patas sin rotar); Escape cierra el modal; "Editar textura" navega al editor actual con el mob correcto cargado, layout del editor idéntico a antes de este ticket. Sin errores de consola.
+
+`npm run lint`, `npx tsc --noEmit`, `npm test` (216 -- 4 tests nuevos de `filterAndSortProjectMobs`), `npm run build` en verde.
+
+Con este ticket se completa el rediseño de "Proyecto" de 3 partes definido en `docs/definiciones/preview-2d-y-rediseno-proyecto.md` (tickets 055/056/057).

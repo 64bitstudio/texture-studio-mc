@@ -16,3 +16,5 @@ export { Menu } from './Menu';
 export type { MenuProps, MenuItem } from './Menu';
 export { LoadingOverlay } from './LoadingOverlay';
 export type { LoadingOverlayProps } from './LoadingOverlay';
+export { SearchSortToggleBar } from './SearchSortToggleBar';
+export type { SearchSortToggleBarProps, SortOption, ToggleLayout } from './SearchSortToggleBar';
