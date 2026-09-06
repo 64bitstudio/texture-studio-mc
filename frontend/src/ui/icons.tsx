@@ -261,12 +261,59 @@ export function IconListView(props: IconProps) {
   );
 }
 
-/** Botón "Editar" de una tarjeta de proyecto (Mis proyectos, ticket 053) -- lápiz de trazo fino, confirmado contra la referencia. */
+/** Botón "Editar" de una tarjeta de proyecto (Mis proyectos, ticket 053) -- lápiz de trazo fino, confirmado contra la referencia. Reusado por "Renombrar" en el menú "⋮" (ticket 054, mismo concepto de "cambiar el nombre"). */
 export function IconPencil(props: IconProps) {
   return (
     <LineIcon {...props}>
       <path d="M4 20 4.6 16.3 15 5.9a1.6 1.6 0 0 1 2.3 0l0.8 0.8a1.6 1.6 0 0 1 0 2.3L7.7 19.4Z" />
       <path d="m13.5 7.4 3.1 3.1" />
+    </LineIcon>
+  );
+}
+
+/**
+ * "Duplicar" (menú "⋮" de una tarjeta de proyecto, ticket 054) -- dos
+ * cuadrados redondeados superpuestos (trazo fino), reemplaza el emoji
+ * 🗂️ que pidió Marco explícitamente quitar ("no quiero que sean
+ * emogis, tu haz los svg").
+ */
+export function IconDuplicate(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <rect x={8.5} y={8.5} width={12} height={12} rx={2.2} />
+      <path d="M15.5 8.5V6.7a2.2 2.2 0 0 0-2.2-2.2H5.7a2.2 2.2 0 0 0-2.2 2.2v7.6a2.2 2.2 0 0 0 2.2 2.2h1.8" />
+    </LineIcon>
+  );
+}
+
+/**
+ * "Exportar proyecto / Resource Pack" (menú "⋮", ticket 054) -- caja
+ * isométrica de trazo fino con la costura central, reemplaza el emoji
+ * 📦.
+ */
+export function IconExport(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="M3.5 8.2 12 4l8.5 4.2v8.6L12 21l-8.5-4.2Z" />
+      <path d="M3.5 8.2 12 12l8.5-4.2M12 12v9" />
+    </LineIcon>
+  );
+}
+
+/**
+ * "Eliminar" (menú "⋮", ticket 054) -- bote de basura de trazo fino
+ * (tapa + cuerpo + 2 líneas internas), reemplaza el emoji 🗑. Se usa con
+ * `color: var(--danger)` en el botón que lo envuelve (ver
+ * `ProjectCard.tsx`), no colores fijos propios -- mismo criterio que el
+ * resto de íconos `currentColor` de este archivo.
+ */
+export function IconTrash(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="M4.5 7h15" />
+      <path d="M9.5 7V5.2a1.2 1.2 0 0 1 1.2-1.2h2.6a1.2 1.2 0 0 1 1.2 1.2V7" />
+      <path d="M6.5 7 7.3 19.2A1.8 1.8 0 0 0 9.1 21h5.8a1.8 1.8 0 0 0 1.8-1.8L17.5 7" />
+      <path d="M10.3 11v6M13.7 11v6" />
     </LineIcon>
   );
 }

@@ -1524,3 +1524,21 @@ Al escribir `ProjectCard.tsx`/`MisProyectos.tsx` con el estilo de formato ya est
 Se crearon proyectos de prueba reales (1 mob, 3 mobs, 4 mobs -- para ver el badge "+1" de overflow) vía el flujo normal de la app. Confirmado en vivo, dark y light theme, sin errores de consola: layout coincide con la imagen de referencia (folder+título+⋮, meta "N mobs · Última modificación", miniaturas + overflow, botón "Editar"); clic en la tarjeta/título abre la vista de detalle; "Editar" con 1 mob va directo al editor (con el selector de mob del editor ya restringido a los mobs del proyecto, ticket 043); "Editar" con varios mobs navega a `Proyecto.tsx` como selector; Renombrar/Duplicar/Eliminar (con confirmación inline) funcionan y refrescan la lista; toggle grid/lista cambia de verdad el layout; búsqueda filtra por nombre.
 
 `npm run lint`, `npx tsc --noEmit`, `npm test` (201 -- 4 tests nuevos de `duplicateProject`), `npm run build` en verde.
+
+## Ticket 054 -- Íconos SVG en el menú ⋮ + botón Editar menos redondeado
+
+Corrección puntual sobre el ticket 053. Marco: "esta bien pero al hacer click en el boton de los 3 puntitos salen iconos de los cuales no quiero que sean emogis, tu haz los svg, el boton de editar debe estar menos redondeado".
+
+### Íconos SVG (`ui/icons.tsx`)
+
+3 íconos nuevos, mismo criterio `LineIcon` hand-drawn del ticket 046 (sin librería externa): `IconDuplicate` (dos cuadrados redondeados superpuestos), `IconExport` (caja isométrica con costura central) e `IconTrash` (bote con tapa + 2 líneas internas, usa `currentColor` -- el rojo lo aporta `color: var(--danger)` del botón que lo envuelve, no un color fijo propio). `IconPencil` (ya existente, ticket 053) se reusa para "Renombrar" -- mismo concepto de "cambiar el nombre" que ya representa en el botón "Editar".
+
+### `ProjectCard.tsx`
+
+Los 4 `<span aria-hidden>✏️/🗂️/📦/🗑</span>` del menú "⋮" se reemplazan por los íconos de arriba. El botón "Editar" baja de `border-radius: var(--radius-lg)` (14px) a `var(--radius-md)` (8px) -- mismo token que ya usa el resto de controles compactos de la app (ej. `.ui-button--icon-square` no aplica aquí porque ese es para botones cuadrados de ícono solo, no para un botón ancho con texto).
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Confirmado en vivo, grid y lista, dark y light theme: los 4 íconos del menú "⋮" son SVG (sin emoji), "Eliminar" se ve en rojo, "Editar" tiene esquinas notablemente menos curvas. Sin errores de consola.
+
+`npm run lint`, `npx tsc --noEmit`, `npm test` (201, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde.
