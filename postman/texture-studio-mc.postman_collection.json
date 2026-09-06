@@ -26,6 +26,13 @@
       }
     },
     {
+      "name": "Base assets - Zombie",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/base-assets/zombie"
+      }
+    },
+    {
       "name": "Base assets - Mob inexistente (404)",
       "request": {
         "method": "GET",

@@ -28,15 +28,16 @@ Respuesta `200`:
 ```jsonc
 {
   "mobs": [
-    { "id": "skeleton", "label": "Esqueleto" }
-    // Zombie/Araña/Creeper se agregan en sus propios tickets (017/020/021).
+    { "id": "skeleton", "label": "Esqueleto" },
+    { "id": "zombie", "label": "Zombie" }
+    // Araña/Creeper se agregan en sus propios tickets (020/021).
   ]
 }
 ```
 
 ## `GET /api/base-assets/:mobId`
 
-Generaliza el endpoint literal `GET /api/base-assets/skeleton` del ticket 001 (ticket 016) — ver `docs/ARQUITECTURA.md` ("Contrato de `GET /api/base-assets/:mobId`") para la decisión de diseño. `mobId` es cualquier `id` del catálogo de `GET /api/mobs` (por ahora, solo `"skeleton"`).
+Generaliza el endpoint literal `GET /api/base-assets/skeleton` del ticket 001 (ticket 016) — ver `docs/ARQUITECTURA.md` ("Contrato de `GET /api/base-assets/:mobId`") para la decisión de diseño. `mobId` es cualquier `id` del catálogo de `GET /api/mobs` (`"skeleton"` o `"zombie"` por ahora).
 
 Respuesta `404` si `mobId` no existe en el registro:
 
@@ -77,6 +78,33 @@ Respuesta `200` (idéntica en forma y valores a la que ya existía para `/api/ba
 - **Ticket 011** (aditivo, no rompe compatibilidad): cada caja de `geometry.parts.*` gana un campo nuevo `faceLabels` — nombre legible (es-MX) de cada una de sus 6 caras (`front`/`back`/`top`/`bottom`/`left`/`right`). Ver `docs/ARQUITECTURA.md`, "Ticket 011", para el catálogo completo y las decisiones de diseño (convención `left`/`right` anatómica, no de pantalla; `armRight`/`armLeft`/`legRight`/`legLeft` con labels sin lateralidad).
 
 Nunca responde `5xx` por falta del asset vanilla real — cae automáticamente al placeholder (ver `docs/ARQUITECTURA.md`).
+
+### `GET /api/base-assets/zombie` (ticket 017)
+
+Misma forma de respuesta que arriba, pero con las 6 cajas del Zombie (verificadas contra `bedrock-samples` + el asset vanilla real — ver `docs/ARQUITECTURA.md`, "Ticket 017"). Dos diferencias reales respecto al Esqueleto, ninguna de forma/contrato:
+
+- `texture.width`/`texture.height` y `geometry.textureWidth`/`textureHeight` son **64×64** (no 64×32) — el `zombie.png` vanilla real es 64×64, con la mitad inferior (filas 32-63) completamente vacía/transparente (no usa overlays de sleeve/pants; confirmado empíricamente pixel a pixel).
+- `armRight`/`armLeft`/`legRight`/`legLeft` usan `size [4,12,4]` (brazos/piernas gruesos, tipo Steve) en vez de `[2,12,2]`; sus `position` NO son las mismas que las del Esqueleto reescaladas (`armRight.position.x = -6`, no `-5`; `legRight.position.x = -1.9`, no `-2` — offset asimétrico ya presente en la fuente oficial de Mojang, ver `docs/ARQUITECTURA.md`).
+
+```jsonc
+{
+  "texture": { "dataUrl": "data:image/png;base64,....", "width": 64, "height": 64, "isPlaceholder": false },
+  "geometry": {
+    "textureWidth": 64,
+    "textureHeight": 64,
+    "parts": {
+      "head":     { "size": [8, 8, 8],   "position": [0, 28, 0],    "uv": { "x": 0,  "y": 0 } },
+      "body":     { "size": [8, 12, 4],  "position": [0, 18, 0],    "uv": { "x": 16, "y": 16 } },
+      "armRight": { "size": [4, 12, 4],  "position": [-6, 18, 0],   "uv": { "x": 40, "y": 16 } },
+      "armLeft":  { "size": [4, 12, 4],  "position": [6, 18, 0],    "uv": { "x": 40, "y": 16 }, "mirrorX": true },
+      "legRight": { "size": [4, 12, 4],  "position": [-1.9, 6, 0],  "uv": { "x": 0,  "y": 16 } },
+      "legLeft":  { "size": [4, 12, 4],  "position": [1.9, 6, 0],   "uv": { "x": 0,  "y": 16 }, "mirrorX": true }
+    }
+  }
+}
+```
+
+(`faceLabels` de cada caja omitidos arriba por brevedad — mismo catálogo exacto que el Esqueleto, ver `backend/src/geometry/zombieGeometry.ts`.)
 
 ## `GET /*` (catch-all SPA)
 
