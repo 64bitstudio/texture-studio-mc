@@ -19,3 +19,12 @@ Sale de `docs/definiciones/multi-mob-y-proyectos-guardados.md` (HU-1, HU-2). Con
 
 ## Criterios de aceptación
 Ver HU-1 y HU-2 completas en la definición.
+
+## Hecho
+Implementado por el agente `fullstack-dev` (PR [#40](https://github.com/64bitstudio/texture-studio-mc/pull/40)). CI de Jenkins en verde a la primera, sin hallazgos del gate de QA automático.
+
+- `MobSelector` genérico (consume `GET /api/mobs`, sin ningún mob hardcodeado) + `App.tsx` orquestando el catálogo y un `bufferCache` (`Map<string, TextureBuffer>`) por mob visitado en la sesión.
+- `Editor` se remonta por mob (`key={mobId}`) — resetea intencionalmente estado de UI (zoom, historial, simetría, parte aislada) pero rescata el `TextureBuffer` del cache, no lo pierde.
+- Rename `Skeleton*`→`Mob*` en tipos del frontend (mismo criterio ya aplicado en el backend, ticket 016).
+- **Verificado en vivo contra el deploy real de DEV** (el orquestador repitió la verificación tras el merge, con `getImageData`): pinté `(1,2)` en Esqueleto → rojo exacto; cambié a Zombie (textura 64×64, placeholder esperado — asset real es el ticket 022), pinté `(8,11)` → rojo exacto; volví a Esqueleto y `getImageData(1,2)` siguió exactamente `(161,28,17,255)`, sin contaminación entre mobs.
+- Pendiente, explícitamente fuera de este ticket: guardado de proyectos (019), Araña/Creeper (020/021), asset real de Zombie en la VM (022).
