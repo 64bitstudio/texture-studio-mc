@@ -46,21 +46,23 @@ const SKELETON_GEOMETRY: MobGeometry = {
   parts: {
     head: { size: [8, 8, 8], position: [0, 28, 0], uv: { x: 0, y: 0 }, faceLabels: HEAD_FACE_LABELS },
     body: { size: [8, 12, 4], position: [0, 18, 0], uv: { x: 16, y: 16 }, faceLabels: BODY_FACE_LABELS },
-    armRight: { size: [2, 12, 2], position: [-5, 18, 0], uv: { x: 40, y: 16 }, faceLabels: ARM_FACE_LABELS },
+    armRight: { size: [2, 12, 2], position: [-5, 18, 0], uv: { x: 40, y: 16 }, faceLabels: ARM_FACE_LABELS, group: 'arm' },
     armLeft: {
       size: [2, 12, 2],
       position: [5, 18, 0],
       uv: { x: 40, y: 16 },
       mirrorX: true,
       faceLabels: ARM_FACE_LABELS,
+      group: 'arm',
     },
-    legRight: { size: [2, 12, 2], position: [-2, 6, 0], uv: { x: 0, y: 16 }, faceLabels: LEG_FACE_LABELS },
+    legRight: { size: [2, 12, 2], position: [-2, 6, 0], uv: { x: 0, y: 16 }, faceLabels: LEG_FACE_LABELS, group: 'leg' },
     legLeft: {
       size: [2, 12, 2],
       position: [2, 6, 0],
       uv: { x: 0, y: 16 },
       mirrorX: true,
       faceLabels: LEG_FACE_LABELS,
+      group: 'leg',
     },
   },
 };
@@ -165,5 +167,62 @@ describe('findRegionAtPixel / findRegionAt', () => {
     const region: NamedUVRegion | null = findRegionAt(point, regions);
     expect(region).toEqual(findRegionAtPixel(point.x, point.y, regions));
     expect(region?.label).toBe('Cara');
+  });
+});
+
+// Ticket 020: `MobGeometry.parts` se generalizo a `Record<string,
+// MobBoxPart>` (ya no las 6 claves fijas de un biped) para dar cabida a
+// la Araña -- 8 patas con NOMBRES distintos (`leg1Right`..`leg4Left`)
+// que comparten la MISMA region UV via `group: 'spiderLeg'` explicito
+// (reemplaza la tabla estatica `PART_GROUP_KEY` que antes asumia las 6
+// claves fijas). Este fixture no reproduce la Araña completa -- solo
+// verifica el mecanismo de dedupe generico con MAS de 2 partes
+// compartiendo un grupo (el biped solo prueba el caso de 2).
+describe('computeNamedRegions con un grupo de mas de 2 partes (group explicito, ticket 020)', () => {
+  const LEG_LABELS = {
+    front: 'Pata — Frente',
+    back: 'Pata — Atrás',
+    top: 'Pata — Superior',
+    bottom: 'Pata — Inferior',
+    left: 'Pata — Lateral',
+    right: 'Pata — Lateral',
+  };
+
+  const geometry: MobGeometry = {
+    textureWidth: 64,
+    textureHeight: 32,
+    parts: {
+      leg1: { size: [16, 2, 2], position: [-11, 9, -1], uv: { x: 18, y: 0 }, faceLabels: LEG_LABELS, group: 'spiderLeg' },
+      leg2: { size: [16, 2, 2], position: [11, 9, -1], uv: { x: 18, y: 0 }, mirrorX: true, faceLabels: LEG_LABELS, group: 'spiderLeg' },
+      leg3: { size: [16, 2, 2], position: [-11, 9, 0], uv: { x: 18, y: 0 }, faceLabels: LEG_LABELS, group: 'spiderLeg' },
+      leg4: { size: [16, 2, 2], position: [11, 9, 0], uv: { x: 18, y: 0 }, mirrorX: true, faceLabels: LEG_LABELS, group: 'spiderLeg' },
+    },
+  };
+
+  it('deduplica las 4 partes en solo 6 regiones (una por cara), no 24', () => {
+    const regions = computeNamedRegions(geometry);
+    expect(regions).toHaveLength(6);
+    const ids = regions.map((r) => r.id);
+    expect(new Set(ids).size).toBe(6);
+    expect(ids).toContain('spiderLeg.front');
+    expect(ids).not.toContain('leg1.front');
+  });
+
+  it('un pixel dentro de la region compartida resuelve al groupKey explicito', () => {
+    const regions = computeNamedRegions(geometry);
+    // uv (18,0), w=16,h=2,d=2 -> front = (20,2)-(36,4)
+    expect(findRegionAtPixel(25, 3, regions)?.groupKey).toBe('spiderLeg');
+  });
+
+  it('una parte SIN `group` explicito cae a su propia clave como groupKey (compatibilidad, ej. head/body)', () => {
+    const noGroupGeometry: MobGeometry = {
+      textureWidth: 64,
+      textureHeight: 32,
+      parts: {
+        thorax: { size: [6, 6, 6], position: [0, 9, 0], uv: { x: 0, y: 0 }, faceLabels: LEG_LABELS },
+      },
+    };
+    const regions = computeNamedRegions(noGroupGeometry);
+    expect(regions[0].groupKey).toBe('thorax');
   });
 });

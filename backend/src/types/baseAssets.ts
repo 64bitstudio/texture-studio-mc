@@ -79,6 +79,15 @@ export interface FaceLabels {
  * de fronteras). Ver docs/ARQUITECTURA.md, "Ticket 011", para el
  * catalogo completo y las decisiones no cubiertas literalmente por el
  * ticket (labels de brazo/pierna sin lateralidad, top/bottom de body).
+ *
+ * `group` (ticket 020): id estable para agrupar partes que comparten
+ * EXACTAMENTE la misma region UV (mismo `uv` + mismo `size`) -- ej. las
+ * 8 patas de la Araña, o `armRight`/`armLeft` del biped clasico.
+ * Opcional: si se omite, el propio nombre de la parte (la clave en
+ * `MobGeometry.parts`) es su grupo -- correcto para cualquier parte con
+ * region UV propia (cabeza, torso). Ver `frontend/src/regionLabels.ts`
+ * (`computeNamedRegions`) para donde se usa: dedupe de regiones
+ * identicas y agrupacion del selector "Aislar parte".
  */
 export interface MobBoxPart {
   size: [number, number, number];
@@ -86,25 +95,34 @@ export interface MobBoxPart {
   uv: BoxUvOrigin;
   mirrorX?: boolean;
   faceLabels: FaceLabels;
+  group?: string;
 }
 
 /**
- * Geometría completa de un mob biped de 6 cajas (Esqueleto, y el
- * Zombie del ticket 017 -- misma anatomía, ver el documento de
- * definición). Mobs con anatomía distinta (Araña, Creeper) definirán
- * su propia forma en su propio ticket -- no se asume de antemano.
+ * Geometría completa de un mob: un conjunto de cajas nombradas
+ * (`parts`), cada una con su tamaño/posicion/UV/`faceLabels` propios.
+ *
+ * TICKET 020 (generalizacion, ver docs/ARQUITECTURA.md "Ticket 020"):
+ * hasta el ticket 017 esta forma era la fija de un biped clasico de 6
+ * cajas (`head`/`body`/`armRight`/`armLeft`/`legRight`/`legLeft`) --
+ * ese comentario dejaba dicho explicitamente que Araña y Creeper, con
+ * anatomia distinta (la Araña no tiene brazos ni un unico segmento de
+ * torso, y tiene 8 patas), decidirian su propia forma en su propio
+ * ticket sin asumir nada de antemano. Esa decision es esta: `parts` es
+ * un diccionario de nombre-de-parte -> caja, de tamaño arbitrario. El
+ * Esqueleto y el Zombie (`classicBipedGeometry.ts`) siguen usando
+ * exactamente las mismas 6 claves de siempre -- este es un
+ * ENSANCHAMIENTO del contrato (cualquier consumidor que ya iteraba
+ * `Object.values(geometry.parts)`/`Object.keys(geometry.parts)`
+ * generica sigue funcionando sin cambios, ver `symmetry.ts`), no una
+ * ruptura de los dos mobs existentes -- confirmado corriendo la
+ * suite de tests completa (`backend/test/baseAssets.spec.ts` sigue
+ * accediendo a `parts.armRight` etc. por nombre, valido con `Record<string, MobBoxPart>`).
  */
 export interface MobGeometry {
   textureWidth: number;
   textureHeight: number;
-  parts: {
-    head: MobBoxPart;
-    body: MobBoxPart;
-    armRight: MobBoxPart;
-    armLeft: MobBoxPart;
-    legRight: MobBoxPart;
-    legLeft: MobBoxPart;
-  };
+  parts: Record<string, MobBoxPart>;
 }
 
 export interface MobTexture {

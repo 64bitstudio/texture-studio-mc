@@ -28,6 +28,15 @@ import type { FaceLabels, MobGeometry } from '../types/baseAssets.js';
 // frontend replica ese mismo comportamiento (ver
 // `frontend/src/geometry/applyBoxUV.ts`).
 //
+// `group` (ticket 020): antes de este ticket, `armRight`/`armLeft` y
+// `legRight`/`legLeft` se agrupaban via una tabla estatica aparte
+// (`PART_GROUP_KEY` en `frontend/src/regionLabels.ts`) que asumia las 6
+// claves fijas de un biped. Con `MobGeometry.parts` generalizado a
+// `Record<string, MobBoxPart>` para dar cabida a la Araña (8 patas
+// compartiendo una sola region UV), esa tabla estatica ya no puede
+// cubrir cualquier mob futuro -- se reemplaza por este campo explicito
+// por parte, mismo dato, sin tabla aparte que mantener sincronizada.
+//
 // Convencion `left`/`right` de `faceLabels` (ticket 011): lado ANATOMICO
 // del personaje (izquierdo/derecho), no pantalla-izquierda/derecha. Como
 // el personaje esta de frente a la camara, la cara `right` (+x,
@@ -115,6 +124,7 @@ export function buildClassicBipedGeometry(textureHeight: number, limbs: ClassicB
         position: [-armOffsetX, 18, 0],
         uv: { x: 40, y: 16 },
         faceLabels: ARM_FACE_LABELS,
+        group: 'arm',
       },
       armLeft: {
         size,
@@ -122,12 +132,14 @@ export function buildClassicBipedGeometry(textureHeight: number, limbs: ClassicB
         uv: { x: 40, y: 16 },
         mirrorX: true,
         faceLabels: ARM_FACE_LABELS,
+        group: 'arm',
       },
       legRight: {
         size,
         position: [-legOffsetX, 6, 0],
         uv: { x: 0, y: 16 },
         faceLabels: LEG_FACE_LABELS,
+        group: 'leg',
       },
       legLeft: {
         size,
@@ -135,6 +147,7 @@ export function buildClassicBipedGeometry(textureHeight: number, limbs: ClassicB
         uv: { x: 0, y: 16 },
         mirrorX: true,
         faceLabels: LEG_FACE_LABELS,
+        group: 'leg',
       },
     },
   };

@@ -148,4 +148,74 @@ describe('GET /api/base-assets/:mobId', () => {
       expect(legRight.faceLabels.front).not.toMatch(/derech|izquierd/i);
     });
   });
+
+  // La Araña (ticket 020) NO es un biped clasico -- no tiene brazos, y
+  // tiene 8 patas en vez de 2 piernas, todas compartiendo la MISMA
+  // region UV (ni siquiera derecho/izquierdo separados como
+  // armRight/legRight). No cabe en `CLASSIC_BIPED_FIXTURES`, tiene su
+  // propio bloque. Valores verificados contra
+  // `Mojang/bedrock-samples/spider.geo.json` + el asset vanilla real
+  // cacheado -- ver `backend/src/geometry/spiderGeometry.ts` para la
+  // investigacion completa.
+  describe('spider (anatomia no-biped, ticket 020)', () => {
+    it('responde con textura 64x32 y las 3 cajas de cuerpo (cabeza/torax/abdomen) correctas', async () => {
+      const app = createApp();
+      const res = await request(app).get('/api/base-assets/spider');
+
+      expect(res.status).toBe(200);
+      expect(res.body.texture.width).toBe(64);
+      expect(res.body.texture.height).toBe(32);
+      expect(res.body.geometry.textureWidth).toBe(64);
+      expect(res.body.geometry.textureHeight).toBe(32);
+
+      const { head, thorax, abdomen } = res.body.geometry.parts;
+      expect(head.size).toEqual([8, 8, 8]);
+      expect(head.position).toEqual([0, 9, -7]);
+      expect(head.uv).toEqual({ x: 32, y: 4 });
+      expect(thorax.size).toEqual([6, 6, 6]);
+      expect(thorax.position).toEqual([0, 9, 0]);
+      expect(thorax.uv).toEqual({ x: 0, y: 0 });
+      expect(abdomen.size).toEqual([10, 8, 12]);
+      expect(abdomen.position).toEqual([0, 9, 9]);
+      expect(abdomen.uv).toEqual({ x: 0, y: 12 });
+    });
+
+    it('tiene 8 patas, todas del mismo tamaño y compartiendo el mismo UV -- 4 pares mirror derecho/izquierdo', async () => {
+      const app = createApp();
+      const res = await request(app).get('/api/base-assets/spider');
+      const { parts } = res.body.geometry;
+
+      const legKeys = Object.keys(parts).filter((k) => k.startsWith('leg'));
+      expect(legKeys).toHaveLength(8);
+
+      for (const key of legKeys) {
+        expect(parts[key].size).toEqual([16, 2, 2]);
+        expect(parts[key].uv).toEqual({ x: 18, y: 0 });
+        expect(parts[key].group).toBe('spiderLeg');
+        // Lado anatomico derecho (x<0) sin mirror; izquierdo (x>0) con mirror.
+        if (parts[key].position[0] < 0) {
+          expect(parts[key].mirrorX).toBeFalsy();
+        } else {
+          expect(parts[key].mirrorX).toBe(true);
+        }
+      }
+
+      // 4 pares unicos en z (uno por cada "Right"/"Left").
+      const zValues = new Set(legKeys.map((k) => parts[k].position[2]));
+      expect(zValues.size).toBe(4);
+    });
+
+    it('las 8 patas comparten faceLabels identicos y sin lateralidad', async () => {
+      const app = createApp();
+      const res = await request(app).get('/api/base-assets/spider');
+      const { parts } = res.body.geometry;
+      const legKeys = Object.keys(parts).filter((k) => k.startsWith('leg'));
+
+      const firstLabels = parts[legKeys[0]].faceLabels;
+      for (const key of legKeys) {
+        expect(parts[key].faceLabels).toEqual(firstLabels);
+      }
+      expect(firstLabels.front).not.toMatch(/derech|izquierd/i);
+    });
+  });
 });

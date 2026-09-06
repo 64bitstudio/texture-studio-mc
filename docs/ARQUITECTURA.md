@@ -725,3 +725,44 @@ Con `backend`+`frontend` corriendo en local (`vanilla-assets/zombie.png` present
 
 - `npm run lint`, `npm test` (121 tests en verde, sin ninguno nuevo agregado por este ticket -- los cambios de este ticket son de composición de componentes/estado de React, mismo criterio de "no mockear canvas/fetch/DOM para este nivel" ya aplicado a `App.tsx`/`Editor.tsx` desde el ticket 001), `npm run build` -- los tres en verde en `frontend/`.
 - Cero cambios en `backend/` -- este ticket es 100% frontend, consumiendo el contrato ya generalizado por los tickets 016/017 sin ninguna modificación.
+
+## Ticket 020 -- Investigacion y geometria de la Araña (primera anatomia no-biped)
+
+### Investigacion (regla permanente del equipo, ver memoria `texture-studio-mc-metodologia-mobs`)
+
+Igual que el Zombie (ticket 017), pero sin poder reusar `classicBipedGeometry.ts` -- la Araña no tiene brazos, tiene cabeza+tórax+abdomen (3 segmentos, no cabeza+torso) y 8 patas en vez de 2 piernas. Investigada desde cero:
+
+1. **Fuente oficial**: fetch real de `Mojang/bedrock-samples/resource_pack/models/entity/spider.geo.json` (rama `main`). `texturewidth`/`textureheight` = 64x32 (formato clasico, sin mitad extra como el Zombie). 3 cajas de cuerpo (`body0`=tórax, `head`, `body1`=abdomen) + 8 patas (`leg0`..`leg7`), TODAS las patas con el MISMO `size [16,2,2]` y el MISMO `uv [18,0]` -- ni siquiera lado derecho/izquierdo separado como en el biped, las 8 comparten una unica region UV. `mirror: true` en 4 de ellas (lado anatomico izquierdo).
+2. **Verificacion empirica**: mapa de luminancia/alpha pixel a pixel contra `~/tools/minecraft-texture-pack/vanilla-cache/spider.png` (64x32 confirmado), cruzado contra el rectangulo UV "cross" que predice cada caja -- coincide EXACTAMENTE en las 4 filas clave revisadas (fila 0, fila 2, filas 12-23, fila 24). Ver el comentario completo en `backend/src/geometry/spiderGeometry.ts` para el detalle fila por fila.
+3. **Hallazgo relevante**: una nota heredada en `docs/ARQUITECTURA.md` (pipeline `minecraft-texture-pack`, de otro proyecto) decia "cabeza+cuerpo en y0-23, patas en y24-31" -- el ticket pedia explicitamente NO darla por sentada. Es **incorrecta**: las patas estan en las filas 0-3 (no 24-31), y las filas 24-31 son el abdomen. Verificado, no asumido.
+
+### Decision de arquitectura: `MobGeometry.parts` generalizado de 6 claves fijas a `Record<string, MobBoxPart>`
+
+Antes de este ticket, tanto `backend/src/types/baseAssets.ts` como su espejo en frontend fijaban la forma de `parts` a exactamente `head/body/armRight/armLeft/legRight/legLeft` -- el propio comentario de ese tipo (ticket 016) decia explicitamente que Araña y Creeper decidirian su propia forma en su propio ticket, sin asumir nada de antemano. Esa decision es la de este ticket:
+
+- `MobGeometry.parts` pasa a ser `Record<string, MobBoxPart>` -- cualquier conjunto de cajas con nombre arbitrario. El Esqueleto y el Zombie siguen usando las mismas 6 claves de siempre sin ningun cambio de comportamiento (es un ENSANCHAMIENTO del contrato, no una ruptura -- confirmado corriendo toda la suite existente sin tocarla, salvo el fixture propio de `regionLabels.spec.ts` que necesito el nuevo campo `group`, ver abajo).
+- Se agrega `group?: string` a `MobBoxPart`: reemplaza la tabla estatica `PART_GROUP_KEY` que antes vivia en `frontend/src/regionLabels.ts` (hardcodeada a las 6 claves fijas del biped) para dedupear partes que comparten la MISMA region UV. Ahora cada parte declara su propio grupo explicitamente (`armRight`/`armLeft` -> `group: 'arm'`; las 8 patas de la Araña -> `group: 'spiderLeg'`); si se omite, el nombre de la propia parte es su grupo (correcto para cabeza/tórax/abdomen, cada una con su propia region UV). `computeNamedRegions` (`regionLabels.ts`) y el selector "Aislar parte" (`PartIsolationControls.tsx`, ya generico) no necesitaron ningun otro cambio.
+- Esta decision SI es un cambio al contrato de datos interno (`MobGeometry`), señalado aqui explicitamente por regla 9 del equipo -- no rompe a ningun consumidor existente (Esqueleto/Zombie no cambian su forma real, solo el TIPO se volvio mas permisivo), verificado con la suite completa (backend + frontend) en verde.
+
+### Nomenclatura de partes de la Araña
+
+`head`, `thorax` (body0 del .geo.json oficial), `abdomen` (body1), y `leg1Right`/`leg1Left` .. `leg4Right`/`leg4Left` (1 = par mas cercano a la cabeza, 4 = par mas cercano al abdomen segun su `origin.z` real -- no el mismo orden que el indice `legN` del archivo oficial, que no sigue un orden espacial obvio). "Right"/"Left" = lado ANATOMICO del personaje (mismo criterio que `armRight`/`legRight` del biped: x negativo = derecho).
+
+### Hallazgo visual: las 8 patas se ven "amontonadas" en el visor 3D (esperado, no es un bug)
+
+Verificado en vivo (`npm run dev` local, backend apuntando a `vanilla-assets/spider.png` copiado de la cache): el modelo carga, la textura real se aplica correctamente (ojos rojos de la cabeza visibles, patron del abdomen correcto), y la silueta es razonablemente reconocible como araña (cuerpo segmentado + cabeza con ojos + patas laterales). PERO las 8 patas, al diferir solo 1 unidad entre si en `origin.z` (ver arriba), se ven visualmente amontonadas/superpuestas en vez de un abanico de 8 patas separadas.
+
+Esto es fiel al archivo `.geo.json` oficial, no un error de esta implementacion: Mojang guarda ahi la pose "bind" (sin animar) de la Araña, y el abanico de patas que se ve en el juego real es producto de rotaciones aplicadas por CODIGO del renderer de la entidad en tiempo de ejecucion (Java `SpiderModel.setupAnim`), valores que NO estan publicados en `bedrock-samples` ni en ningun archivo estatico verificable. `MobBoxPart` de este proyecto no tiene (todavia) un campo de rotacion -- agregarlo e inventar angulos de "pose de reposo" sin una fuente verificable habria violado la regla permanente de "investigar, nunca asumir" que el propio Product Owner establecio para este proyecto. Se documenta aqui como limitacion conocida en vez de ocultarla -- si se decide en el futuro que el visor necesita patas visualmente separadas, es un ticket aparte con su propia investigacion (o una decision explicita del Product Owner de aceptar una pose inventada, no derivada de una fuente oficial).
+
+### Mejora generalizada (hallazgo durante la implementacion, no pedido literalmente por el ticket): `Viewer3D` calcula su `target` de camara del bounding box real
+
+`OrbitControls target={[0, 16, 0]}` era un valor FIJO, correcto solo por coincidencia para el biped clasico (pies en y=0, cabeza hasta y=32, centro real = 16). La Araña, mucho mas pequeña y centrada en otra altura/profundidad, quedaria mirando a un punto lejos de su propio modelo con ese valor fijo. Se agrega `frontend/src/geometry/geometryBounds.ts` (`computeGeometryCenter`, puro, con tests) que deriva el centro real del bounding box de CUALQUIER `MobGeometry` -- confirmado que para Esqueleto/Zombie devuelve exactamente `[0, 16, 0]` (sin regresion visual), y para la Araña centra la camara correctamente en su propio modelo. Beneficia automaticamente a cualquier mob futuro (Creeper, ticket 021) sin tener que tocar `Viewer3D.tsx` de nuevo.
+
+### Asset vanilla real para desarrollo local
+
+`~/tools/minecraft-texture-pack/vanilla-cache/spider.png` (ya cacheado, 64x32) copiado a `backend/vanilla-assets/spider.png` (no versionado, mismo mecanismo que Zombie) para desarrollo/pruebas locales. El despliegue del asset real a la VM (DEV/QA/PROD) es responsabilidad del ticket 022, junto con Zombie y Creeper.
+
+### Verificación
+
+- `npm run lint`, `npm test`, `npm run build` en verde en `backend/` y `frontend/` (suite completa, incluyendo tests nuevos: `backend/test/baseAssets.spec.ts` con bloque dedicado para `spider`, `frontend/test/regionLabels.spec.ts` con el caso de dedupe de mas de 2 partes por `group`, `frontend/test/geometryBounds.spec.ts` nuevo).
+- En vivo (local, `npm run dev`): `GET /api/base-assets/spider` responde `isPlaceholder: false` con las 11 partes esperadas (`head`, `thorax`, `abdomen`, `leg1Right`..`leg4Left`); el selector de mob muestra "Araña"; el editor 2D muestra la textura real con las cajas UV correctamente delimitadas (cabeza, tórax, patas, abdomen, sin solapamientos); el visor 3D carga el modelo con la textura real aplicada (ver hallazgo de patas amontonadas arriba).

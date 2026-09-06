@@ -29,15 +29,18 @@ Respuesta `200`:
 {
   "mobs": [
     { "id": "skeleton", "label": "Esqueleto" },
-    { "id": "zombie", "label": "Zombie" }
-    // Araña/Creeper se agregan en sus propios tickets (020/021).
+    { "id": "zombie", "label": "Zombie" },
+    { "id": "spider", "label": "Araña" } // ticket 020
+    // Creeper se agrega en su propio ticket (021).
   ]
 }
 ```
 
 ## `GET /api/base-assets/:mobId`
 
-Generaliza el endpoint literal `GET /api/base-assets/skeleton` del ticket 001 (ticket 016) — ver `docs/ARQUITECTURA.md` ("Contrato de `GET /api/base-assets/:mobId`") para la decisión de diseño. `mobId` es cualquier `id` del catálogo de `GET /api/mobs` (`"skeleton"` o `"zombie"` por ahora).
+Generaliza el endpoint literal `GET /api/base-assets/skeleton` del ticket 001 (ticket 016) — ver `docs/ARQUITECTURA.md` ("Contrato de `GET /api/base-assets/:mobId`") para la decisión de diseño. `mobId` es cualquier `id` del catálogo de `GET /api/mobs` (`"skeleton"`, `"zombie"` o `"spider"` por ahora).
+
+> **Ticket 020 — ensanchamiento de contrato (aditivo, no rompe compatibilidad con Esqueleto/Zombie):** `geometry.parts` deja de ser un objeto con exactamente las 6 claves `head`/`body`/`armRight`/`armLeft`/`legRight`/`legLeft` y pasa a ser un diccionario de nombre-de-parte → caja de **tamaño arbitrario**, necesario para dar cabida a la Araña (cabeza+tórax+abdomen+8 patas, sin brazos). Esqueleto y Zombie siguen devolviendo exactamente las mismas 6 claves de siempre, sin ningún cambio. Cada caja también puede traer un campo nuevo opcional `group` (mismo criterio que `mirrorX`/`faceLabels`: úsalo para saber qué partes comparten la misma región UV — ver el ejemplo de la Araña más abajo, donde las 8 patas comparten `group: "spiderLeg"`). Ver `docs/ARQUITECTURA.md`, "Ticket 020", para la justificación completa.
 
 Respuesta `404` si `mobId` no existe en el registro:
 
@@ -105,6 +108,32 @@ Misma forma de respuesta que arriba, pero con las 6 cajas del Zombie (verificada
 ```
 
 (`faceLabels` de cada caja omitidos arriba por brevedad — mismo catálogo exacto que el Esqueleto, ver `backend/src/geometry/zombieGeometry.ts`.)
+
+### `GET /api/base-assets/spider` (ticket 020)
+
+Primera anatomía NO-biped del catálogo: 3 cajas de cuerpo (`head`, `thorax`, `abdomen` — sin `body` genérico ni brazos) + 8 patas, todas compartiendo `size`/`uv` (y por eso el mismo `group`). Verificado contra `bedrock-samples` + el asset vanilla real — ver `docs/ARQUITECTURA.md`, "Ticket 020".
+
+```jsonc
+{
+  "texture": { "dataUrl": "data:image/png;base64,....", "width": 64, "height": 32, "isPlaceholder": false },
+  "geometry": {
+    "textureWidth": 64,
+    "textureHeight": 32,
+    "parts": {
+      "head":      { "size": [8, 8, 8],    "position": [0, 9, -7], "uv": { "x": 32, "y": 4 } },
+      "thorax":    { "size": [6, 6, 6],    "position": [0, 9, 0],  "uv": { "x": 0,  "y": 0 } },
+      "abdomen":   { "size": [10, 8, 12],  "position": [0, 9, 9],  "uv": { "x": 0,  "y": 12 } },
+      "leg1Right": { "size": [16, 2, 2],   "position": [-11, 9, -1], "uv": { "x": 18, "y": 0 }, "group": "spiderLeg" },
+      "leg1Left":  { "size": [16, 2, 2],   "position": [11, 9, -1],  "uv": { "x": 18, "y": 0 }, "mirrorX": true, "group": "spiderLeg" }
+      // leg2Right/Left .. leg4Right/Left: mismo size/uv/group, solo cambia `position.z` (ver spiderGeometry.ts).
+    }
+  }
+}
+```
+
+- Ningún campo `body`/`armRight`/`armLeft`/`legRight`/`legLeft` — anatomía distinta, ver el ensanchamiento de contrato arriba.
+- Las 8 patas comparten `group: "spiderLeg"`: pintar la región UV de una pata en el editor pinta las 8 a la vez (mismo comportamiento que `armRight`/`armLeft` en el biped, solo que con 8 partes en vez de 2 compartiendo el grupo).
+- `faceLabels` de cada caja (omitidos arriba por brevedad): prefijados por parte (`"Tórax — Frente"`, `"Abdomen — Frente"`, `"Pata — Frente"`, sin lateralidad en las patas) para que el selector "Aislar parte" no muestre dos regiones distintas con el mismo nombre "Frente" — ver `backend/src/geometry/spiderGeometry.ts`.
 
 ## `GET /*` (catch-all SPA)
 
