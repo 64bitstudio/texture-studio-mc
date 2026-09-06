@@ -122,7 +122,33 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
   useEffect(() => {
     bufferCache.set(mobId, buffer);
   }, [bufferCache, mobId, buffer]);
-  const [resolution, setResolutionState] = useState(RESOLUTION_DEFAULT);
+
+  // FIX (ticket 019, encontrado al implementar HU-4 "misma resolucion de
+  // trabajo" -- bug latente desde el ticket 018, nunca antes ejercitado
+  // porque su QA en vivo no combino "cambiar de resolucion" con "cambiar
+  // de mob y volver"): `resolution` arrancaba SIEMPRE en
+  // `RESOLUTION_DEFAULT` (x1) sin importar el tamaño real del buffer
+  // recuperado de `bufferCache` -- si un buffer cacheado (de una visita
+  // anterior al mob, o de un proyecto recien cargado, ver
+  // `App.tsx`/`ProjectControls.tsx`) tenia una resolucion de trabajo
+  // distinta de x1, `resolution` quedaba DESINCRONIZADO del tamaño real
+  // del buffer. Como `uvBoxes`/`namedRegions` (mas abajo) se escalan por
+  // `resolution`, no por `buffer.width`, esto rompia silenciosamente la
+  // simetria, el aislamiento de partes y -- mas grave -- el masking de
+  // exportacion (ticket 015): `encodeBufferToPngBlob` habria recibido
+  // cajas UV a escala x1 contra un buffer x4, tratando la mayor parte
+  // del lienzo como "fuera de cualquier caja UV" y forzandolo a
+  // alpha=0 en la exportacion. Fix: se deriva la resolucion inicial de
+  // la razon `buffer.width / baseTexture.width` (misma tecnica exacta
+  // que usa `handleResolutionChange` mas abajo para construir buffers
+  // nuevos) cuando el buffer viene de la cache -- mismo patron de lazy
+  // initial state que `hadCachedBuffer`/`buffer` arriba, para leerlo UNA
+  // sola vez al montar.
+  const [resolution, setResolutionState] = useState(() => {
+    const cached = bufferCache.get(mobId);
+    if (!cached) return RESOLUTION_DEFAULT;
+    return clampResolutionMultiplier(cached.width / baseTexture.width);
+  });
   const [version, setVersion] = useState(0);
   const [color, setColor] = useState(DEFAULT_COLOR);
   const [initError, setInitError] = useState<string | null>(null);

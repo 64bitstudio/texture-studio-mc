@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Editor } from './components/Editor';
 import { MobSelector } from './components/MobSelector';
+import { ProjectControls } from './components/ProjectControls';
 import { fetchMobBaseAssets } from './api/baseAssets';
 import { fetchMobs } from './api/mobs';
-import type { MobBaseAssetsResponse } from './types/baseAssets';
+import type { MobBaseAssetsResponse, MobGeometry } from './types/baseAssets';
 import type { MobSummary } from './types/mobs';
 import { TextureBuffer } from './textureBuffer';
 
@@ -54,6 +55,29 @@ function App() {
   // guardado de proyectos es el ticket 019.
   const [bufferCache] = useState(() => new Map<string, TextureBuffer>());
 
+  // Ticket 019 (guardado de proyectos): geometria por mob VISITADO en la
+  // sesion, en el mismo `useState` perezoso + mutacion in-place que
+  // `bufferCache` de arriba (mismo criterio: nunca leer un `ref` durante
+  // el render). Necesaria SOLO al guardar un proyecto -- para escalar
+  // `uvBoxes` correctamente al codificar el PNG de CADA mob cacheado
+  // (ticket 015, `maskPixelsOutsideUVBoxes` via `encodeBufferToPngBlob`),
+  // no solo el mob actualmente activo (ver `projectSnapshot.ts`). Se
+  // puebla en el efecto de fetch del asset de abajo, SIEMPRE antes de
+  // que `Editor` pueda llegar a escribir el buffer correspondiente en
+  // `bufferCache` (el propio `Editor` de ese mob todavia ni se monto en
+  // ese punto) -- invariante: todo mobId presente en `bufferCache` tiene
+  // su geometria ya en `geometryCache`.
+  const [geometryCache] = useState(() => new Map<string, MobGeometry>());
+
+  // Ticket 019: se incrementa cada vez que un proyecto cargado incluye
+  // al mob ACTUALMENTE seleccionado, para forzar el remount de `Editor`
+  // (ver `key` mas abajo) y que recoja de inmediato el buffer recien
+  // restaurado desde `bufferCache` -- mismo mecanismo de "remount +
+  // lectura perezosa desde la cache" que ya usa el cambio de mob del
+  // ticket 018, sin inventar una segunda forma de sincronizar `Editor`
+  // con un cambio externo al `Map`.
+  const [loadGeneration, setLoadGeneration] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -87,7 +111,14 @@ function App() {
 
     fetchMobBaseAssets(selectedMobId)
       .then((data) => {
-        if (!cancelled) setAssetState({ status: 'ready', data });
+        if (!cancelled) {
+          setAssetState({ status: 'ready', data });
+          // Ticket 019: registrado ANTES de que `Editor` de este mob
+          // pueda montarse (el render de `Editor` depende de
+          // `assetState.status === 'ready'`, que recien se setea en la
+          // linea de arriba) -- ver comentario de `geometryCache`.
+          geometryCache.set(selectedMobId, data.geometry);
+        }
       })
       .catch((err: unknown) => {
         if (!cancelled) {
@@ -99,7 +130,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedMobId, assetRetryCount]);
+  }, [selectedMobId, assetRetryCount, geometryCache]);
 
   function handleRetryMobs() {
     setMobsState({ status: 'loading' });
@@ -115,6 +146,25 @@ function App() {
     if (mobId === selectedMobId) return;
     setAssetState({ status: 'loading' });
     setSelectedMobIdOverride(mobId);
+  }
+
+  // Ticket 019 (HU-4, "el mob actualmente activo se actualiza de
+  // inmediato"): `ProjectControls` ya dejo el buffer restaurado de cada
+  // mob del proyecto en `bufferCache` (mutacion directa del `Map`,
+  // ver `ProjectControls.tsx`) ANTES de llamar a este callback -- si el
+  // mob ACTUALMENTE seleccionado esta entre los recien restaurados, se
+  // fuerza el remount de `Editor` (bump de `loadGeneration`, ver `key`
+  // mas abajo) para que recoja de inmediato el buffer nuevo. Si no esta
+  // entre ellos, no hace falta remontar nada -- ese buffer ya quedo
+  // disponible en `bufferCache` para cuando el usuario lo seleccione
+  // despues (mismo mecanismo de "cache por mob visitado" del ticket
+  // 018), y forzar un remount igual solo resetearia sin necesidad el
+  // zoom/historial/simetria del mob activo, que el proyecto cargado ni
+  // siquiera toco.
+  function handleProjectLoaded(loadedMobIds: string[]) {
+    if (selectedMobId !== null && loadedMobIds.includes(selectedMobId)) {
+      setLoadGeneration((g) => g + 1);
+    }
   }
 
   const selectedMobLabel =
@@ -157,6 +207,22 @@ function App() {
         )}
       </header>
 
+      {/* Ticket 019 (HU-3/HU-4/HU-5): fila propia, hermana del header --
+          un proyecto agrupa VARIOS mobs a la vez (no es un control por
+          mob), y debe seguir visible sin importar cual mob este activo
+          en cada momento (ver `ProjectControls.tsx`). */}
+      {mobsState.status === 'ready' && (
+        <div
+          style={{
+            flexShrink: 0,
+            padding: '8px 16px',
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+          }}
+        >
+          <ProjectControls bufferCache={bufferCache} geometryCache={geometryCache} onProjectLoaded={handleProjectLoaded} />
+        </div>
+      )}
+
       <div style={{ flex: 1, minHeight: 0 }}>
         {mobsState.status === 'loading' && (
           <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%' }}>
@@ -189,17 +255,26 @@ function App() {
         )}
 
         {mobsState.status === 'ready' && selectedMobId && assetState.status === 'ready' && selectedMobLabel && (
-          // `key={selectedMobId}` remonta `Editor` por completo al cambiar
-          // de mob (ticket 018) -- todo su estado interno (zoom, historial,
-          // simetria, parte aislada, panel de importar/pegar, etc.) se
-          // resetea a los defaults de una sesion nueva, EXCEPTO el
-          // `TextureBuffer` de pixeles, que `Editor` recupera de
-          // `bufferCache` si ya existe para este mob (ver `Editor.tsx`/
-          // `docs/ARQUITECTURA.md`, "Ticket 018") -- es la unica pieza de
-          // estado que el ticket exige preservar entre visitas al mismo
-          // mob dentro de la sesion.
+          // `key={selectedMobId}-{loadGeneration}` remonta `Editor` por
+          // completo al cambiar de mob (ticket 018) -- todo su estado
+          // interno (zoom, historial, simetria, parte aislada, panel de
+          // importar/pegar, etc.) se resetea a los defaults de una
+          // sesion nueva, EXCEPTO el `TextureBuffer` de pixeles, que
+          // `Editor` recupera de `bufferCache` si ya existe para este
+          // mob (ver `Editor.tsx`/`docs/ARQUITECTURA.md`, "Ticket 018")
+          // -- es la unica pieza de estado que el ticket exige preservar
+          // entre visitas al mismo mob dentro de la sesion.
+          //
+          // `loadGeneration` (ticket 019) forma parte de la `key` para
+          // que cargar un proyecto que incluye al mob ACTIVO tambien
+          // fuerce este mismo remount -- sin este segundo componente de
+          // la key, `Editor` seguiria montado con su `buffer` viejo (el
+          // `useState` inicial de `buffer` solo lee `bufferCache` en el
+          // MONTAJE, nunca de nuevo) pese a que `ProjectControls` ya
+          // dejo el buffer restaurado en la cache (ver
+          // `handleProjectLoaded` arriba).
           <Editor
-            key={selectedMobId}
+            key={`${selectedMobId}-${loadGeneration}`}
             data={assetState.data}
             mobId={selectedMobId}
             mobLabel={selectedMobLabel}
