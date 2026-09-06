@@ -1225,3 +1225,7 @@ Se sembró un proyecto de 3 mobs ("Set Nether QA 044": Esqueleto=rojo, Zombie=ve
 - Se confirmó además que el editor ya no muestra ningún botón de zip de un solo mob (`find` sobre la página: único match "Exportar PNG").
 
 `npm run lint`, `npm test` (197 -- 9 tests nuevos en `exportPack.spec.ts` cubriendo `entityTexturePngPath`, `buildResourcePackFiles` multi-mob, `dataUrlToBytes`, `projectZipFilename`), `npm run build` en verde.
+
+### Hallazgo de QA (falso positivo, PR #72) -- tercera repetición del mismo patrón
+
+El gate `🔍 QA Review (auto)` volvió a marcar "&lt;img&gt; sin atributo alt". `gh pr diff 72 --patch | grep -n "<img"` mostró que TODAS las apariciones de `<img>` en el diff caen dentro de prosa de `docs/ARQUITECTURA.md`/`docs/COMPONENTES.md` (citando el hallazgo del ticket 043 y describiendo la miniatura de `Proyecto.tsx`) -- el `<img>` real de `Proyecto.tsx` (la miniatura del mob, con `alt` correcto desde el ticket 041) NO forma parte de ningún hunk modificado en este PR (`Proyecto.tsx` solo cambió las líneas del botón de exportar/el nuevo `handleExportProject`, confirmado revisando los rangos `@@` del diff). Mismo patrón que los falsos positivos ya documentados en los tickets 042 (PR #70) y 043 (PR #71) -- tercera repetición exacta, refuerza que el bug del gate (reportado una vez, ticket 042) sigue sin corregirse. Confirmado falso positivo por inspección directa del diff antes de mergear.
