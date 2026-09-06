@@ -203,6 +203,74 @@ export function IconX(props: IconProps) {
   );
 }
 
+/** "Buscar proyectos" (Mis proyectos, ticket 053) -- trazo fino, confirmado contra la referencia (lupa simple, sin relleno). */
+export function IconSearch(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <circle cx={10.5} cy={10.5} r={6.5} />
+      <path d="m20 20-4.8-4.8" />
+    </LineIcon>
+  );
+}
+
+/**
+ * Menú de acciones "⋮" de una tarjeta de proyecto (Mis proyectos, ticket
+ * 053) -- 3 puntos RELLENOS apilados, confirmado contra la referencia
+ * (recorte ampliado: puntos sólidos, no un trazo).
+ */
+export function IconDots(props: IconProps) {
+  return (
+    <FilledIcon {...props}>
+      <circle cx={12} cy={5.5} r={1.9} />
+      <circle cx={12} cy={12} r={1.9} />
+      <circle cx={12} cy={18.5} r={1.9} />
+    </FilledIcon>
+  );
+}
+
+/**
+ * Vista de cuadrícula (toggle grid/lista, Mis proyectos, ticket 053) --
+ * 4 cuadrados RELLENOS con esquinas redondeadas, confirmado contra la
+ * referencia.
+ */
+export function IconGridView(props: IconProps) {
+  return (
+    <FilledIcon {...props}>
+      <rect x={3} y={3} width={8} height={8} rx={1.8} />
+      <rect x={13} y={3} width={8} height={8} rx={1.8} />
+      <rect x={3} y={13} width={8} height={8} rx={1.8} />
+      <rect x={13} y={13} width={8} height={8} rx={1.8} />
+    </FilledIcon>
+  );
+}
+
+/**
+ * Vista de lista (toggle grid/lista, Mis proyectos, ticket 053) -- trazo
+ * fino, 3 filas de "punto + línea", confirmado contra la referencia.
+ */
+export function IconListView(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <circle cx={4.5} cy={6} r={1} fill="currentColor" stroke="none" />
+      <path d="M9 6h11" />
+      <circle cx={4.5} cy={12} r={1} fill="currentColor" stroke="none" />
+      <path d="M9 12h11" />
+      <circle cx={4.5} cy={18} r={1} fill="currentColor" stroke="none" />
+      <path d="M9 18h11" />
+    </LineIcon>
+  );
+}
+
+/** Botón "Editar" de una tarjeta de proyecto (Mis proyectos, ticket 053) -- lápiz de trazo fino, confirmado contra la referencia. */
+export function IconPencil(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="M4 20 4.6 16.3 15 5.9a1.6 1.6 0 0 1 2.3 0l0.8 0.8a1.6 1.6 0 0 1 0 2.3L7.7 19.4Z" />
+      <path d="m13.5 7.4 3.1 3.1" />
+    </LineIcon>
+  );
+}
+
 /**
  * Logo pixel-art de bloque de pasto -- REEMPLAZADO en la revisión 2 de
  * este ticket por el PNG real que mandó Marco (`assets/brand/logo.png`,

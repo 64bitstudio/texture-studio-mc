@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Button } from './Button';
+import { Button, type ButtonProps } from './Button';
 import { getNextMenuItemIndex } from './menuNavigation';
 
 export interface MenuItem {
@@ -29,6 +29,21 @@ export interface MenuProps {
    * Escape o click afuera.
    */
   children?: ReactNode;
+  /**
+   * Variant del `Button` disparador (ticket 053, aditivo -- default
+   * `undefined` deja el comportamiento previo intacto, `Button` ya cae a
+   * `'secondary'` por su propio default). Primer caso real: el menú "⋮"
+   * de cada tarjeta de "Mis proyectos" necesita verse compacto
+   * (`'icon-square'`, mismo variant que ya usa la topbar) en vez del
+   * botón con borde/padding normal que usa "Archivo" en `Editor.tsx`.
+   * `label` sigue siendo el único contenido -- si se pasa un ícono sin
+   * texto visible, quien llama es responsable de incluir texto accesible
+   * via `.sr-only` dentro de `label` (mismo criterio que
+   * `.ui-button--icon-square`, ver `index.css`) para no romper la regla
+   * de accesibilidad del ticket 032 ("nunca solo ícono, sin nombre
+   * accesible").
+   */
+  triggerVariant?: ButtonProps['variant'];
 }
 
 /**
@@ -40,7 +55,7 @@ export interface MenuProps {
  * mismo criterio de "sin dependencias nuevas si no hace falta" del
  * resto del proyecto.
  */
-export function Menu({ label, items = [], children }: MenuProps) {
+export function Menu({ label, items = [], children, triggerVariant }: MenuProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -124,7 +139,7 @@ export function Menu({ label, items = [], children }: MenuProps) {
 
   return (
     <div className="ui-menu" ref={rootRef}>
-      <Button aria-haspopup="menu" aria-expanded={open} onClick={toggleOpen}>
+      <Button variant={triggerVariant} aria-haspopup="menu" aria-expanded={open} onClick={toggleOpen}>
         {label}
       </Button>
       <div className={`ui-menu__panel${open ? ' ui-menu__panel--open' : ''}`} aria-hidden={!open} ref={panelRef}>

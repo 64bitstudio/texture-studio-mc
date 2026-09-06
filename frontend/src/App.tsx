@@ -200,6 +200,26 @@ function App() {
     handleProjectActivated(projectName, [mobId]);
   }
 
+  // Ticket 053: acción "Editar" de una tarjeta de "Mis proyectos" --
+  // DISTINTA de abrir el proyecto (`handleProjectActivated`, que siempre
+  // navega a `'proyecto'`). Decisión confirmada con Marco (dio
+  // discreción explícita: "el editor podría abrir la última textura
+  // editada o una vista para elegir cuál editar"): con UN solo mob no
+  // hay nada que elegir, se va derecho al editor
+  // (`handleSelectMob`, mismo punto de entrada que ya usa el resto de
+  // la app); con VARIOS mobs se reusa `Proyecto.tsx` (ticket 041) como
+  // la "vista para elegir cuál editar" -- ya es exactamente eso, sin
+  // necesitar trackear un "último mob editado" que hoy no existe en
+  // `ProjectRecord` (ver `docs/ARQUITECTURA.md`, "Ticket 053").
+  function handleProjectEdit(projectName: string, mobIds: string[]) {
+    setActiveProject({ name: projectName, mobIds });
+    if (mobIds.length === 1) {
+      handleSelectMob(mobIds[0]!);
+    } else {
+      setView('proyecto');
+    }
+  }
+
   // Ticket 041: acciones de la vista de detalle de "Proyecto".
   function handleAddMobs() {
     setView('agregar-mobs');
@@ -305,7 +325,12 @@ function App() {
             )}
 
             {mobsState.status === 'ready' && (
-              <MisProyectos mobs={mobsState.mobs} bufferCache={bufferCache} onProjectSelected={handleProjectActivated} />
+              <MisProyectos
+                mobs={mobsState.mobs}
+                bufferCache={bufferCache}
+                onProjectSelected={handleProjectActivated}
+                onProjectEdit={handleProjectEdit}
+              />
             )}
           </>
         )}
