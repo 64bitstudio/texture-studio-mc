@@ -20,3 +20,17 @@ Sale de `docs/definiciones/proyectos-y-navegacion.md` (HU-1, "Diseño técnico" 
 - Dado que hago click en "Crear proyecto" sin nombre o sin mob elegido, entonces veo un error inline y el proyecto no se crea.
 - Dado que creo el proyecto con éxito, entonces navego a la vista de detalle de ese proyecto, que ya muestra el mob elegido.
 - Dado que el nombre ya existe entre mis proyectos guardados, cuando intento crear uno con el mismo nombre, entonces veo el aviso de sobrescritura ya existente (ticket 019).
+
+## Hecho
+
+Implementado tal como estaba alcanzado:
+
+- `NuevoProyecto.tsx` (nuevo): nombre + selección de UN mob + vista previa 3D en vivo (`Viewer3D`/`useCanvasTexture`, mismo pipeline que `Editor.tsx` usa para su buffer inicial). `assetCache` local evita re-pedir el asset de un mob ya visitado en esta misma pantalla.
+- `saveProject` se llama con `Map` LOCALES de un solo mob -- deliberadamente NO el `bufferCache`/`geometryCache` compartido de `App.tsx` (que acumula cualquier mob visitado en la sesión) para que el proyecto nuevo arranque únicamente con el mob elegido.
+- `App.tsx`: nuevo estado `activeProject` (adelanto mínimo del ticket 041) + `handleProjectCreated`, que navega a `'proyecto'` mostrando el nombre real del proyecto recién creado en el `PlaceholderScreen` (la vista de detalle completa es el ticket 041).
+
+Tests: 184/184 en verde (sin tests nuevos -- este componente depende de canvas/DOM/fetch de punta a punta, verificado en vivo en vez de con mocks, mismo criterio ya aplicado a `projectSnapshot.ts`), `npm run lint` y `npm run build` en verde.
+
+Verificación en vivo (Claude in Chrome, local): vista previa 3D actualiza en vivo al cambiar de mob (los 4); crear sin nombre muestra el error inline y no crea nada; crear con éxito navega a "Proyecto: Set Nether" con `activeProject` poblado; confirmado con `localStorage` real que el proyecto quedó con exactamente 1 mob y un PNG válido; repetir el nombre dispara el aviso de sobrescritura ya existente del ticket 019.
+
+Sin hallazgos de QA pendientes.

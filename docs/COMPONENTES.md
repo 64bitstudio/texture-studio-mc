@@ -224,3 +224,8 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`components/PlaceholderScreen.tsx`** (nuevo) — contenido mínimo para destinos sin implementación real todavía.
 - **`components/Settings.tsx`** — deja de ser overlay (`position: fixed`), ahora se renderiza como vista normal dentro de `AppShell`; pierde el prop `onClose` (ya no hace falta).
 - **`App.tsx`** — `View` pasa de `'home' | 'editor'` a 7 destinos; `showSettings` se elimina (`handleOpenSettings` navega directo a `'configuracion'`); "Nuevo proyecto"/"Mis proyectos" muestran temporalmente el mismo `HomeScreen` (decisión real documentada, ver `docs/ARQUITECTURA.md`).
+
+### Ticket 038 -- Pantalla "Nuevo proyecto"
+
+- **`components/NuevoProyecto.tsx`** (nuevo) — nombre + selección de UN mob + vista previa 3D en vivo (`Viewer3D`/`useCanvasTexture`, mismo pipeline que `Editor.tsx`); crea el proyecto con `saveProject` (sin cambio de forma) usando `Map` locales de un solo mob, no el `bufferCache`/`geometryCache` compartido.
+- **`App.tsx`** — "Nuevo proyecto" ya no muestra el `HomeScreen` temporal (reemplazado por `NuevoProyecto`); "Mis proyectos" lo sigue mostrando (hasta el ticket 039). Nuevo estado `activeProject` (adelanto mínimo del ticket 041) y handler `handleProjectCreated`.
