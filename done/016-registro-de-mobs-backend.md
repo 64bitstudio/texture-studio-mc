@@ -20,3 +20,12 @@ Sale de `docs/definiciones/multi-mob-y-proyectos-guardados.md` (Diseño técnico
 - Dado `GET /api/mobs`, cuando se consulta, entonces devuelve al menos `{ id: "skeleton", label: "Esqueleto" }`.
 - Dado `GET /api/base-assets/skeleton`, cuando se consulta, entonces el contrato de respuesta es idéntico al de antes de este ticket (sin romper nada ya construido).
 - Dado `GET /api/base-assets/mob-inexistente`, cuando se consulta, entonces responde 404 con un mensaje claro.
+
+## Hecho
+Implementado por el agente `fullstack-dev` (PR [#36](https://github.com/64bitstudio/texture-studio-mc/pull/36)). CI de Jenkins en verde, sin hallazgos del gate de QA automático.
+
+- `MOB_REGISTRY` + `getMobDefinition()`/`listMobs()` (`backend/src/mobs/registry.ts`), con `MobId='skeleton'` como única entrada por ahora — diseñado para que 017/020/021 solo agreguen su geometría + una entrada.
+- `GET /api/mobs` nuevo; `GET /api/base-assets/:mobId` reemplaza la ruta hardcodeada (una sola ruta parametrizada, no dos en paralelo) con 404 claro para mob inexistente.
+- Renombrado genérico `Skeleton*`→`Mob*` en tipos/servicios (`loadMobTexture`, `generatePlaceholderMobTexturePng` ya parametrizado a `width`/`height`, anticipando el 64×64 del Zombie) — `skeletonTexture.ts` correctamente eliminado (no dejado como código muerto), verificado.
+- **Verificado en vivo contra el deploy real de DEV** (el orquestador repitió la verificación tras el merge): `GET /api/mobs` → `{"mobs":[{"id":"skeleton","label":"Esqueleto"}]}`; `GET /api/base-assets/skeleton` → 200 sin cambio de contrato (sin regresión); `GET /api/base-assets/mob-inexistente` → 404.
+- Pendiente, explícitamente fuera de este ticket: agregar Zombie/Araña/Creeper al registro (017/020/021), migrar el frontend a la ruta parametrizada (018).
