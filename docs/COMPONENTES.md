@@ -235,3 +235,8 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`components/MisProyectos.tsx`** (nuevo) — traslado de la sección "Guardados" de `HomeScreen.tsx` (buscar/filtrar/ordenar, sin cambios de lógica); elegir un proyecto navega a su vista de detalle en vez de al editor.
 - **`components/HomeScreen.tsx`** — **eliminado** (`git rm`) -- sin consumidores tras este ticket (038 ya había reemplazado "Nuevo proyecto").
 - **`App.tsx`** — "Mis proyectos" usa `MisProyectos`; `handleProjectOpenedFromHome` se elimina, reemplazado por `handleProjectActivated` (compartido con `handleProjectCreated` del ticket 038).
+
+### Ticket 040 -- Pantalla "Recientes"
+
+- **`components/Recientes.tsx`** (nuevo) — top 5 proyectos por `updatedAt` (`filterAndSortProjects` sin búsqueda/filtro, solo orden), sin controles propios; abrir un proyecto usa la misma lógica de restaurar buffers que `MisProyectos.tsx` y navega a `'proyecto'` vía `onProjectSelected`.
+- **`App.tsx`** — "Recientes" usa `Recientes` (reemplaza el `PlaceholderScreen` del ticket 037).

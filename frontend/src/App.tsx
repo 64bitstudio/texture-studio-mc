@@ -3,6 +3,7 @@ import { Editor } from './components/Editor';
 import { MobSelector } from './components/MobSelector';
 import { ProjectControls } from './components/ProjectControls';
 import { MisProyectos } from './components/MisProyectos';
+import { Recientes } from './components/Recientes';
 import { AppShell } from './components/AppShell';
 import type { NavView } from './components/Sidebar';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -316,7 +317,23 @@ function App() {
           </>
         )}
 
-        {view === 'recientes' && <PlaceholderScreen title="Recientes" ticket={40} />}
+        {/* Ticket 040: "Recientes" ya tiene contenido real. */}
+        {view === 'recientes' && (
+          <>
+            {mobsState.status === 'loading' && <LoadingOverlay message="Cargando catálogo de mobs…" />}
+
+            {mobsState.status === 'error' && (
+              <div style={{ display: 'grid', placeItems: 'center', padding: 48, gap: 12 }}>
+                <p role="alert">No se pudo cargar el catálogo de mobs: {mobsState.message}</p>
+                <Button onClick={handleRetryMobs}>Reintentar</Button>
+              </div>
+            )}
+
+            {mobsState.status === 'ready' && (
+              <Recientes mobs={mobsState.mobs} bufferCache={bufferCache} onProjectSelected={handleProjectActivated} />
+            )}
+          </>
+        )}
         {view === 'proyecto' && (
           <PlaceholderScreen title={activeProject ? `Proyecto: ${activeProject.name}` : 'Proyecto'} ticket={41} />
         )}
