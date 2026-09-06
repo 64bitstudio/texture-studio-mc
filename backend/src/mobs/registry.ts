@@ -1,4 +1,5 @@
 import { SKELETON_GEOMETRY } from '../geometry/skeletonGeometry.js';
+import { ZOMBIE_GEOMETRY } from '../geometry/zombieGeometry.js';
 import type { MobGeometry } from '../types/baseAssets.js';
 
 // Registro central de mobs soportados (ticket 016 -- ver
@@ -7,23 +8,21 @@ import type { MobGeometry } from '../types/baseAssets.js';
 // - `GET /api/mobs` (catalogo para el menu del frontend, ticket 018).
 // - `GET /api/base-assets/:mobId` (textura + geometria de un mob).
 //
-// Diseñado para crecer SIN refactor: agregar el Zombie (ticket 017) es
+// Diseñado para crecer SIN refactor: agregar el Zombie (ticket 017) fue
 // solo (a) escribir `backend/src/geometry/zombieGeometry.ts` (ver ese
-// archivo para la investigacion ya hecha -- mismas 6 cajas que el
-// Esqueleto, solo cambia el grosor de brazos/piernas) y (b) agregar una
-// entrada nueva a `MOB_REGISTRY` con su `id`/`label`/`geometry`/
-// `vanillaAssetFileName` -- ningun cambio a este archivo mas alla de
-// esas dos lineas, ni a las rutas (`routes/mobs.ts`,
-// `routes/baseAssets.ts`) ni al servicio de carga de textura
-// (`services/mobTexture.ts`), que ya son 100% genericos sobre
-// `MobDefinition`.
+// archivo para la investigacion + verificacion ya hechas -- mismas 6
+// cajas que el Esqueleto, solo cambia el grosor/posicion de
+// brazos/piernas y el alto real de la textura, 64 no 32) y (b) agregar
+// la entrada de abajo a `MOB_REGISTRY` -- ningun cambio a las rutas
+// (`routes/mobs.ts`, `routes/baseAssets.ts`) ni al servicio de carga de
+// textura (`services/mobTexture.ts`), que ya eran 100% genericos sobre
+// `MobDefinition`, confirmando la prediccion del ticket 016.
 //
-// `MobId` es hoy un literal unico ('skeleton') a proposito -- el ticket
-// 016 dice explicitamente que NO se agregan Zombie/Araña/Creeper todavia
-// (eso es 017/020/021). Cuando esos tickets agreguen su entrada,
-// `MobId` se amplia a una union (`'skeleton' | 'zombie' | ...`), sin
-// tocar la forma de `MobDefinition` ni de las rutas.
-export type MobId = 'skeleton';
+// `MobId` ya es una union de dos literales ('skeleton' | 'zombie') --
+// el ticket 016 dejo dicho que se ampliaria aqui cuando 017/020/021
+// agregaran su entrada, sin tocar la forma de `MobDefinition` ni de las
+// rutas (asi fue: cero cambios a esos archivos en este ticket).
+export type MobId = 'skeleton' | 'zombie';
 
 export interface MobDefinition {
   id: MobId;
@@ -46,6 +45,12 @@ export const MOB_REGISTRY: Record<MobId, MobDefinition> = {
     label: 'Esqueleto',
     geometry: SKELETON_GEOMETRY,
     vanillaAssetFileName: 'skeleton.png',
+  },
+  zombie: {
+    id: 'zombie',
+    label: 'Zombie',
+    geometry: ZOMBIE_GEOMETRY,
+    vanillaAssetFileName: 'zombie.png',
   },
 };
 
