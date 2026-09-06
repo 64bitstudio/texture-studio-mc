@@ -30,12 +30,17 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 
 /**
  * Arma el `mobs` que espera `saveProject`, a partir de TODOS los mobs
- * visitados en la sesion (`bufferCache`, ticket 018) que tengan su
- * geometria ya conocida (`geometryCache`, ver `App.tsx` -- se puebla en
- * el mismo momento en que `GET /api/base-assets/:mobId` responde para
- * ese mob, siempre ANTES de que `Editor` pueda escribir su buffer en
- * `bufferCache`, asi que en la practica todo mob presente en
- * `bufferCache` ya tiene su entrada en `geometryCache`).
+ * presentes en `bufferCache` que tengan su geometria ya conocida en
+ * `geometryCache` -- ambos Maps son responsabilidad de quien llama
+ * (ticket 045: ya NO hay un `bufferCache`/`geometryCache` compartido de
+ * sesion completa en `App.tsx`; `NuevoProyecto.tsx`/`AgregarMobs.tsx`,
+ * tickets 038/042, construyen Maps LOCALES con solo los mobs que
+ * corresponde guardar en ese momento). Se puebla `geometryCache` en el
+ * mismo momento en que `GET /api/base-assets/:mobId` responde para ese
+ * mob, siempre ANTES de que se escriba el buffer correspondiente en
+ * `bufferCache` -- invariante que debe mantener quien construya ambos
+ * Maps: todo mob presente en `bufferCache` debe tener su entrada en
+ * `geometryCache`.
  *
  * MASKING ticket 015 (`maskPixelsOutsideUVBoxes`, via
  * `encodeBufferToPngBlob` -- reusada tal cual, sin duplicar la logica de

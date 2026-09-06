@@ -1229,3 +1229,32 @@ Se sembró un proyecto de 3 mobs ("Set Nether QA 044": Esqueleto=rojo, Zombie=ve
 ### Hallazgo de QA (falso positivo, PR #72) -- tercera repetición del mismo patrón
 
 El gate `🔍 QA Review (auto)` volvió a marcar "&lt;img&gt; sin atributo alt". `gh pr diff 72 --patch | grep -n "<img"` mostró que TODAS las apariciones de `<img>` en el diff caen dentro de prosa de `docs/ARQUITECTURA.md`/`docs/COMPONENTES.md` (citando el hallazgo del ticket 043 y describiendo la miniatura de `Proyecto.tsx`) -- el `<img>` real de `Proyecto.tsx` (la miniatura del mob, con `alt` correcto desde el ticket 041) NO forma parte de ningún hunk modificado en este PR (`Proyecto.tsx` solo cambió las líneas del botón de exportar/el nuevo `handleExportProject`, confirmado revisando los rangos `@@` del diff). Mismo patrón que los falsos positivos ya documentados en los tickets 042 (PR #70) y 043 (PR #71) -- tercera repetición exacta, refuerza que el bug del gate (reportado una vez, ticket 042) sigue sin corregirse. Confirmado falso positivo por inspección directa del diff antes de mergear.
+
+## Ticket 045 -- Retiro del flujo de edición libre sin proyecto (último ticket del epic 034-045)
+
+### Cambio de comportamiento (regla 9 de CLAUDE.md)
+
+Se eliminó `ProjectControls.tsx` (componente/archivo completo, `git rm`) y el menú "💾 Proyecto" de `App.tsx` que lo alojaba (ticket 019/031) -- guardar/cargar/eliminar un proyecto directo desde dentro del editor, INDEPENDIENTE del `activeProject` de la navegación nueva (038-044). Ya confirmado por Marco en la fase de definición ("Todo dentro de un proyecto") -- este ticket lo ejecuta y lo documenta como referencia futura.
+
+**Por qué era un gap real, no solo redundancia**: `ProjectControls` permitía dos cosas que rompían la consistencia del modelo `activeProject` nuevo:
+1. **Guardar** un proyecto NUEVO (con cualquier nombre) desde el editor, sin pasar por "Nuevo proyecto" -- sin la restricción de "un solo mob para arrancar", y sin que `App.tsx` se enterara (`activeProject` seguía apuntando al proyecto original, o a ninguno).
+2. **Cargar** un proyecto CUALQUIERA (potencialmente distinto al `activeProject` actual) directo en `bufferCache`, sin actualizar `activeProject` -- la app quedaba en un estado inconsistente: la navegación/el título seguían mostrando el proyecto viejo mientras el editor ya mostraba buffers del proyecto recién cargado por este menú.
+
+Ambos casos son exactamente la clase de "edición sin pertenecer realmente a un proyecto" (o peor, perteneciendo a uno que la UI ya no refleja) que el epic completo (034-044) existe para cerrar. El flujo nuevo (`NuevoProyecto`→`Proyecto`→`AgregarMobs`, tickets 038-042) mantiene `activeProject` sincronizado en cada paso; `ProjectControls` era el único camino que podía desincronizarlo.
+
+### Limpieza en cascada de código muerto (mismo criterio del ticket 029)
+
+Retirar `ProjectControls` dejó tres piezas más sin ningún consumidor real, retiradas en el mismo commit:
+- **`loadGeneration`** (estado de `App.tsx`, ticket 019) y **`handleProjectLoaded`**: existían únicamente para forzar el remount de `Editor` cuando `ProjectControls` cargaba un proyecto que incluía al mob actualmente activo SIN desmontar `Editor`. El único camino que queda para cargar un proyecto (`MisProyectos`/`Recientes`, tickets 039/040) siempre navega a `'proyecto'` ANTES de tocar `bufferCache` -- `Editor` se desmonta por completo, y el remount natural de React al volver a `'editor'` ya cubre el caso sin necesidad de un segundo componente en la `key`. `key={selectedMobId}-{loadGeneration}` vuelve a ser simplemente `key={selectedMobId}`.
+- **`geometryCache`** (estado compartido de `App.tsx`, ticket 019): se poblaba en cada fetch de asset pero NINGÚN consumidor lo leía ya -- `buildProjectSnapshot(bufferCache, geometryCache)` (`projectSnapshot.ts`) sigue existiendo y sigue necesitando ambos Maps, pero desde los tickets 038/042 cada llamador (`NuevoProyecto.tsx`/`AgregarMobs.tsx`) construye sus propios Maps LOCALES (con solo los mobs que corresponde guardar en ese momento) en vez de usar el compartido de sesión completa -- el de `App.tsx` quedó "write-only" (se escribía, nadie leía) desde que el último de esos tickets migró. Se elimina junto con el import ahora no usado de `MobGeometry` en `App.tsx`.
+
+### Confirmación de los criterios de aceptación
+
+- **Ningún camino sin proyecto**: se auditó toda la navegación (`Sidebar`: Nuevo proyecto/Mis proyectos/Recientes, más las subvistas Proyecto/Agregar mobs/Configuración) -- el único punto que monta `Editor` es `handleSelectMob`, alcanzable solo desde `MobSelector` (dentro del editor mismo, ya en un proyecto) o desde `Proyecto.tsx` (elegir un mob de la lista del proyecto activo). No existe ningún botón/ruta que lleve a `'editor'` sin haber pasado antes por `'proyecto'`.
+- **Sin código muerto de la navegación anterior**: `HomeScreen.tsx` (ticket 039) y `PlaceholderScreen.tsx` (ticket 042) ya se habían eliminado antes; este ticket confirma que el `view` binario `'home'|'editor'` no dejó ningún resto (`grep` de `'home'` en `frontend/src` -- cero matches de código real, solo comentarios históricos que documentan el ticket 037 como referencia).
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Con el proyecto real "Set Nether" ya guardado: se navegó Mis proyectos → Set Nether → Esqueleto (editor). El editor cargó normalmente; ya NO existe ninguna fila/menú "💾 Proyecto" entre el header y los paneles de herramientas (antes ocupaba una fila propia justo debajo del header). Búsqueda explícita (`find`) de un menú de proyecto standalone confirmó que no existe ningún elemento así en el árbol de accesibilidad -- solo queda el menú "Archivo" (import/paste/export, sin cambios). Sin errores en consola durante la carga completa de la página ni la navegación.
+
+`npm run lint`, `npm test` (197, sin tests nuevos -- cambio de eliminación de UI/estado muerto, verificado en vivo), `npm run build` en verde (630 módulos, uno menos que antes de este ticket).
