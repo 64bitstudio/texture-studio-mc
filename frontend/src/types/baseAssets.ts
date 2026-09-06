@@ -43,6 +43,9 @@ export interface MobBoxPart {
   mirrorX?: boolean;
   faceLabels: FaceLabels;
   group?: string;
+  /** Ticket 024 -- ver `backend/src/types/baseAssets.ts` para la justificacion completa (espejo exacto). */
+  pivot?: [number, number, number];
+  rotation?: [number, number, number];
 }
 
 export interface MobGeometry {

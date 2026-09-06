@@ -123,9 +123,9 @@ Primera anatomía NO-biped del catálogo: 3 cajas de cuerpo (`head`, `thorax`, `
       "head":      { "size": [8, 8, 8],    "position": [0, 9, -7], "uv": { "x": 32, "y": 4 } },
       "thorax":    { "size": [6, 6, 6],    "position": [0, 9, 0],  "uv": { "x": 0,  "y": 0 } },
       "abdomen":   { "size": [10, 8, 12],  "position": [0, 9, 9],  "uv": { "x": 0,  "y": 12 } },
-      "leg1Right": { "size": [16, 2, 2],   "position": [-11, 9, -1], "uv": { "x": 18, "y": 0 }, "group": "spiderLeg" },
-      "leg1Left":  { "size": [16, 2, 2],   "position": [11, 9, -1],  "uv": { "x": 18, "y": 0 }, "mirrorX": true, "group": "spiderLeg" }
-      // leg2Right/Left .. leg4Right/Left: mismo size/uv/group, solo cambia `position.z` (ver spiderGeometry.ts).
+      "leg1Right": { "size": [16, 2, 2],   "position": [-11, 9, -1], "uv": { "x": 18, "y": 0 }, "group": "spiderLeg", "pivot": [-4, 9, -1], "rotation": [0, -45, 45] },
+      "leg1Left":  { "size": [16, 2, 2],   "position": [11, 9, -1],  "uv": { "x": 18, "y": 0 }, "mirrorX": true, "group": "spiderLeg", "pivot": [4, 9, -1], "rotation": [0, 45, -45] }
+      // leg2Right/Left .. leg4Right/Left: mismo size/uv/group, solo cambia `position.z`/`pivot.z`/`rotation` (ver spiderGeometry.ts).
     }
   }
 }
@@ -133,6 +133,7 @@ Primera anatomía NO-biped del catálogo: 3 cajas de cuerpo (`head`, `thorax`, `
 
 - Ningún campo `body`/`armRight`/`armLeft`/`legRight`/`legLeft` — anatomía distinta, ver el ensanchamiento de contrato arriba.
 - Las 8 patas comparten `group: "spiderLeg"`: pintar la región UV de una pata en el editor pinta las 8 a la vez (mismo comportamiento que `armRight`/`armLeft` en el biped, solo que con 8 partes en vez de 2 compartiendo el grupo).
+- **Ticket 024 (ensanchamiento de contrato, aditivo):** `pivot`/`rotation` opcionales en cualquier `MobBoxPart` -- solo la Araña los usa hoy (Esqueleto/Zombie/Creeper no los traen, comportamiento sin cambios). Afectan ÚNICAMENTE el visor 3D (posan la caja rotada alrededor de `pivot` en vez de posicionarla directamente) -- nunca el mapa de píxeles/UV/export. `rotation` en grados, sourced de `animation.spider.default_leg_pose` (fuente oficial siempre activa, no inventada) -- ver `docs/ARQUITECTURA.md`, "Ticket 024".
 - `faceLabels` de cada caja (omitidos arriba por brevedad): prefijados por parte (`"Tórax — Frente"`, `"Abdomen — Frente"`, `"Pata — Frente"`, sin lateralidad en las patas) para que el selector "Aislar parte" no muestre dos regiones distintas con el mismo nombre "Frente" — ver `backend/src/geometry/spiderGeometry.ts`.
 
 ### `GET /api/base-assets/creeper` (ticket 021)
