@@ -31,3 +31,14 @@ Si tras una investigación razonable no se encuentra la fuga exacta, está bien 
 - Exporta el PNG/ZIP tras el fix y confirma con un script (`PIL`/similar) que TODA la zona fuera de las 6 cajas conocidas es alpha=0, para varias resoluciones (×1, ×4, ×10).
 - Si es posible, valida en un cliente Minecraft real (o pide a Marco que lo valide) que la cabeza ya muestra el diseño real sin el overlay opaco tapándola.
 - Confirma que el contenido real de la cabeza (dentro de su caja UV) no se vio afectado por el fix.
+
+## Hecho
+Corregido por el agente `fullstack-dev` (PR [#33](https://github.com/64bitstudio/texture-studio-mc/pull/33)). CI de Jenkins en verde, sin hallazgos del gate de QA automático.
+
+**Parte A** (mitigación robusta): `frontend/src/uvBoxCleanup.ts` (`maskPixelsOutsideUVBoxes`, reusa `computeUVBoxRects`) se aplica sobre una COPIA del buffer justo antes de codificar PNG/ZIP en `export.ts` — nunca muta el buffer real que el usuario sigue editando.
+
+**Parte B** (fuga real encontrada): "Importar textura" (`Editor.tsx#handleImportFile`, ticket 005) volcaba el PNG importado completo sin ninguna restricción a las cajas UV — un PNG externo con contenido opaco en la zona "hat" (como el que probablemente usó Marco en algún punto de su sesión, o el propio placeholder si en algún momento se importó/reexportó) quedaba incrustado sin limpieza. Ahora se aplica el mismo `maskPixelsOutsideUVBoxes` a la imagen importada antes de cargarla al buffer. "Pegar imagen" y los cambios de resolución se revisaron y están a salvo (recortan/escalan correctamente).
+
+**Verificado en vivo contra el deploy real de DEV** (el orquestador repitió la verificación tras el merge, reproduciendo el escenario real): importé un PNG 64×32 100% opaco de un color distintivo — el buffer mostró de inmediato la zona "hat" limpia (0 de 512 pixeles opacos) mientras la cabeza real tomó el color importado sin pérdida; exporté el PNG resultante y confirmé con un script Python/PIL exactamente lo mismo en el archivo final: 0/512 pixeles opacos en la zona del hat, 512/512 intactos en la cabeza con el color exacto importado (200,30,200).
+
+Nota para el futuro (no bloqueante, señalada por el agente): el placeholder procedural del backend (`placeholderTexture.ts`) sigue siendo 100% opaco en toda la zona muerta por diseño — la Parte A ya lo neutraliza en cualquier export, así que no es urgente, pero si se quiere consistencia total con el asset real (que sí es transparente ahí) sería un ticket aparte que toca el backend.
