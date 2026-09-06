@@ -1,3 +1,5 @@
+import { Button } from '../ui';
+
 export interface HistoryControlsProps {
   canUndo: boolean;
   canRedo: boolean;
@@ -12,48 +14,20 @@ export interface HistoryControlsProps {
  * teclado equivalentes (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z, Ctrl+Y) se
  * manejan a nivel de pagina en `Editor.tsx`, no aqui -- este componente
  * es solo la superficie de UI.
+ *
+ * Ticket 025: primer consumidor real de `Button` (`frontend/src/ui/`) --
+ * ejemplo mínimo de verificación pedido por el ticket, antes de migrar
+ * el resto de los ~15 controles del panel en el ticket 026.
  */
 export function HistoryControls({ canUndo, canRedo, onUndo, onRedo }: HistoryControlsProps) {
   return (
     <div role="group" aria-label="Deshacer y rehacer" style={{ display: 'flex', gap: 8 }}>
-      <button
-        type="button"
-        onClick={onUndo}
-        disabled={!canUndo}
-        title="Deshacer (Ctrl/Cmd+Z)"
-        style={{
-          flex: 1,
-          padding: '8px 10px',
-          fontSize: 13,
-          borderRadius: 4,
-          border: '1px solid rgba(255,255,255,0.25)',
-          background: 'var(--panel-bg)',
-          color: 'var(--text)',
-          cursor: canUndo ? 'pointer' : 'not-allowed',
-          opacity: canUndo ? 1 : 0.5,
-        }}
-      >
+      <Button onClick={onUndo} disabled={!canUndo} title="Deshacer (Ctrl/Cmd+Z)" style={{ flex: 1, justifyContent: 'center' }}>
         Deshacer
-      </button>
-      <button
-        type="button"
-        onClick={onRedo}
-        disabled={!canRedo}
-        title="Rehacer (Ctrl/Cmd+Shift+Z o Ctrl+Y)"
-        style={{
-          flex: 1,
-          padding: '8px 10px',
-          fontSize: 13,
-          borderRadius: 4,
-          border: '1px solid rgba(255,255,255,0.25)',
-          background: 'var(--panel-bg)',
-          color: 'var(--text)',
-          cursor: canRedo ? 'pointer' : 'not-allowed',
-          opacity: canRedo ? 1 : 0.5,
-        }}
-      >
+      </Button>
+      <Button onClick={onRedo} disabled={!canRedo} title="Rehacer (Ctrl/Cmd+Shift+Z o Ctrl+Y)" style={{ flex: 1, justifyContent: 'center' }}>
         Rehacer
-      </button>
+      </Button>
     </div>
   );
 }

@@ -6,7 +6,43 @@
   --text-dim: #9d9aab;
   --accent: #c084fc;
 
+  /* Ticket 025 -- tokens de diseño para frontend/src/ui/ (sistema de
+     componentes reutilizables). Se agregan aquí, junto a los tokens de
+     color ya existentes (--bg/--panel-bg/--text/--text-dim/--accent, sin
+     tocarlos) en vez de un archivo aparte -- este proyecto ya usa un
+     único stylesheet global, sin CSS Modules/CSS-in-JS, y no hay
+     necesidad real de separarlos (ver docs/ARQUITECTURA.md, "Ticket
+     025"). */
+  --border: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.28);
+  --surface-raised: #2c2f3a;
+  --danger: #f87171;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  --font-xs: 11px;
+  --font-sm: 13px;
+  --font-md: 14px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+
+  --transition-fast: 150ms ease;
+
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0ms;
+  }
 }
 
 * {
@@ -24,4 +60,183 @@ body,
 
 body {
   overflow: hidden;
+}
+
+/* ---- frontend/src/ui/ (ticket 025) ---- */
+
+.ui-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  font-family: inherit;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  color: var(--text);
+  background: var(--surface-raised);
+}
+
+.ui-button:hover {
+  border-color: var(--border-strong);
+}
+
+.ui-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ui-button--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #1b1c22;
+  font-weight: 600;
+}
+
+.ui-button--primary:hover {
+  filter: brightness(1.08);
+}
+
+.ui-button--icon {
+  padding: var(--space-2);
+}
+
+.ui-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ui-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--font-sm);
+}
+
+.ui-field__label {
+  color: var(--text-dim);
+}
+
+.ui-select {
+  font-size: var(--font-sm);
+  font-family: inherit;
+  padding: var(--space-2) var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.ui-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.ui-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.ui-section__title {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+}
+
+.ui-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.ui-menu__list {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  min-width: 200px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-1);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.ui-menu__list--open {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.ui-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  text-align: left;
+  font-size: var(--font-sm);
+  font-family: inherit;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+
+.ui-menu__item:hover,
+.ui-menu__item:focus-visible {
+  background: rgba(255, 255, 255, 0.08);
+  outline: none;
+}
+
+.ui-loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  background: rgba(27, 28, 34, 0.75);
+  color: var(--text);
+  font-size: var(--font-sm);
+  z-index: 10;
+}
+
+.ui-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--border-strong);
+  border-top-color: var(--accent);
+  animation: ui-spin 800ms linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-spinner {
+    animation-duration: 2400ms;
+  }
+}
+
+@keyframes ui-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
