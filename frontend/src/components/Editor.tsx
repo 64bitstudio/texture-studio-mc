@@ -31,6 +31,7 @@ import {
   validateImportDimensions,
   type OverlayRect,
 } from '../importImage';
+import { maskPixelsOutsideUVBoxes } from '../uvBoxCleanup';
 import type { SkeletonBaseAssetsResponse } from '../types/baseAssets';
 
 /** Imagen pegada/subida en espera de confirmar o descartar (ticket 005, HU-9) -- una a la vez (ver alcance del ticket). */
@@ -513,6 +514,21 @@ export function Editor({ data }: EditorProps) {
   // diff pixel a pixel (`computeFullReplaceDiff`, en `importImage.ts`)
   // ya produce exactamente el mismo shape (`PixelChange`) que un trazo
   // de pincel normal.
+  //
+  // FIX ticket 015 (Parte B -- fuga real identificada, ver
+  // `pending/015-bug-hat-overlay-contaminado-en-export.md`): esta
+  // funcion solo validaba dimensiones (`validateImportDimensions`)
+  // antes de volcar el PNG importado tal cual al buffer entero, sin
+  // ninguna restriccion a las cajas UV conocidas -- un PNG externo
+  // (ej. un export previo re-importado, o cualquier imagen 64x32/NxM
+  // editada fuera de la app) con contenido opaco en la caja "hat" u
+  // otro hueco del layout clasico quedaba incrustado en el buffer sin
+  // que nada lo limpiara hasta este ticket. Se aplica el mismo
+  // `maskPixelsOutsideUVBoxes` que usa `export.ts` a la imagen
+  // DECODIFICADA antes de diffear/cargarla -- el contenido dentro de
+  // las cajas se importa intacto, solo se fuerza alpha=0 en lo que
+  // caiga fuera de ellas (zona que de todas formas Minecraft nunca
+  // renderiza como parte real del modelo).
   const handleImportFile = useCallback(
     async (file: File) => {
       setImportError(null);
@@ -534,18 +550,19 @@ export function Editor({ data }: EditorProps) {
         return;
       }
 
+      const cleanedImport = maskPixelsOutsideUVBoxes(decoded.imageData, uvBoxes);
       const currentSnapshot: PixelSource = { width: buffer.width, height: buffer.height, data: buffer.getRawData() };
-      const changes = computeFullReplaceDiff(currentSnapshot, decoded.imageData);
-      if (changes.length === 0) return; // PNG identico al actual -- no hay nada que reemplazar ni que apilar en el historial.
+      const changes = computeFullReplaceDiff(currentSnapshot, cleanedImport);
+      if (changes.length === 0) return; // PNG identico al actual (ya limpio) -- no hay nada que reemplazar ni que apilar en el historial.
 
-      buffer.loadFromImageData(decoded.imageData);
+      buffer.loadFromImageData(cleanedImport);
       history.beginStroke();
       changes.forEach((c) => history.recordChange(c.x, c.y, c.before, c.after));
       history.commitStroke();
       setVersion((v) => v + 1);
       setHistoryTick((t) => t + 1);
     },
-    [buffer, history],
+    [buffer, history, uvBoxes],
   );
 
   // Pegar/insertar imagen sobre una region UV (ticket 005, HU-9).
@@ -863,7 +880,7 @@ export function Editor({ data }: EditorProps) {
 
         <section>
           <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Exportar</h2>
-          <ExportControls buffer={buffer} />
+          <ExportControls buffer={buffer} uvBoxes={uvBoxes} />
         </section>
       </aside>
     </div>

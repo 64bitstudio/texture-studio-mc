@@ -1,9 +1,18 @@
 import { useCallback, useState } from 'react';
 import type { TextureBuffer } from '../textureBuffer';
 import { exportResourcePackZip, exportTexturePng } from '../export';
+import type { UVBoxRect } from '../symmetry';
 
 export interface ExportControlsProps {
   buffer: TextureBuffer;
+  /**
+   * Cajas UV conocidas, YA escaladas a la resolucion de trabajo activa
+   * (`computeUVBoxRects(geometry, resolution)`, ver `Editor.tsx`) --
+   * ticket 015: se pasan tal cual a `export.ts` para forzar alpha=0
+   * fuera de ellas al exportar (mitigacion del bug "hat overlay
+   * contaminado en export"), sin recalcularlas aca.
+   */
+  uvBoxes: UVBoxRect[];
 }
 
 /**
@@ -17,7 +26,7 @@ export interface ExportControlsProps {
  * curso esta en vuelo evita disparar una segunda descarga con un doble
  * click (la codificacion PNG/ZIP es rapida pero asincrona).
  */
-export function ExportControls({ buffer }: ExportControlsProps) {
+export function ExportControls({ buffer, uvBoxes }: ExportControlsProps) {
   const [pending, setPending] = useState<'png' | 'zip' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -25,25 +34,25 @@ export function ExportControls({ buffer }: ExportControlsProps) {
     setError(null);
     setPending('png');
     try {
-      await exportTexturePng(buffer);
+      await exportTexturePng(buffer, uvBoxes);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo exportar el PNG.');
     } finally {
       setPending(null);
     }
-  }, [buffer]);
+  }, [buffer, uvBoxes]);
 
   const handleExportZip = useCallback(async () => {
     setError(null);
     setPending('zip');
     try {
-      await exportResourcePackZip(buffer);
+      await exportResourcePackZip(buffer, uvBoxes);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo exportar el resource pack.');
     } finally {
       setPending(null);
     }
-  }, [buffer]);
+  }, [buffer, uvBoxes]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
