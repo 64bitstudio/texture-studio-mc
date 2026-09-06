@@ -3,6 +3,7 @@ import { Editor } from './components/Editor';
 import { MobSelector } from './components/MobSelector';
 import { ProjectControls } from './components/ProjectControls';
 import { HomeScreen } from './components/HomeScreen';
+import { ThemeToggle } from './components/ThemeToggle';
 import { fetchMobBaseAssets } from './api/baseAssets';
 import { fetchMobs } from './api/mobs';
 import type { MobBaseAssetsResponse, MobGeometry } from './types/baseAssets';
@@ -218,8 +219,17 @@ function App() {
       // practica cubre lo mismo, pero deja el mecanismo correcto si
       // algun dia este `<main>` deja de ser pantalla completa.
       <main style={{ width: '100vw', height: '100vh', overflow: 'auto', position: 'relative' }}>
-        <header style={{ padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <header
+          style={{
+            padding: '10px 16px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
           <h1 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Texture Studio MC</h1>
+          <ThemeToggle />
         </header>
 
         {mobsState.status === 'loading' && <LoadingOverlay message="Cargando catálogo de mobs…" />}
@@ -254,7 +264,7 @@ function App() {
           justifyContent: 'space-between',
           gap: 16,
           flexWrap: 'wrap',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          borderBottom: '1px solid var(--border)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -287,6 +297,8 @@ function App() {
             Textura placeholder (asset vanilla real pendiente — ver ticket 007)
           </span>
         )}
+
+        <ThemeToggle />
       </header>
 
       {/* Ticket 019 (HU-3/HU-4/HU-5): fila propia, hermana del header --
@@ -309,7 +321,7 @@ function App() {
           style={{
             flexShrink: 0,
             padding: '8px 16px',
-            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            borderBottom: '1px solid var(--border)',
           }}
         >
           <Menu

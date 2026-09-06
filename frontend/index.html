@@ -5,6 +5,23 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Texture Studio MC</title>
+    <!-- Ticket 034 (HU-5): aplica el tema guardado ANTES de cualquier
+         CSS/render, para que no haya un parpadeo del tema por defecto.
+         Duplica la clave/default de `src/theme.ts` en JS plano (no
+         puede importar ese módulo aquí) -- si esa clave cambia, hay que
+         actualizar también este script. -->
+    <script>
+      (function () {
+        var theme = 'dark';
+        try {
+          var stored = localStorage.getItem('ts-theme');
+          if (stored === 'light' || stored === 'dark') theme = stored;
+        } catch (err) {
+          console.warn('index.html: no se pudo leer el tema guardado -- se usa "dark" por defecto.', err);
+        }
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

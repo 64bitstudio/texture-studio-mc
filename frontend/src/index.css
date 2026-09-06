@@ -1,23 +1,10 @@
 :root {
-  color-scheme: light dark;
-  --bg: #1b1c22;
-  --panel-bg: #24262e;
-  --text: #e8e6f0;
-  --text-dim: #9d9aab;
-  --accent: #c084fc;
-
   /* Ticket 025 -- tokens de diseño para frontend/src/ui/ (sistema de
-     componentes reutilizables). Se agregan aquí, junto a los tokens de
-     color ya existentes (--bg/--panel-bg/--text/--text-dim/--accent, sin
-     tocarlos) en vez de un archivo aparte -- este proyecto ya usa un
-     único stylesheet global, sin CSS Modules/CSS-in-JS, y no hay
-     necesidad real de separarlos (ver docs/ARQUITECTURA.md, "Ticket
-     025"). */
-  --border: rgba(255, 255, 255, 0.14);
-  --border-strong: rgba(255, 255, 255, 0.28);
-  --surface-raised: #2c2f3a;
-  --danger: #f87171;
-
+     componentes reutilizables). Tokens de ESPACIADO/TIPOGRAFÍA/SOMBRA/
+     TRANSICIÓN -- no dependen del tema claro/oscuro, viven en el único
+     `:root` sin condicionar. Los tokens de COLOR (bg/panel-bg/text/etc.)
+     y `color-scheme` (ver comentario del bloque `[data-theme='dark']`
+     de abajo) se movieron a los bloques `[data-theme]` (ticket 034). */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -31,9 +18,6 @@
   --font-sm: 13px;
   --font-md: 14px;
 
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
-
   --transition-fast: 150ms ease;
 
   font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -43,6 +27,64 @@
   :root {
     --transition-fast: 0ms;
   }
+}
+
+/* Ticket 034 (HU-5): tokens de color separados por tema. `html` arranca
+   con `data-theme="dark"` o `"light"` puesto por un script inline en
+   `index.html` (ANTES de este CSS, antes del primer render de React) --
+   nunca queda sin el atributo, así que no hace falta un bloque `:root`
+   "sin data-theme" aparte ni depender de `prefers-color-scheme` (el
+   documento de definición decidió oscuro/claro explícitos, sin modo
+   "automático" en este ticket). `theme.ts` es la fuente de verdad en
+   JS (persistencia en `localStorage`, ver ese archivo) -- este CSS solo
+   reacciona al atributo que ese módulo ya puso.
+
+   `--danger` NO se repite entre temas (un rojo que funciona
+   razonablemente sobre fondo claro u oscuro, sin necesidad de dos
+   valores) -- los shadows (`--shadow-sm/md`) tampoco, un mismo negro
+   translúcido se ve bien sobre ambos fondos como sombra proyectada. */
+:root[data-theme='dark'] {
+  /* `color-scheme` (no solo los tokens de color de abajo) controla el
+     tema NATIVO de controles de formulario sin estilo propio
+     (`<select>`/`<input>` de `HomeScreen.tsx`, que no pasan por
+     `ui/Select` -- ver ese archivo) -- un valor estatico `light dark`
+     en `:root` (como estaba antes de este ticket) deja que el
+     navegador elija segun el SISTEMA operativo, ignorando el
+     `data-theme` de esta app (bug real encontrado en vivo: los
+     `<select>` se veian oscuros incluso con el tema claro activo,
+     porque el SO seguía en modo oscuro). Fijarlo por bloque de tema
+     hace que los controles nativos sigan SIEMPRE el tema de la app. */
+  color-scheme: dark;
+  --bg: #1b1c22;
+  --panel-bg: #24262e;
+  --text: #e8e6f0;
+  --text-dim: #9d9aab;
+  --accent: #c084fc;
+  --border: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.28);
+  --surface-raised: #2c2f3a;
+  --hover-overlay: rgba(255, 255, 255, 0.08);
+  --overlay-bg: rgba(27, 28, 34, 0.75);
+  --danger: #f87171;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f4f4f7;
+  --panel-bg: #ffffff;
+  --text: #1e1f26;
+  --text-dim: #62636f;
+  --accent: #c084fc;
+  --border: rgba(0, 0, 0, 0.12);
+  --border-strong: rgba(0, 0, 0, 0.22);
+  --surface-raised: #ffffff;
+  --hover-overlay: rgba(0, 0, 0, 0.06);
+  --overlay-bg: rgba(244, 244, 247, 0.75);
+  --danger: #dc2626;
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.16);
 }
 
 * {
@@ -288,7 +330,7 @@ body {
 
 .ui-menu__item:hover,
 .ui-menu__item:focus-visible {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--hover-overlay);
   outline: none;
 }
 
@@ -300,7 +342,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: var(--space-3);
-  background: rgba(27, 28, 34, 0.75);
+  background: var(--overlay-bg);
   color: var(--text);
   font-size: var(--font-sm);
   z-index: 10;

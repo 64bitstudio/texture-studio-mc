@@ -993,3 +993,27 @@ El ticket pedía "indicador de carga... mientras los buffers se decodifican" par
 ### Verificación en vivo (Claude in Chrome, local, con demora artificial temporal)
 
 Los fetches del catálogo/asset (`fetchMobs`/`fetchMobBaseAssets`) son casi instantáneos contra el backend local -- se agregó una demora artificial temporal (`setTimeout` de 5s) a ambas funciones SOLO para poder observar el overlay en pantalla, revertida antes de cerrar el ticket (`git checkout -- src/api/mobs.ts src/api/baseAssets.ts`, confirmado sin diff). Con la demora activa: la carga inicial mostró el overlay con spinner + "Cargando catálogo de mobs…" (captura de pantalla); cambiar de mob desde el `MobSelector` del header mostró "Cargando modelo…" -- confirmado tanto visualmente como con `getComputedStyle`/`querySelector('.ui-loading-overlay')` 50ms después del click (sin esperar el round-trip completo de la herramienta de automatización, que agrega su propia latencia real y puede confundir la observación -- primera vez que se hizo así en la sesión, útil como técnica para el futuro). `npm run lint`, `npm test`, `npm run build` en verde después de revertir la demora.
+
+## Ticket 034 -- Sistema de tema claro/oscuro (HU-5)
+
+### Tokens de color movidos de `:root` a bloques `[data-theme]`
+
+Los tokens de espaciado/tipografía/sombra/transición (ticket 025) siguen en el único `:root` sin condicionar -- no dependen del tema. Los tokens de COLOR (`--bg`, `--panel-bg`, `--text`, `--text-dim`, `--accent`, `--border`, `--border-strong`, `--surface-raised`) se movieron a `:root[data-theme='dark']` (valores actuales, sin cambios) y un nuevo `:root[data-theme='light']` (paleta nueva). Dos tokens nuevos para casos que antes usaban un color hardcodeado: `--hover-overlay` (hover de `.ui-menu__item`, antes `rgba(255,255,255,0.08)` fijo -- invisible sobre fondo claro) y `--overlay-bg` (fondo de `.ui-loading-overlay`, antes `rgba(27,28,34,0.75)` fijo -- un scrim oscuro sobre una app clara se veía fuera de lugar). `--danger` y los `--shadow-*` NO se duplican entre temas -- un rojo y una sombra negra translúcida funcionan razonablemente sobre ambos fondos.
+
+### `theme.ts` (nuevo, mayormente puro) + script inline en `index.html`
+
+`getTheme`/`setTheme`/`toggleTheme`/`nextTheme` -- persistencia en `localStorage` vía `globalThis.localStorage` (mismo criterio ya establecido en `projectStorage.ts`, ticket 019: permite testear `getTheme`/`nextTheme` en el entorno de test `environment: 'node'` sin jsdom, mockeando `globalThis.localStorage`). `setTheme`/`toggleTheme` sí tocan `document.documentElement.dataset.theme` -- esa parte se verifica en vivo, no con test unitario (mismo criterio que el resto del código que toca DOM/canvas en este proyecto).
+
+Para evitar el parpadeo del tema por defecto antes del primer render de React, `index.html` gana un `<script>` inline (JS plano, sin imports) que lee la MISMA clave de `localStorage` (`ts-theme`) y aplica `data-theme` en `<html>` -- duplicado a propósito respecto a `theme.ts` (un script inline no puede importar un módulo ES), documentado explícitamente para que quien cambie la clave de storage recuerde actualizar ambos lugares.
+
+### Bug real encontrado y corregido en vivo: `color-scheme: light dark` ignoraba el tema de la app
+
+El `:root` original tenía `color-scheme: light dark` (estático) -- controla el tema NATIVO de controles de formulario sin estilo propio (los `<select>`/`<input>` de `HomeScreen.tsx`, que no pasan por `ui/Select`). Con ese valor estático, el navegador elige el tema nativo según el SISTEMA OPERATIVO, ignorando el `data-theme` de la app -- confirmado en vivo: con el tema claro activo y el SO en modo oscuro, los `<select>` de "Guardados" se veían con fondo oscuro y texto blanco, rompiendo la paleta clara. Corregido fijando `color-scheme: dark`/`color-scheme: light` dentro de cada bloque `[data-theme]` respectivo -- los controles nativos ahora siguen SIEMPRE el tema explícito de la app, nunca el del sistema operativo.
+
+### `ThemeToggle.tsx` (nuevo) -- ubicación temporal en el header actual
+
+Botón compacto (ícono ☀️/🌙 + texto, `variant="icon"`, mismo criterio del ticket 032 de nunca dejar un botón solo con ícono) en el header existente de `App.tsx` (ambas vistas, `home` y `editor`) -- el ticket 037 (shell de navegación nueva) lo reubicará dentro del header definitivo sin cambiar su lógica interna, que ya lee/escribe la única fuente de verdad (`theme.ts`).
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Confirmado con captura de pantalla en ambos temas: toggle cambia toda la UI visible al instante (Sections, botones, checkbox, menú "Proyecto" desplegable); recargar la página mantiene el tema elegido (persistencia real, no solo en memoria); el bug de `color-scheme` se reprodujo y se re-verificó corregido con capturas antes/después. `npm run lint`, `npm test` (174, incluye `theme.spec.ts` nuevo), `npm run build` en verde -- este último atrapó un bug real de sintaxis en `index.html` (comentario HTML cerrado accidentalmente con `*/` de JS en vez de `-->`, error `parse5: eof-in-comment`), corregido antes de continuar.

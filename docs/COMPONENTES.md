@@ -196,3 +196,10 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 
 - **`App.tsx`** — reemplaza los textos planos de "Cargando catálogo de mobs…"/"Cargando modelo…" por `<LoadingOverlay message="..." />` (ticket 025); ambos contenedores padre ganan `position: relative` (`LoadingOverlay` usa `inset: 0`). Cubre carga inicial, reintento tras error y cambio de mob -- sin lógica nueva, solo qué se renderiza para los estados `loading` ya existentes.
 - La carga de un proyecto guardado (`ProjectControls.tsx`/`HomeScreen.tsx`) conserva su indicador por-botón existente ("Cargando…"/"Abriendo…", tickets 019/027) -- decisión real de NO migrarlo a `LoadingOverlay`, ver `docs/ARQUITECTURA.md`, "Ticket 033".
+
+### Ticket 034 -- Sistema de tema claro/oscuro
+
+- **`theme.ts`** (nuevo) — `getTheme`/`setTheme`/`toggleTheme`/`nextTheme`, persistencia en `localStorage` (`globalThis.localStorage`). Fuente de verdad única para el toggle rápido y, más adelante, el selector de "Configuración" (ticket 036).
+- **`components/ThemeToggle.tsx`** (nuevo) — botón ícono+texto en el header de `App.tsx` (ambas vistas).
+- **`index.css`** — tokens de color separados en `:root[data-theme='dark']`/`:root[data-theme='light']`; nuevos tokens `--hover-overlay`/`--overlay-bg`; `color-scheme` fijado por tema (ver `docs/ARQUITECTURA.md`, bug real corregido).
+- **`index.html`** — script inline que aplica el tema guardado antes del primer render (sin parpadeo).
