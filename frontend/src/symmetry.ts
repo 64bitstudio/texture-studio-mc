@@ -57,18 +57,28 @@ export interface UVBoxRect {
  * el resultado tiene como maximo un rectangulo por region de pixeles
  * realmente distinta (4 para el Esqueleto: cabeza, torso, brazo,
  * pierna), nunca dos rectangulos identicos.
+ *
+ * `scale` (ticket 009, resolucion de trabajo escalable x1-x10): la
+ * geometria del backend siempre describe el UV en pixeles NATIVOS
+ * (x1) -- cuando el `TextureBuffer` activo trabaja a una resolucion
+ * mayor (`components/Editor.tsx`, `resolution.ts`), sus pixeles NO se
+ * corresponden 1:1 con esas coordenadas nativas. `scale` (default 1,
+ * compatible con todo el codigo/tests previos a este ticket) multiplica
+ * el rectangulo completo -- equivalente a escalar `uv.x/y` y `w/h/d`
+ * por separado antes de sumarlos, porque la formula del rectangulo es
+ * lineal en esos terminos.
  */
-export function computeUVBoxRects(geometry: SkeletonGeometry): UVBoxRect[] {
+export function computeUVBoxRects(geometry: SkeletonGeometry, scale: number = 1): UVBoxRect[] {
   const seen = new Set<string>();
   const rects: UVBoxRect[] = [];
 
   for (const part of Object.values(geometry.parts)) {
     const [w, h, d] = part.size;
     const rect: UVBoxRect = {
-      x0: part.uv.x,
-      y0: part.uv.y,
-      x1: part.uv.x + 2 * d + 2 * w,
-      y1: part.uv.y + d + h,
+      x0: part.uv.x * scale,
+      y0: part.uv.y * scale,
+      x1: (part.uv.x + 2 * d + 2 * w) * scale,
+      y1: (part.uv.y + d + h) * scale,
     };
     const key = `${rect.x0},${rect.y0},${rect.x1},${rect.y1}`;
     if (seen.has(key)) continue;

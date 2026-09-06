@@ -120,4 +120,21 @@ export class PaintHistory {
     this.undoStack.push(stroke);
     return stroke;
   }
+
+  /**
+   * Descarta TODO el historial (undo y redo) y cualquier trazo
+   * pendiente sin cerrar -- ticket 009: cambiar la resolucion de
+   * trabajo del editor reemplaza el `TextureBuffer` por uno de otro
+   * tamaño (ver `resolution.ts`/`components/Editor.tsx`), y los trazos
+   * ya apilados quedan en coordenadas del tamaño ANTERIOR -- aplicarlos
+   * sobre el buffer nuevo escribiria en la posicion incorrecta (una
+   * escala distinta no es una traslacion 1:1 de coordenadas). Mismo
+   * criterio de producto que usan editores de pixel art reales (ej.
+   * Aseprite invalida el historial de undo al redimensionar el lienzo).
+   */
+  clear(): void {
+    this.undoStack = [];
+    this.redoStack = [];
+    this.pending = null;
+  }
 }

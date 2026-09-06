@@ -17,6 +17,18 @@ import type { TextureBuffer } from '../textureBuffer';
  * `useLoader(TextureLoader, dataUrl)` que reemplaza este hook).
  * `DataTexture` por default trae `flipY = false`, lo que invertiria
  * verticalmente el modelo ya calibrado -- ver docs/ARQUITECTURA.md.
+ *
+ * Ticket 009 (resolucion de trabajo escalable x1-x10): `buffer` puede
+ * ser REEMPLAZADO por una instancia de otro tamaño cuando cambia la
+ * resolucion (ver `components/Editor.tsx`, `resolution.ts`) -- el
+ * canvas offscreen ya no puede crearse una unica vez con las
+ * dimensiones del `buffer` de montaje inicial (`useState` perezoso, tal
+ * como hacia este hook antes de este ticket): si el tamaño cambiara sin
+ * redimensionar tambien el `<canvas>`, `ctx.putImageData` fallaria (el
+ * `ImageData` fuente ya no cabe en un canvas mas chico) o quedaria
+ * recortado en silencio. El efecto de abajo redimensiona el `<canvas>`
+ * cada vez que `buffer.width`/`buffer.height` no coinciden con el
+ * tamaño actual, antes de volcar los pixeles.
  */
 export function useCanvasTexture(buffer: TextureBuffer, version: number): THREE.CanvasTexture {
   const [canvas] = useState(() => {
@@ -39,6 +51,16 @@ export function useCanvasTexture(buffer: TextureBuffer, version: number): THREE.
   useEffect(() => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+    if (canvas.width !== buffer.width || canvas.height !== buffer.height) {
+      // Mutar el `<canvas>` (un elemento DOM real, no un valor
+      // inmutable de React) devuelto por `useState` es el patron
+      // idiomatico para un canvas offscreen creado una sola vez -- mismo
+      // criterio ya aplicado abajo para `texture.needsUpdate`.
+      // oxlint-disable-next-line react/immutability
+      canvas.width = buffer.width;
+      // oxlint-disable-next-line react/immutability
+      canvas.height = buffer.height;
+    }
     ctx.putImageData(buffer.toImageData(), 0, 0);
     // Mismo caso que Viewer3D.tsx (ticket 001): mutar sampler
     // settings/needsUpdate sobre una THREE.Texture ya creada es el
