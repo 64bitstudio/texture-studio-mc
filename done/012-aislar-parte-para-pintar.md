@@ -21,3 +21,13 @@ Ticket 011 (regiones UV nombradas) — usa el mismo catálogo de nombres.
 - Dado que se selecciona una parte (ej. "Cara"), cuando se activa el modo aislado, entonces solo esa región es pintable y el resto queda claramente diferenciado como no-editable en ese momento.
 - Dado el modo aislado activo, cuando se pinta dentro de la región, entonces el resultado se refleja correctamente en el modelo 3D completo (no solo en la parte visible del editor).
 - Dado el modo aislado activo, cuando se elige "Mostrar todo", entonces la cuadrícula vuelve a su vista completa sin perder nada de lo pintado.
+
+## Hecho
+Implementado por el agente `fullstack-dev` (PR [#25](https://github.com/64bitstudio/texture-studio-mc/pull/25)). CI de Jenkins en verde, sin hallazgos del gate de QA automático.
+
+- Selector de partes reusando directamente el catálogo de `regionLabels.ts` (ticket 011), sin redefinirlo.
+- Atenuado visual (overlay con "agujero" sobre la región activa) + bloqueo REAL de pintura fuera de la región (filtrado antes de tocar `history`/`buffer`, no solo visual) + feedback en 3 capas (atenuado, cursor `not-allowed`, mensaje inline).
+- Simetría (ticket 004) respeta el aislamiento: una contraparte espejada fuera de la región se descarta en silencio.
+- `isolatedRegion` expuesto en `Editor.tsx` para que el ticket 013 lo consuma directamente.
+- **Verificado en vivo contra el deploy real de DEV** (el orquestador repitió la verificación tras el merge): al aislar "Cara", el resto de la cuadrícula se atenúa claramente (la cara del cráneo queda iluminada); pintar dentro de la cara aplica el color y se refleja en el modelo 3D; pintar fuera muestra el mensaje "Pintura bloqueada: ese pixel está fuera de la parte aislada (Cara)." sin modificar nada; "Mostrar todo" restaura la vista completa sin pérdida.
+- Pendiente, explícitamente fuera de este ticket: pegado con ajuste automático a la parte aislada (013).
