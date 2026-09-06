@@ -1,6 +1,7 @@
 import { useCallback, useState, type ChangeEvent } from 'react';
 import { Button, FormField, InlineError, Section } from '../ui';
 import { ProjectAlreadyExistsError, deleteProject, loadProject, renameProject } from '../projectStorage';
+import { exportProjectZip } from '../export';
 import type { MobSummary } from '../types/mobs';
 
 export interface ProyectoProps {
@@ -25,7 +26,8 @@ function mobLabelFor(mobId: string, mobs: MobSummary[]): string {
  * Vista de detalle de "Proyecto" (ticket 041, HU-2) -- pieza central
  * del flujo nuevo: punto de llegada desde "Nuevo proyecto"/"Mis
  * proyectos"/"Recientes" (038/039/040), punto de partida hacia el
- * editor y "Agregar mobs" (042).
+ * editor y "Agregar mobs" (042), y ahora tambien hacia exportar el
+ * proyecto completo (044).
  *
  * Lee el registro COMPLETO del proyecto con `loadProject` en cada
  * render (fresco desde `localStorage`, mismo criterio que
@@ -40,6 +42,14 @@ function mobLabelFor(mobId: string, mobs: MobSummary[]): string {
  * una vista chica, y este proyecto no tiene ningún otro asset de
  * miniatura/ícono por mob (ver `MobSelector.tsx`/`NuevoProyecto.tsx`,
  * ambos solo texto).
+ *
+ * Ticket 044 (HU-4): "Exportar proyecto (.zip)" ya no esta deshabilitado
+ * -- llama a `exportProjectZip(projectName, record.mobs)`, que decodifica
+ * DIRECTAMENTE cada `pngDataUrl` ya guardado (sin re-decodificar a
+ * `TextureBuffer`/re-codificar, ver `export.ts`). REEMPLAZA a la vieja
+ * exportacion de "solo el mob activo del editor" (retirada de
+ * `ExportControls.tsx` en este mismo ticket) -- esta es ahora la UNICA
+ * forma de exportar un `.zip` en la app.
  */
 export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectRenamed, onProjectDeleted }: ProyectoProps) {
   const [renameInput, setRenameInput] = useState(projectName);
@@ -47,6 +57,8 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
   const [renameError, setRenameError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const record = loadProject(projectName);
   const mobIds = record ? Object.keys(record.mobs) : [];
@@ -107,6 +119,19 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
     }
   }, [projectName, onProjectDeleted]);
 
+  const handleExportProject = useCallback(async () => {
+    if (!record) return;
+    setExportError(null);
+    setExporting(true);
+    try {
+      await exportProjectZip(projectName, record.mobs);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'No se pudo exportar el proyecto.');
+    } finally {
+      setExporting(false);
+    }
+  }, [projectName, record]);
+
   if (!record) {
     return (
       <div style={{ padding: 24 }}>
@@ -149,8 +174,8 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
         <Button variant="primary" onClick={onAddMobs}>
           <span aria-hidden="true">➕</span> Agregar mobs
         </Button>
-        <Button disabled title="Disponible cuando se implemente el ticket 044">
-          <span aria-hidden="true">📦</span> Exportar proyecto (.zip)
+        <Button onClick={() => void handleExportProject()} disabled={exporting}>
+          <span aria-hidden="true">📦</span> {exporting ? 'Exportando proyecto…' : 'Exportar proyecto (.zip)'}
         </Button>
         {confirmDelete ? (
           <span role="alertdialog" aria-label="Confirmar eliminación de proyecto" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -167,6 +192,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
         )}
       </div>
       {deleteError && <InlineError message={deleteError} />}
+      {exportError && <InlineError message={exportError} />}
 
       <Section title={`Mobs de este proyecto (${mobIds.length})`}>
         {mobIds.length === 0 ? (

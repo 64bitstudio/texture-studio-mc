@@ -243,7 +243,7 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 
 ### Ticket 041 -- Vista de detalle de "Proyecto"
 
-- **`components/Proyecto.tsx`** (nuevo) — lista de mobs con miniatura real (`<img src={pngDataUrl}>`), elegir uno navega al editor; acciones "Agregar mobs" (navega a `'agregar-mobs'`), "Exportar proyecto (.zip)" (deshabilitado hasta el ticket 044), "Renombrar" (`renameProject`, nuevo) y "Eliminar proyecto" (`deleteProject`, con confirmación inline).
+- **`components/Proyecto.tsx`** (nuevo) — lista de mobs con miniatura real (`<img src={pngDataUrl}>`), elegir uno navega al editor; acciones "Agregar mobs" (navega a `'agregar-mobs'`), "Exportar proyecto (.zip)" (wireado en el ticket 044, `exportProjectZip`), "Renombrar" (`renameProject`, nuevo) y "Eliminar proyecto" (`deleteProject`, con confirmación inline).
 - **`projectStorage.ts`** — gana `renameProject(oldName, newName)`: mueve la entrada de clave, sin tocar `mobs`/`updatedAt`; lanza `ProjectAlreadyExistsError` si el nombre destino ya existe (sin ofrecer sobrescribir -- decisión real documentada en `docs/ARQUITECTURA.md`).
 - **`App.tsx`** — "Proyecto" usa `Proyecto` (reemplaza el `PlaceholderScreen` del ticket 037); nuevos handlers `handleAddMobs`/`handleProjectRenamed`/`handleProjectDeleted`.
 
@@ -257,3 +257,10 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 
 - **`components/MobSelector.tsx`** — gana prop opcional `onAddMob` (botón "+ Agregar mob" al final, solo si se pasa); sigue sin saber nada de "proyecto" (genérico).
 - **`App.tsx`** — nuevo `editorMobs` (filtra `mobsState.mobs` contra `activeProject.mobIds` antes de pasarlo a `MobSelector`); `onAddMob={handleAddMobs}` reusa el mismo handler del ticket 041.
+
+### Ticket 044 -- Exportar proyecto completo como .zip
+
+- **`exportPack.ts`** — `SKELETON_PNG_PATH` reemplazado por `entityTexturePngPath(mobId)` (ruta vanilla parametrizada por mob); `buildResourcePackFiles` generalizado a `ResourcePackMobInput[]` (N mobs, antes un solo `pngBytes` hardcodeado a Esqueleto); nuevas `dataUrlToBytes` (decodifica un `pngDataUrl` guardado a bytes crudos de PNG, sin canvas) y `projectZipFilename` (slug del nombre del proyecto).
+- **`export.ts`** — `exportResourcePackZip` (un solo mob) **eliminada**; nueva `exportProjectZip(projectName, mobs)` itera todos los mobs del proyecto y arma el ZIP reusando cada `pngDataUrl` ya guardado.
+- **`components/ExportControls.tsx`** — pierde el botón "Exportar pack (.zip)" (retirado); solo queda "Exportar PNG" (HU-10, sin cambios).
+- **`components/Proyecto.tsx`** — "Exportar proyecto (.zip)" deja de estar `disabled`, llama a `exportProjectZip`.
