@@ -1111,3 +1111,13 @@ Con "Nuevo proyecto" (038) y "Mis proyectos" (039) mostrando cada uno su conteni
 ### Verificación en vivo (Claude in Chrome, local)
 
 Confirmado con capturas: "Mis proyectos" lista el proyecto guardado en el ticket 038 con buscar/orden (el filtro por mob no se muestra -- solo hay un mob entre los proyectos guardados, comportamiento ya esperado del ticket 028); buscar un texto que no coincide con ningún proyecto muestra "Ningún proyecto coincide con la búsqueda/filtro."; elegir el proyecto navega a "Proyecto: Set Nether" (la vista de detalle placeholder, NO al editor). `npm run build` sirvió también como verificación de que ningún import roto quedó apuntando a `HomeScreen.tsx` tras borrarlo. `npm run lint`, `npm test` (184, sin tests nuevos -- mismo criterio que `NuevoProyecto.tsx`), `npm run build` en verde.
+
+## Ticket 040 -- Pantalla "Recientes" (HU-5)
+
+### `Recientes.tsx` (nuevo) -- reusa `filterAndSortProjects` solo para ordenar
+
+`filterAndSortProjects(allProjects, { searchText: '', mobId: null, sortBy: 'updatedAt' }).slice(0, RECENT_PROJECTS_LIMIT)` -- sin duplicar la lógica de orden (ticket 028), solo se le pasa `searchText`/`mobId` vacíos (sin filtrar nada) y se trunca a los primeros `RECENT_PROJECTS_LIMIT` (5, constante a nivel de módulo, "ajustable sin impacto arquitectónico" per el ticket). A diferencia de `MisProyectos.tsx`, esta vista NO tiene ningún control de búsqueda/filtro/orden -- de solo lectura, con la misma acción de abrir (restaurar buffers + `onProjectSelected`) que `MisProyectos.tsx`, código casi idéntico entre ambos (aceptado como duplicación pequeña y con propósito distinto -- una es de exploración con controles, la otra un atajo de solo lectura; no se extrajo un componente compartido para no acoplar dos pantallas con roles conceptualmente distintos por una duplicación menor).
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Sembrados 7 proyectos de prueba directamente en `localStorage` (con fechas de guardado crecientes) además del ya existente -- confirmado que "Recientes" muestra EXACTAMENTE los 5 más recientes (Proyecto 7 a Proyecto 3), sin controles de búsqueda visibles, y que ni "Proyecto 1"/"Proyecto 2"/"Set Nether" (más antiguos) aparecen. Abrir uno con datos de PNG inválidos (deliberado, para probar el camino de error) mostró el mensaje de error inline ya existente sin romper la pantalla; corregido el dato de un proyecto con un PNG real generado en el propio navegador, abrirlo navegó correctamente a "Proyecto: Proyecto 7" (la vista de detalle, confirmando el flujo de éxito). Datos de prueba limpiados de `localStorage` antes de cerrar. `npm run lint`, `npm test` (184, sin tests nuevos -- mismo criterio que `MisProyectos.tsx`/`NuevoProyecto.tsx`), `npm run build` en verde.
