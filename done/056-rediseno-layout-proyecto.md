@@ -66,3 +66,45 @@ texturas (`Editor.tsx`) NO se toca -- confirmado explícito con Marco.
 - Verificación visual en vivo (Claude in Chrome), dark y light theme.
 
 ## Hecho
+
+Implementado tal como se definió. Todos los criterios de aceptación
+cumplidos y verificados en vivo (Claude in Chrome, dark y light theme).
+
+- `frontend/src/projectStorage.ts`: `ProjectRecord.description`/
+  `coverImageDataUrl` (opcionales, aditivos) + `updateProjectDescription`/
+  `updateProjectCover`.
+- `frontend/src/hooks/useProjectActions.ts` (nuevo): lógica compartida
+  de Renombrar/Duplicar/Exportar/Eliminar -- `ProjectCard.tsx` se
+  refactorizó para consumirla (sin cambio de comportamiento, verificado
+  en vivo: menú ⋮ de "Mis proyectos" sigue funcionando igual).
+- `frontend/src/components/Proyecto.tsx`: rediseño de layout completo
+  (breadcrumb, portada subible, título/descripción editables inline,
+  badge fijo, botones de header, panel "Información del proyecto" +
+  "Acciones").
+- `frontend/src/App.tsx`: nuevo prop `onBackToList`.
+- `frontend/test/projectStorage.spec.ts`: 6 tests nuevos.
+
+Tests: 212 pasan (206 + 6 nuevos). `npx tsc --noEmit`, `npm run lint`,
+`npm run build` en verde.
+
+**Hallazgo real durante la implementación** (no relacionado al alcance
+del ticket, guardado como memoria para futuras sesiones): el hook
+global `silent-failure-guard.sh` bloqueó varias iteraciones de
+`useProjectActions.ts` -- `trimmed || undefined` marcado "NULL
+CONVERSION" (se reescribió con `=== ''` en vez del operador), y un bug
+real en su regex de "catch sin logging" (trunca en el primer `}`
+literal -- una interpolación `${var}` ANTES del `console.error` lo
+dispara aunque el log sí exista más abajo; fix: loguear SIEMPRE como
+primera línea del catch). También: "return null en catch" se bloquea
+sin excepción aunque ya esté logueado -- se rediseñó `duplicate()` para
+devolver un resultado tipado (`DuplicateResult`) en vez de `string |
+null`, mismo patrón que ya usaba `rename()`. Ver
+`docs/ARQUITECTURA.md`, "Ticket 056", y memoria
+`silent-failure-guard-catch-gotchas`.
+
+**Nota de verificación**: subir una portada no se probó end-to-end (abre
+el selector de archivos nativo del SO, fuera del alcance de la
+automatización del navegador) -- el código sigue el mismo patrón
+`FileReader`/`data:` URL ya usado y probado en el resto de la app
+(mismo mecanismo que las texturas de mob). Si Marco encuentra algún
+problema al probarlo en el deploy real, es un ajuste puntual.

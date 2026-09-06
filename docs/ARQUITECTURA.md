@@ -1570,3 +1570,32 @@ Nuevo componente interno `MobThumbnail2D` reemplaza el `<img>` que mostraba la t
 Confirmado con un proyecto real de 4 mobs (Esqueleto/Zombie/Creeper/Araña): Esqueleto/Zombie/Creeper se ven como siluetas 2D reconocibles del personaje (antes: una hoja de texturas ilegible). Araña muestra la limitación conocida de arriba (patas sin rotar). Sin errores de consola.
 
 `npm run lint`, `npx tsc --noEmit`, `npm test` (206 -- 5 tests nuevos de `computeMobFrontSpriteLayout`), `npm run build` en verde.
+
+## Ticket 056 -- Rediseño de layout de "Proyecto": header, portada, descripción, acciones
+
+Segunda pieza del rediseño definido en `docs/definiciones/preview-2d-y-rediseno-proyecto.md` (VoBo de Marco obtenido). Reconstruye el header/layout de `Proyecto.tsx` (sin tocar desde el ticket 041) -- breadcrumb, portada subible, título/descripción editables inline, badge fijo, botones de header, y un panel lateral de "Acciones". El grid de mobs (con la miniatura 2D del ticket 055) sigue siendo el simple del ticket 041 -- el rediseño de las tarjetas es el ticket 057, deliberadamente separado para no mezclar dos rediseños grandes en un mismo ticket.
+
+### `projectStorage.ts` -- campos nuevos aditivos
+
+`ProjectRecord` gana `description?: string` y `coverImageDataUrl?: string`, ambos opcionales -- proyectos guardados antes de este ticket simplemente no los tienen, sin migración. Dos funciones nuevas (`updateProjectDescription`/`updateProjectCover`) siguen el mismo criterio que `renameProject`: leen/escriben el registro completo, NO tocan `updatedAt` (son metadato, no trabajo hecho sobre el proyecto -- mismo razonamiento ya aplicado a renombrar en el ticket 041).
+
+### `hooks/useProjectActions.ts` (nuevo) -- una sola fuente de verdad para las 4 acciones
+
+Extrae la lógica de Renombrar/Duplicar/Exportar/Eliminar que `ProjectCard.tsx` (tickets 053/054) tenía inline, para que `Proyecto.tsx` (el panel de "Acciones" de este ticket) llame exactamente al mismo código en vez de mantener una tercera copia. Deliberadamente NO decide presentación (`ProjectCard.tsx` sigue con su propio `menuMode` de menú desplegable; `Proyecto.tsx` con su propio panel fijo) -- el hook solo centraliza QUÉ pasa al ejecutar cada acción. `ProjectCard.tsx` se refactorizó en este mismo ticket para consumir el hook (sin cambio de comportamiento, ya verificado en vivo).
+
+**Hallazgo real durante la implementación**: el hook global `silent-failure-guard.sh` (`PreToolUse:Edit/Write` sobre `.ts`/`.tsx`) bloqueó varias iteraciones de este archivo:
+- `trimmed || undefined` (para "cadena vacía → sin descripción") se marcó como "NULL CONVERSION" -- se reescribió como `trimmed === '' ? undefined : trimmed` (misma semántica, sin el operador que dispara la regla).
+- Un `catch` sin `console.error`/`throw` como primera línea se marcó "SWALLOWED ERROR" -- causa real encontrada leyendo el script del hook (`perl` con `[^}]*` para extraer el cuerpo del `catch`, que trunca en el PRIMER `}` que encuentra): si el `catch` arma un mensaje de error con una plantilla de texto que interpola una variable (`` `...${trimmed}...` ``) ANTES de la línea de log, ese `${trimmed}` cierra el "cuerpo" extraído antes de llegar al `console.error` real, aunque sí exista más abajo. Fix: `console.error(...)` SIEMPRE como la primera línea de cada `catch`, antes de cualquier otra construcción de string.
+- `return null` dentro de un `catch` se marca "NULL PROPAGATION" de forma incondicional (sin importar si ya se logueó el error) -- `duplicate()` se rediseñó para devolver un resultado tipado (`DuplicateResult = {ok:true, name} | {ok:false, error}`) en vez de `string | null`, mismo patrón que ya usaba `rename()`.
+
+### `components/Proyecto.tsx` -- layout nuevo
+
+Breadcrumb ("Mis proyectos › Nombre", nuevo prop `onBackToList` desde `App.tsx`); portada como `<button>` que dispara un `<input type="file">` oculto (mismo patrón `FileReader`→`data:` URL que el resto de la app) con placeholder de carpeta si no hay una subida; título y descripción editables inline (mismo mecanismo que ya tenía "Renombrar", generalizado); badge fijo "Minecraft Java Edition" (mismo estilo que `NuevoProyecto.tsx`, copiado tal cual); "Exportar proyecto"/"Agregar mob" en el header. Grid de dos columnas: mobs a la izquierda (sin cambios de este ticket, ver ticket 055), panel lateral con "Información del proyecto" (Nombre/Mobs/Última modificación, de solo lectura) + "Acciones" (Renombrar/Duplicar/Exportar/Eliminar vía `useProjectActions`, con "Eliminar" separado visualmente y confirmación inline). "Exportar proyecto" aparece DOS veces (header + panel de Acciones) a propósito, igual que en la imagen de referencia -- ambas llaman al mismo `exportZip` del hook, sin lógica duplicada.
+
+`refreshTick`: como `record` se deriva fresco de `loadProject()` en cada render (mismo criterio que siempre tuvo este componente) y `description`/`coverImageDataUrl` no tienen ningún prop que cambie al guardarlos (a diferencia de renombrar, que sí cambia `projectName` vía `onProjectRenamed`), se necesita un estado dummy que fuerce el re-render tras guardarlos -- mismo patrón ya usado en `MisProyectos.tsx`.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Confirmado dark y light theme: breadcrumb navega a "Mis proyectos"; título y descripción editables inline y persisten sin recargar; "Duplicar proyecto" desde el panel crea la copia al instante (mismo resultado que desde "Mis proyectos") y muestra confirmación inline; "Eliminar proyecto" muestra la confirmación inline y "Cancelar" no borra nada. Sin errores de consola. (Subir portada no se probó end-to-end en esta verificación -- abre el selector de archivos nativo del SO, fuera del alcance de la automatización del navegador; el código sigue el mismo patrón `FileReader` ya usado y probado en el resto de la app.)
+
+`npm run lint`, `npx tsc --noEmit`, `npm test` (212 -- 6 tests nuevos de `updateProjectDescription`/`updateProjectCover`), `npm run build` en verde.

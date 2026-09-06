@@ -1,8 +1,7 @@
 import { useCallback, useState, type ChangeEvent } from 'react';
 import type { MobSummary } from '../types/mobs';
 import type { ProjectSummary } from '../projectStorage';
-import { ProjectAlreadyExistsError, deleteProject, duplicateProject, loadProject, renameProject } from '../projectStorage';
-import { exportProjectZip } from '../export';
+import { useProjectActions } from '../hooks/useProjectActions';
 import { MOB_ICONS } from '../mobIcons';
 import { Button, InlineError, Menu } from '../ui';
 import { IconDots, IconDuplicate, IconExport, IconFolder, IconPencil, IconTrash } from '../ui/icons';
@@ -58,86 +57,52 @@ type MenuMode = 'default' | 'rename' | 'delete';
 export function ProjectCard({ project, mobs, layout, busy, onOpen, onEdit, onChanged }: ProjectCardProps) {
   const [menuMode, setMenuMode] = useState<MenuMode>('default');
   const [renameInput, setRenameInput] = useState(project.name);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
+  // Ticket 056: la lógica de las 4 acciones (qué llamar, cómo reportar
+  // un error) vive en `useProjectActions` -- compartida con el panel de
+  // "Acciones" de `Proyecto.tsx`, para no mantener una tercera copia.
+  // Este componente sigue dueño de SU propia presentación (el estado
+  // `menuMode` del menú desplegable), que es distinta de la de
+  // `Proyecto.tsx` (panel fijo de página completa).
+  const { actionError, exporting, rename, duplicate, exportZip, remove, clearError } = useProjectActions(project.name);
 
   const resetMenu = useCallback(() => {
     setMenuMode('default');
-    setActionError(null);
-  }, []);
+    clearError();
+  }, [clearError]);
 
   const handleStartRename = useCallback(() => {
     setRenameInput(project.name);
-    setActionError(null);
+    clearError();
     setMenuMode('rename');
-  }, [project.name]);
+  }, [project.name, clearError]);
 
   const handleRenameInputChange = useCallback((e: ChangeEvent<HTMLInputElement>) => {
     setRenameInput(e.target.value);
   }, []);
 
   const handleConfirmRename = useCallback(() => {
-    const trimmed = renameInput.trim();
-    if (!trimmed) {
-      setActionError('Ingresa un nombre para el proyecto.');
-      return;
-    }
-    if (trimmed === project.name) {
-      resetMenu();
-      return;
-    }
-    try {
-      renameProject(project.name, trimmed);
+    const result = rename(renameInput);
+    if (result.ok) {
       resetMenu();
       onChanged();
-    } catch (err) {
-      setActionError(
-        err instanceof ProjectAlreadyExistsError
-          ? `Ya existe un proyecto llamado "${trimmed}" -- elige otro nombre.`
-          : err instanceof Error
-            ? err.message
-            : 'No se pudo renombrar el proyecto.',
-      );
     }
-  }, [renameInput, project.name, resetMenu, onChanged]);
+  }, [rename, renameInput, resetMenu, onChanged]);
 
   const handleDuplicate = useCallback(() => {
-    setActionError(null);
-    try {
-      duplicateProject(project.name);
+    const result = duplicate();
+    if (result.ok) {
       resetMenu();
       onChanged();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'No se pudo duplicar el proyecto.');
     }
-  }, [project.name, resetMenu, onChanged]);
-
-  const handleExport = useCallback(async () => {
-    setActionError(null);
-    setExporting(true);
-    try {
-      const record = loadProject(project.name);
-      if (!record) {
-        setActionError(`El proyecto "${project.name}" ya no existe -- puede que se haya eliminado en otra pestaña.`);
-        return;
-      }
-      await exportProjectZip(project.name, record.mobs);
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'No se pudo exportar el proyecto.');
-    } finally {
-      setExporting(false);
-    }
-  }, [project.name]);
+  }, [duplicate, resetMenu, onChanged]);
 
   const handleConfirmDelete = useCallback(() => {
-    try {
-      deleteProject(project.name);
+    const result = remove();
+    if (result.ok) {
       resetMenu();
       onChanged();
-    } catch (err) {
-      setActionError(err instanceof Error ? err.message : 'No se pudo eliminar el proyecto.');
     }
-  }, [project.name, resetMenu, onChanged]);
+  }, [remove, resetMenu, onChanged]);
 
   const visibleMobIds = project.mobIds.slice(0, MAX_VISIBLE_THUMBS);
   const overflowCount = project.mobIds.length - visibleMobIds.length;
@@ -211,7 +176,7 @@ export function ProjectCard({ project, mobs, layout, busy, onOpen, onEdit, onCha
             <button type="button" className="ui-menu__item" onClick={handleDuplicate}>
               <IconDuplicate size={16} /> Duplicar
             </button>
-            <button type="button" className="ui-menu__item" onClick={() => void handleExport()} disabled={exporting}>
+            <button type="button" className="ui-menu__item" onClick={() => void exportZip()} disabled={exporting}>
               <IconExport size={16} /> {exporting ? 'Exportando…' : 'Exportar proyecto / Resource Pack'}
             </button>
             {/* Separada visualmente (línea + color de peligro) por ser destructiva -- pedido explícito de Marco. */}

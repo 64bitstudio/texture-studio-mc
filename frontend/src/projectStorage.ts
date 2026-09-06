@@ -37,6 +37,21 @@ export interface ProjectMobEntry {
 export interface ProjectRecord {
   updatedAt: string;
   mobs: Record<string, ProjectMobEntry>;
+  /**
+   * Descripción libre del proyecto (ticket 056, rediseño de "Proyecto" --
+   * ver `docs/definiciones/preview-2d-y-rediseno-proyecto.md`). Opcional
+   * y ADITIVO: los proyectos guardados antes de este ticket simplemente
+   * no la tienen (`undefined`), se tratan como "sin descripción" en vez
+   * de requerir una migración.
+   */
+  description?: string;
+  /**
+   * Portada del proyecto (ticket 056), subida por el usuario -- mismo
+   * mecanismo `FileReader`/`data:` URL ya usado en el resto de la app
+   * (ej. `pngDataUrl` de cada mob). Opcional y ADITIVO, mismo criterio
+   * que `description`.
+   */
+  coverImageDataUrl?: string;
 }
 
 /**
@@ -218,6 +233,41 @@ export function renameProject(oldName: string, newName: string): void {
   const record = all[oldName]!;
   delete all[oldName];
   all[newName] = record;
+  writeAllProjects(all);
+}
+
+/**
+ * Actualiza la descripción de un proyecto guardado (ticket 056). Mismo
+ * criterio que `renameProject`: lee/escribe el registro completo, sin
+ * tocar `updatedAt` -- la descripción es metadato, no trabajo hecho
+ * sobre el proyecto (mismo razonamiento ya aplicado a renombrar).
+ * `description` vacío/solo-espacios se guarda como `undefined` (sin
+ * descripción), no como cadena vacía -- evita distinguir dos formas de
+ * "no hay descripción" en el resto de la app.
+ */
+export function updateProjectDescription(name: string, description: string): void {
+  const all = readAllProjects();
+  if (!(name in all)) {
+    throw new Error(`El proyecto "${name}" ya no existe -- puede que se haya eliminado en otra pestaña.`);
+  }
+  const trimmed = description.trim();
+  const nextDescription = trimmed === '' ? undefined : trimmed;
+  all[name] = { ...all[name]!, description: nextDescription };
+  writeAllProjects(all);
+}
+
+/**
+ * Actualiza la portada de un proyecto guardado (ticket 056). Mismo
+ * criterio que `updateProjectDescription` -- metadato, no toca
+ * `updatedAt`. `coverImageDataUrl` de `undefined` quita la portada
+ * (vuelve al placeholder genérico).
+ */
+export function updateProjectCover(name: string, coverImageDataUrl: string | undefined): void {
+  const all = readAllProjects();
+  if (!(name in all)) {
+    throw new Error(`El proyecto "${name}" ya no existe -- puede que se haya eliminado en otra pestaña.`);
+  }
+  all[name] = { ...all[name]!, coverImageDataUrl };
   writeAllProjects(all);
 }
 
