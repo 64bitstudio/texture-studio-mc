@@ -309,3 +309,7 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 
 - **`ui/icons.tsx`** — `IconSettings` reconstruido (tercera vez) con la geometría correcta verificada contra referencia real: contorno de 6 pétalos vía curva paramétrica `r(θ)=R_prom+R_amp·cos(6θ)`, trazo fino (no relleno), aro central suelto.
 - **`components/Viewer3D.tsx`** — 2 `<Grid>` adicionales rotados 90° simulando paredes izquierda/derecha (mismos colores que el piso, extraídos a `BOX_GRID_PROPS`); `side: THREE.DoubleSide` (drei usa `BackSide` por defecto, culleaba las paredes); colores del piso/paredes más sutiles (`#274435`/`#3c6b4f`, antes `#3a6b4d`/`#5b9e77`).
+
+### Ticket 051 -- Visor 3D: solo piso, colores homologados, material sin tone mapping
+
+- **`components/Viewer3D.tsx`** — se retiran las 2 paredes del ticket 050 (`BOX_GRID_PROPS` renombrado a `FLOOR_GRID_PROPS`, sin `side: THREE.DoubleSide`); colores re-muestreados de la referencia (`#20392c`/`#2c4d3c`, antes `#274435`/`#3c6b4f`); `MeshBasicMaterial` del modelo gana `toneMapped: false` (el `<Canvas>` de r3f aplica `ACESFilmicToneMapping` por defecto, alterando los colores reales de la textura -- causa real de "se ve brilloso").

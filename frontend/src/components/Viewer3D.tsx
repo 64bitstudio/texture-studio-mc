@@ -16,33 +16,31 @@ interface MobPartMeshProps {
 const DEG_TO_RAD = Math.PI / 180;
 
 /**
- * Props compartidas de los 3 planos de la "caja" del visor (piso + 2
- * paredes, ver `Viewer3D`) -- mismos colores/tamaños de celda en los
- * 3 para que combinen entre sí. Ticket 050 (pedido de Marco: "el piso
- * debe ser un verde mas sutil"): tonos más apagados que la revisión
- * anterior del ticket 049 (`cellColor`/`sectionColor` más cerca del
- * fondo de la escena, menos contraste).
+ * Props del piso cuadriculado del visor (ver `Viewer3D`).
  *
- * `side: THREE.DoubleSide` (el `<Grid>` de drei por default usa
- * `THREE.BackSide`, pensado para un piso visto desde arriba) --
- * hallazgo real al agregar las paredes: con `BackSide`, una pared
- * rotada 90° respecto al piso queda con la cara "visible" mirando
- * para el lado contrario a la cámara según la posición/rotación
- * exactas, así que se renderiza invisible (cara trasera). `DoubleSide`
- * la hace visible sin importar la orientación relativa a la cámara --
- * más simple y robusto que calcular a mano qué signo de rotación le
- * toca a cada pared.
+ * Ticket 051 (corrección de Marco): revierte las 2 paredes agregadas
+ * en el ticket 050 ("mejor solo deja la cuadricula del piso") -- vuelve
+ * a ser un único plano horizontal, sin `side: THREE.DoubleSide` (esa
+ * prop solo hacía falta para las paredes rotadas, ver el ticket 050 en
+ * `docs/ARQUITECTURA.md` para el porqué -- el piso, sin rotación,
+ * siempre se vio bien con el `side: THREE.BackSide` por defecto del
+ * `<Grid>` de drei).
+ *
+ * Colores RE-MUESTREADOS de la imagen de referencia que mandó Marco
+ * (Python/PIL, no a ojo -- ver `docs/ARQUITECTURA.md`, "Ticket 051"):
+ * mucho más sutiles/apagados que la revisión del ticket 050
+ * (`#274435`/`#3c6b4f`) -- las líneas de la cuadrícula de referencia
+ * son casi imperceptibles, apenas un poco más claras que el fondo.
  */
-const BOX_GRID_PROPS = {
+const FLOOR_GRID_PROPS = {
   cellSize: 4,
-  cellThickness: 0.7,
-  cellColor: '#274435',
+  cellThickness: 0.6,
+  cellColor: '#20392c',
   sectionSize: 20,
-  sectionThickness: 1.2,
-  sectionColor: '#3c6b4f',
+  sectionThickness: 1,
+  sectionColor: '#2c4d3c',
   fadeDistance: 220,
   fadeStrength: 1,
-  side: THREE.DoubleSide,
   infiniteGrid: true,
 } as const;
 
@@ -113,7 +111,20 @@ function MobModel({ texture, geometry }: MobModelProps) {
       // MeshBasicMaterial (sin luces): el objetivo es previsualizar la
       // textura tal cual, sin sombreado que altere los colores -- clave
       // para el editor de pixeles.
-      new THREE.MeshBasicMaterial({ map: texture, side: THREE.FrontSide }),
+      //
+      // Ticket 051 (hallazgo real, corrección de Marco: "siempre se ve
+      // como brilloso, no se respetan los colores reales"): `<Canvas>`
+      // de react-three-fiber aplica `ACESFilmicToneMapping` por default
+      // a TODO el renderer -- una curva de tono pensada para escenas con
+      // iluminación realista, que reinterpreta/satura los colores en vez
+      // de reproducirlos tal cual (exactamente lo contrario de lo que
+      // necesita un editor de textura pixel a pixel, donde cada píxel
+      // debe verse con su color RGB real, no una versión "cinematográfica"
+      // de él). `toneMapped: false` en el material saca a ESTE material
+      // específico de ese pipeline -- sin tocar `<Canvas>` globalmente
+      // (más seguro/acotado si en el futuro se agrega algo que sí
+      // necesite tone mapping, ej. luces reales).
+      new THREE.MeshBasicMaterial({ map: texture, side: THREE.FrontSide, toneMapped: false }),
     [texture],
   );
 
@@ -188,25 +199,11 @@ export function Viewer3D({ texture, geometry, mobLabel }: Viewer3DProps) {
             10x10 quedaba MUY por debajo del área visible, cortando la
             cuadrícula antes de que pudiera desvanecerse de forma
             natural).
-            Ticket 050 (pedido de Marco: "imagina que el mob esta dentro
-            de una caja... falta la pared de la izquierda y de la
-            derecha, pero esta debe ser igual cuadriculada como el piso"):
-            2 planos verticales más, mismo `<Grid>`, rotados 90° para
-            pasar de piso (plano XZ) a pared (planos YZ) -- ver el
-            comentario de cada uno abajo para la matemática de la
-            rotación. Colores más sutiles que la revisión anterior (pedido
-            explícito de Marco sobre el piso, aplicado a los 3 planos para
-            que combinen entre sí). */}
-        <Grid position={[0, 0, 0]} args={[300, 300]} {...BOX_GRID_PROPS} />
-        {/* Pared "izquierda": mismo plano, rotado 90° alrededor del eje
-            Z (`rotation={[0, 0, Math.PI / 2]}`) -- un punto del piso
-            (x, 0, z) pasa a (0, x, z) en mundo, es decir, el ancho del
-            piso (eje X) se vuelve ALTURA (eje Y) y queda fijo en
-            mundo-X=0 antes de trasladarlo -- `position={[-40, 0, 0]}`
-            lo desplaza a un costado real del modelo. */}
-        <Grid position={[-40, 0, 0]} rotation={[0, 0, Math.PI / 2]} args={[300, 300]} {...BOX_GRID_PROPS} />
-        {/* Pared "derecha": mismo plano rotado, reflejado al otro lado. */}
-        <Grid position={[40, 0, 0]} rotation={[0, 0, Math.PI / 2]} args={[300, 300]} {...BOX_GRID_PROPS} />
+            Ticket 050 había agregado 2 paredes ("imagina que el mob esta
+            dentro de una caja"); ticket 051 las revirtió ("mejor solo deja
+            la cuadricula del piso") -- ver `FLOOR_GRID_PROPS` arriba para
+            el porqué de los colores. */}
+        <Grid position={[0, 0, 0]} args={[300, 300]} {...FLOOR_GRID_PROPS} />
         <MobModel texture={texture} geometry={geometry} />
         <OrbitControls target={target} enableDamping />
       </Canvas>
