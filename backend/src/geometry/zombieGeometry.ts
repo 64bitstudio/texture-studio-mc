@@ -1,17 +1,22 @@
+import { buildClassicBipedGeometry } from './classicBipedGeometry.js';
 import type { MobGeometry } from '../types/baseAssets.js';
 
-// Geometria por cajas + UV clasico del modelo biped vanilla del Zombie
-// (ticket 017 -- ver docs/definiciones/multi-mob-y-proyectos-guardados.md,
-// "Diseño técnico"). Mismo shape que `skeletonGeometry.ts` -- 6 cajas
-// identicas en anatomia y en origenes UV -- pero brazos/piernas GRUESOS
-// (tipo Steve), no los huesos delgados del Esqueleto.
+// Geometria del Zombie -- biped clasico de 6 cajas (ticket 017, ver
+// docs/definiciones/multi-mob-y-proyectos-guardados.md, "Diseño
+// técnico"). Misma anatomia y mismos origenes UV que el Esqueleto, pero
+// brazos/piernas GRUESOS (tipo Steve), no los huesos delgados del
+// Esqueleto. La estructura compartida por cualquier biped clasico
+// (cabeza/torso fijos, convencion de ejes, `mirrorX`, `faceLabels`) vive
+// en `classicBipedGeometry.ts` (extraida en este mismo ticket para
+// eliminar la duplicacion literal que tenia este archivo con
+// `skeletonGeometry.ts`, señalada por el gate de calidad de SonarQube) --
+// aqui solo quedan los valores que son propios del Zombie, ya
+// verificados.
 //
-// METODO DE VERIFICACION (el mismo estandar del ticket 009, ver
-// docs/ARQUITECTURA.md "Ticket 009" y el comentario de cabecera de
-// `skeletonGeometry.ts"): NO se copio el valor de `[4,12,4]` de memoria
-// ni del documento de definicion sin confirmar -- se volvio a verificar
-// en esta misma sesion contra dos fuentes independientes antes de
-// escribir este archivo:
+// METODO DE VERIFICACION (mismo estandar del ticket 009): NO se copio el
+// valor de `[4,12,4]` de memoria ni del documento de definicion sin
+// confirmar -- se volvio a verificar en esta misma sesion contra dos
+// fuentes independientes antes de escribir este archivo:
 //
 // 1) FUENTE OFICIAL -- fetch real (no de memoria) de
 //    `Mojang/bedrock-samples/resource_pack/models/entity/zombie.geo.json`
@@ -81,90 +86,8 @@ import type { MobGeometry } from '../types/baseAssets.js';
 //        que el editor de textura (que dimensiona su buffer con
 //        `texture.width/height` de la respuesta) muestre las 64x64
 //        filas/columnas reales del asset sin recortar ni estirar nada.
-//
-// Convencion de ejes y de `left`/`right` anatomico: identica a
-// `skeletonGeometry.ts` (ver ese archivo) -- no se repite aqui.
-const HEAD_FACE_LABELS = {
-  front: 'Cara',
-  back: 'Nuca',
-  top: 'Parte superior',
-  bottom: 'Parte inferior',
-  left: 'Lateral derecho',
-  right: 'Lateral izquierdo',
-};
-
-const BODY_FACE_LABELS = {
-  front: 'Pecho',
-  back: 'Espalda',
-  top: 'Parte superior',
-  bottom: 'Parte inferior',
-  left: 'Costado derecho',
-  right: 'Costado izquierdo',
-};
-
-// Sin lateralidad (mismo criterio del ticket 011 ya aplicado al
-// Esqueleto): armRight/armLeft (y legRight/legLeft) comparten
-// EXACTAMENTE la misma region UV -- pintar ahi afecta ambos lados 3D a
-// la vez, asi que etiquetarlo "derecho"/"izquierdo" seria enganoso.
-const ARM_FACE_LABELS = {
-  front: 'Brazo — Frente',
-  back: 'Brazo — Atrás',
-  top: 'Brazo — Superior',
-  bottom: 'Brazo — Inferior',
-  left: 'Brazo — Lateral',
-  right: 'Brazo — Lateral',
-};
-
-const LEG_FACE_LABELS = {
-  front: 'Pierna — Frente',
-  back: 'Pierna — Atrás',
-  top: 'Pierna — Superior',
-  bottom: 'Pierna — Inferior',
-  left: 'Pierna — Lateral',
-  right: 'Pierna — Lateral',
-};
-
-export const ZOMBIE_GEOMETRY: MobGeometry = {
-  textureWidth: 64,
-  textureHeight: 64,
-  parts: {
-    head: {
-      size: [8, 8, 8],
-      position: [0, 28, 0],
-      uv: { x: 0, y: 0 },
-      faceLabels: HEAD_FACE_LABELS,
-    },
-    body: {
-      size: [8, 12, 4],
-      position: [0, 18, 0],
-      uv: { x: 16, y: 16 },
-      faceLabels: BODY_FACE_LABELS,
-    },
-    armRight: {
-      size: [4, 12, 4],
-      position: [-6, 18, 0],
-      uv: { x: 40, y: 16 },
-      faceLabels: ARM_FACE_LABELS,
-    },
-    armLeft: {
-      size: [4, 12, 4],
-      position: [6, 18, 0],
-      uv: { x: 40, y: 16 },
-      mirrorX: true,
-      faceLabels: ARM_FACE_LABELS,
-    },
-    legRight: {
-      size: [4, 12, 4],
-      position: [-1.9, 6, 0],
-      uv: { x: 0, y: 16 },
-      faceLabels: LEG_FACE_LABELS,
-    },
-    legLeft: {
-      size: [4, 12, 4],
-      position: [1.9, 6, 0],
-      uv: { x: 0, y: 16 },
-      mirrorX: true,
-      faceLabels: LEG_FACE_LABELS,
-    },
-  },
-};
+export const ZOMBIE_GEOMETRY: MobGeometry = buildClassicBipedGeometry(64, {
+  size: [4, 12, 4],
+  armOffsetX: 6,
+  legOffsetX: 1.9,
+});
