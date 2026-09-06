@@ -189,3 +189,18 @@ export function deleteProject(name: string): void {
   delete all[name];
   writeAllProjects(all);
 }
+
+/**
+ * Borra TODOS los proyectos guardados de una vez (ticket 036, pantalla
+ * "Configuración", "Borrar todos los datos locales"). Elimina solo la
+ * clave `PROJECTS_STORAGE_KEY` -- NO toca ninguna otra clave de
+ * `localStorage` que use esta app (tema, preferencias de usuario), ya
+ * que esas son preferencias de UI, no "datos" en el sentido de trabajo
+ * guardado (el criterio de aceptación del ticket solo pide que
+ * `listProjects()` quede vacío). La UI que llame a esto es responsable
+ * de pedir confirmación en línea antes -- esta función nunca confirma
+ * por su cuenta.
+ */
+export function deleteAllProjects(): void {
+  getStorage().removeItem(PROJECTS_STORAGE_KEY);
+}

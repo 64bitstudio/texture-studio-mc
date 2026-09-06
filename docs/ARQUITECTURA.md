@@ -1027,3 +1027,25 @@ Confirmado con captura de pantalla en ambos temas: toggle cambia toda la UI visi
 ### Fuera de alcance, confirmado sin regresión: checkbox nativo
 
 El `<input type="checkbox">` de `ui/Checkbox.tsx` nunca tuvo `accent-color` fijado (usa el color de sistema del navegador, no `--accent`) -- no es una regresión de este ticket, ya era así desde el ticket 026, y queda fuera de alcance (no pedido en la definición ni en el ticket).
+
+## Ticket 036 -- Preferencias locales de usuario + pantalla Configuración (HU-6)
+
+### `userPrefs.ts` (nuevo) -- mismo patrón que `theme.ts`
+
+`getUserPrefs`/`setUserPrefs`/`getAvatarInitial` -- persistencia en `localStorage` vía `globalThis.localStorage` (testeable sin jsdom, mismo criterio del ticket 019/034). `getAvatarInitial` deriva la inicial del avatar de `displayName` (primera letra, mayúscula) -- NO es un campo separado que el usuario deba llenar aparte. Default `{ displayName: 'Usuario' }` si nunca se configuró o el valor guardado está corrupto/con forma inesperada (mismo criterio defensivo de `readAllProjects` en `projectStorage.ts`).
+
+### `deleteAllProjects()` (nuevo, en `projectStorage.ts`) -- borra SOLO la clave de proyectos
+
+Elimina únicamente `PROJECTS_STORAGE_KEY` -- NO toca `ts-theme`/`ts-user-prefs` (esas son preferencias de UI, no "datos" en el sentido del criterio de aceptación, que solo exige que `listProjects()` quede vacío). La UI (`Settings.tsx`) es responsable de la confirmación en línea antes de llamarla -- la función nunca confirma por su cuenta, mismo criterio de separar "regla de confirmar" de "acción destructiva en sí" ya usado en `deleteProject`.
+
+### `Avatar.tsx`/`Settings.tsx` (nuevos) -- ubicación temporal en el header actual
+
+Igual que `ThemeToggle` (ticket 034): se montan en el header EXISTENTE de `App.tsx` (ambas vistas) como una solución temporal -- `Settings` se abre como un overlay (`position: fixed; inset: 0`) disparado por un ícono de engranaje nuevo, no como un destino real de navegación todavía. El ticket 037 los reubicará en el header/sidebar definitivos sin tocar su lógica interna.
+
+### Bug real encontrado y corregido en vivo: `ThemeToggle` y `Settings` quedaban desincronizados
+
+`ThemeToggle` (ticket 034) tenía su PROPIO `useState<Theme>(() => getTheme())`, inicializado una sola vez al montar. Al agregar `Settings` como un SEGUNDO lugar desde donde cambiar el tema, cambiarlo ahí actualizaba `theme.ts`/el DOM correctamente, pero el estado interno de `ThemeToggle` nunca se enteraba -- el botón rápido del header seguía mostrando "Cambiar a tema claro" con el tema YA en claro (confirmado en vivo con `textContent` antes del fix). Mismo patrón que `displayName`/`Avatar` de este mismo ticket: se levantó el estado de `theme` a `App.tsx` (única fuente de verdad para AMBOS componentes hermanos, `ThemeToggle` y `Settings` pasan a ser controlados vía props `theme`/`onThemeChange`) -- confirmado corregido reproduciendo el mismo flujo (cambiar tema desde Configuración) y verificando que el botón rápido refleja el cambio de inmediato.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Cambiar el nombre en Configuración actualiza el avatar del header de inmediato ("U" → "M"); cambiar el tema desde Configuración sincroniza el toggle rápido (bug reproducido y re-verificado corregido); "Borrar todos los datos locales" muestra la confirmación en línea (nunca diálogo nativo), y al confirmar la sección "Guardados" pasa a "Todavía no hay proyectos guardados" (capturas de pantalla). `npm run lint`, `npm test` (184, incluye `userPrefs.spec.ts` nuevo y 3 tests nuevos de `deleteAllProjects` en `projectStorage.spec.ts`), `npm run build` en verde.

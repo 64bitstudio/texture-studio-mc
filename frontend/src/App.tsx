@@ -4,6 +4,10 @@ import { MobSelector } from './components/MobSelector';
 import { ProjectControls } from './components/ProjectControls';
 import { HomeScreen } from './components/HomeScreen';
 import { ThemeToggle } from './components/ThemeToggle';
+import { Avatar } from './components/Avatar';
+import { Settings } from './components/Settings';
+import { getUserPrefs } from './userPrefs';
+import { getTheme, type Theme } from './theme';
 import { fetchMobBaseAssets } from './api/baseAssets';
 import { fetchMobs } from './api/mobs';
 import type { MobBaseAssetsResponse, MobGeometry } from './types/baseAssets';
@@ -27,6 +31,23 @@ type AssetState =
 function App() {
   // Ticket 027, HU-1: arranca en 'home', no directo al editor.
   const [view, setView] = useState<View>('home');
+
+  // Ticket 036 (HU-6): nombre del perfil local, levantado aca porque lo
+  // leen DOS componentes hermanos (`Avatar` en el header, `Settings` al
+  // editarlo) -- evita releer `localStorage` en cada uno o inventar un
+  // mecanismo de eventos para un caso de 2 consumidores. `showSettings`
+  // es la ubicacion TEMPORAL de la pantalla de Configuracion (overlay
+  // disparado por el icono de engranaje) -- el ticket 037 la conecta
+  // como destino real de la navegacion nueva, sin tocar `Settings.tsx`.
+  const [displayName, setDisplayName] = useState(() => getUserPrefs().displayName);
+  const [showSettings, setShowSettings] = useState(false);
+  // Mismo criterio que `displayName` de arriba -- `ThemeToggle` (header)
+  // y `Settings` (Configuración) son DOS componentes hermanos que
+  // pueden cambiar la MISMA preferencia; levantar el estado aca es lo
+  // que los mantiene sincronizados (bug real encontrado en vivo:
+  // cambiar el tema desde Configuración no actualizaba el texto del
+  // toggle rapido, que tenia su propio `useState` desincronizado).
+  const [theme, setTheme] = useState<Theme>(() => getTheme());
 
   // Catalogo de mobs (ticket 018, HU-1) -- `GET /api/mobs`. El menu no
   // hardcodea ninguna lista: muestra exactamente lo que este fetch
@@ -151,6 +172,14 @@ function App() {
     setAssetRetryCount((c) => c + 1);
   }
 
+  function handleOpenSettings() {
+    setShowSettings(true);
+  }
+
+  function handleCloseSettings() {
+    setShowSettings(false);
+  }
+
   // Ticket 027: unico punto de entrada para "activar este mob y mostrar
   // el editor" -- lo usan tanto `MobSelector` del header (mob ya en
   // vista de editor) como `HomeScreen` (primera eleccion desde el
@@ -229,8 +258,16 @@ function App() {
           }}
         >
           <h1 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Texture Studio MC</h1>
-          <ThemeToggle />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ThemeToggle theme={theme} onThemeChange={setTheme} />
+            <Button variant="icon" title="Configuración" onClick={handleOpenSettings}>
+              <span aria-hidden="true">⚙️</span> Configuración
+            </Button>
+            <Avatar displayName={displayName} />
+          </div>
         </header>
+
+        {showSettings && <Settings displayName={displayName} onDisplayNameSaved={setDisplayName} theme={theme} onThemeChange={setTheme} onClose={handleCloseSettings} />}
 
         {mobsState.status === 'loading' && <LoadingOverlay message="Cargando catálogo de mobs…" />}
 
@@ -298,8 +335,16 @@ function App() {
           </span>
         )}
 
-        <ThemeToggle />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ThemeToggle theme={theme} onThemeChange={setTheme} />
+          <Button variant="icon" title="Configuración" onClick={handleOpenSettings}>
+            <span aria-hidden="true">⚙️</span> Configuración
+          </Button>
+          <Avatar displayName={displayName} />
+        </div>
       </header>
+
+      {showSettings && <Settings displayName={displayName} onDisplayNameSaved={setDisplayName} theme={theme} onThemeChange={setTheme} onClose={handleCloseSettings} />}
 
       {/* Ticket 019 (HU-3/HU-4/HU-5): fila propia, hermana del header --
           un proyecto agrupa VARIOS mobs a la vez (no es un control por
