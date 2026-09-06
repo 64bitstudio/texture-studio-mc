@@ -3,19 +3,20 @@ import { computeUVBoxRects, mirrorPointHorizontal, type UVBoxRect } from '../src
 import type { SkeletonGeometry } from '../src/types/baseAssets';
 
 // Mismos valores que `backend/src/geometry/skeletonGeometry.ts` (formato
-// clasico 64x32 del Esqueleto/Player) -- duplicados aca a proposito,
-// igual que `frontend/src/types/baseAssets.ts` ya duplica el contrato
-// del backend (ver docs/ARQUITECTURA.md).
+// clasico 64x32 del Esqueleto/Player, YA con la correccion del ticket
+// 009 -- brazos/piernas delgados [2,12,2]) -- duplicados aca a
+// proposito, igual que `frontend/src/types/baseAssets.ts` ya duplica el
+// contrato del backend (ver docs/ARQUITECTURA.md).
 const SKELETON_GEOMETRY: SkeletonGeometry = {
   textureWidth: 64,
   textureHeight: 32,
   parts: {
     head: { size: [8, 8, 8], position: [0, 28, 0], uv: { x: 0, y: 0 } },
     body: { size: [8, 12, 4], position: [0, 18, 0], uv: { x: 16, y: 16 } },
-    armRight: { size: [4, 12, 4], position: [-6, 18, 0], uv: { x: 40, y: 16 } },
-    armLeft: { size: [4, 12, 4], position: [6, 18, 0], uv: { x: 40, y: 16 }, mirrorX: true },
-    legRight: { size: [4, 12, 4], position: [-2, 6, 0], uv: { x: 0, y: 16 } },
-    legLeft: { size: [4, 12, 4], position: [2, 6, 0], uv: { x: 0, y: 16 }, mirrorX: true },
+    armRight: { size: [2, 12, 2], position: [-5, 18, 0], uv: { x: 40, y: 16 } },
+    armLeft: { size: [2, 12, 2], position: [5, 18, 0], uv: { x: 40, y: 16 }, mirrorX: true },
+    legRight: { size: [2, 12, 2], position: [-2, 6, 0], uv: { x: 0, y: 16 } },
+    legLeft: { size: [2, 12, 2], position: [2, 6, 0], uv: { x: 0, y: 16 }, mirrorX: true },
   },
 };
 
@@ -24,13 +25,15 @@ describe('computeUVBoxRects', () => {
     const rects = computeUVBoxRects(SKELETON_GEOMETRY);
 
     // 6 partes, pero armRight/armLeft comparten caja y legRight/legLeft
-    // tambien -- deduplicadas, quedan 4 cajas distintas.
+    // tambien -- deduplicadas, quedan 4 cajas distintas. Brazo/pierna
+    // miden 8 columnas de ancho (2*d+2*w = 2*2+2*2), no 16 -- ver el
+    // ticket 009 (verificacion empirica contra el skeleton.png real).
     expect(rects).toHaveLength(4);
 
     expect(rects).toContainEqual({ x0: 0, y0: 0, x1: 32, y1: 16 }); // cabeza
     expect(rects).toContainEqual({ x0: 16, y0: 16, x1: 40, y1: 32 }); // torso
-    expect(rects).toContainEqual({ x0: 40, y0: 16, x1: 56, y1: 32 }); // brazo (compartida)
-    expect(rects).toContainEqual({ x0: 0, y0: 16, x1: 16, y1: 32 }); // pierna (compartida)
+    expect(rects).toContainEqual({ x0: 40, y0: 16, x1: 48, y1: 30 }); // brazo (compartida)
+    expect(rects).toContainEqual({ x0: 0, y0: 16, x1: 8, y1: 30 }); // pierna (compartida)
   });
 
   it('no duplica el rectangulo de armRight/armLeft ni el de legRight/legLeft', () => {
@@ -38,6 +41,20 @@ describe('computeUVBoxRects', () => {
     const key = (r: UVBoxRect) => `${r.x0},${r.y0},${r.x1},${r.y1}`;
     const keys = rects.map(key);
     expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it('ticket 009: `scale` multiplica el rectangulo completo -- resolucion de trabajo x1-x10', () => {
+    const nativeRects = computeUVBoxRects(SKELETON_GEOMETRY);
+    const scaledRects = computeUVBoxRects(SKELETON_GEOMETRY, 4);
+
+    expect(scaledRects).toHaveLength(nativeRects.length);
+    for (const rect of nativeRects) {
+      expect(scaledRects).toContainEqual({ x0: rect.x0 * 4, y0: rect.y0 * 4, x1: rect.x1 * 4, y1: rect.y1 * 4 });
+    }
+  });
+
+  it('ticket 009: scale=1 (default) es identico a no pasar el parametro -- compatible con el resto de tests/llamadores previos', () => {
+    expect(computeUVBoxRects(SKELETON_GEOMETRY, 1)).toEqual(computeUVBoxRects(SKELETON_GEOMETRY));
   });
 });
 

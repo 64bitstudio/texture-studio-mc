@@ -119,4 +119,29 @@ describe('PaintHistory', () => {
     const stroke = history.undo();
     expect(stroke).toEqual([{ x: 3, y: 3, before: TRANSPARENT, after: BLUE }]);
   });
+
+  it('ticket 009: clear() descarta undo, redo y cualquier trazo pendiente sin cerrar', () => {
+    const history = new PaintHistory();
+
+    history.beginStroke();
+    history.recordChange(0, 0, TRANSPARENT, RED);
+    history.commitStroke();
+    history.undo();
+    expect(history.canRedo).toBe(true);
+
+    // Trazo pendiente sin cerrar (sin commitStroke) -- clear() tambien debe descartarlo.
+    history.beginStroke();
+    history.recordChange(9, 9, TRANSPARENT, BLUE);
+
+    history.clear();
+
+    expect(history.canUndo).toBe(false);
+    expect(history.canRedo).toBe(false);
+    expect(history.undo()).toBeNull();
+    expect(history.redo()).toBeNull();
+
+    // El trazo pendiente antes de clear() nunca se apila, ni siquiera al cerrarlo despues.
+    history.commitStroke();
+    expect(history.canUndo).toBe(false);
+  });
 });

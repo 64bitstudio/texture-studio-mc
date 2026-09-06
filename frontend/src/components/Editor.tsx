@@ -10,12 +10,14 @@ import { ImportTextureControl } from './ImportTextureControl';
 import { PasteImageControls } from './PasteImageControls';
 import { PasteImageOverlay } from './PasteImageOverlay';
 import { ExportControls } from './ExportControls';
+import { ResolutionControls } from './ResolutionControls';
 import { decodeImageFileToImageData, decodePngDataUrlToImageData } from '../decodeTexture';
 import { useCanvasTexture } from '../hooks/useCanvasTexture';
 import { bresenhamLine, TextureBuffer, type PixelPoint, type PixelSource, type RGBA } from '../textureBuffer';
 import { PaintHistory, type Stroke } from '../history';
 import { computeUVBoxRects, mirrorPointHorizontal } from '../symmetry';
 import { ZOOM_DEFAULT } from '../zoom';
+import { RESOLUTION_DEFAULT, clampResolutionMultiplier, resamplePixelSource } from '../resolution';
 import {
   computeBurnPixels,
   computeFullReplaceDiff,
@@ -57,7 +59,16 @@ export interface EditorProps {
 export function Editor({ data }: EditorProps) {
   const { texture: baseTexture, geometry } = data;
 
-  const [buffer] = useState(() => new TextureBuffer(baseTexture.width, baseTexture.height));
+  // `buffer` es reemplazable (no un unico `useState` sin setter) desde
+  // el ticket 009: cambiar la resolucion de trabajo (`handleResolutionChange`
+  // mas abajo) crea una NUEVA instancia de `TextureBuffer` con las
+  // dimensiones nuevas -- `width`/`height` son `readonly` en
+  // `TextureBuffer` a proposito (ver `textureBuffer.ts`, decision
+  // original del ticket 002: las dimensiones de una instancia nunca
+  // cambian a mitad de vida), asi que un cambio de tamaño real siempre
+  // implica una instancia nueva, nunca mutar la existente.
+  const [buffer, setBuffer] = useState(() => new TextureBuffer(baseTexture.width, baseTexture.height));
+  const [resolution, setResolutionState] = useState(RESOLUTION_DEFAULT);
   const [version, setVersion] = useState(0);
   const [color, setColor] = useState(DEFAULT_COLOR);
   const [initError, setInitError] = useState<string | null>(null);
@@ -79,7 +90,14 @@ export function Editor({ data }: EditorProps) {
   // justificacion completa de por que se ofrece un unico eje
   // (horizontal, dentro de la caja UV completa de cada parte).
   const [symmetryEnabled, setSymmetryEnabled] = useState(false);
-  const uvBoxes = useMemo(() => computeUVBoxRects(geometry), [geometry]);
+  // `scale = resolution` (ticket 009): la geometria del backend describe
+  // el UV en pixeles NATIVOS (x1) -- a una resolucion de trabajo mayor,
+  // esas cajas deben escalarse proporcionalmente para seguir
+  // correspondiendo a las coordenadas reales del `TextureBuffer` activo
+  // (ver `symmetry.ts`). Simetria (HU-6) y pegado de imagen (HU-9,
+  // `findTargetUVBox`/`clampRectToBox` en `importImage.ts`) consumen
+  // `uvBoxes` ya escalado, sin ningun cambio propio.
+  const uvBoxes = useMemo(() => computeUVBoxRects(geometry, resolution), [geometry, resolution]);
 
   // Zoom y cuadricula del editor de textura (ticket 004, HU-7). Estado
   // subido aca (no local a `TextureEditor`) porque los controles
@@ -144,13 +162,38 @@ export function Editor({ data }: EditorProps) {
   // lo vuelca al buffer compartido. A partir de aca el buffer vive solo
   // en memoria del navegador (sin persistencia server-side, decision
   // confirmada en la definicion).
+  //
+  // Ticket 009 -- NO depende de `buffer` (a diferencia de antes de este
+  // ticket): un cambio de resolucion reemplaza `buffer` por una
+  // instancia NUEVA (`setBuffer` mas abajo), y este componente corre
+  // bajo `<StrictMode>` (`main.tsx`), que en desarrollo invoca cada
+  // efecto DOS veces (monta -> limpia -> vuelve a montar) para detectar
+  // efectos sin cleanup -- un guard de "ya corri una vez" con un `ref`
+  // rompe justo esa segunda invocacion (la promesa de la primera ya
+  // quedo cancelada por el cleanup, y el guard bloquea que la segunda
+  // vuelva a intentarlo), dejando el buffer sin cargar nunca (bug real
+  // detectado en la revision visual en vivo de este ticket: el modelo
+  // se veia completamente negro). En vez de un guard, se usa la forma
+  // funcional de `setBuffer` para escribir siempre sobre el buffer
+  // VIGENTE al momento en que la decodificacion termina (nunca uno ya
+  // reemplazado por un cambio de resolucion mientras tanto) y se
+  // descarta en silencio si sus dimensiones ya no coinciden con la
+  // textura nativa decodificada (el usuario cambio de resolucion antes
+  // de que terminara esta carga inicial -- extremadamente improbable,
+  // el decode de un PNG nativo es casi instantaneo, ver ticket 002, pero
+  // de ocurrir no hay nada razonable que cargar sobre un buffer de otro
+  // tamaño).
   useEffect(() => {
     let cancelled = false;
 
     decodePngDataUrlToImageData(baseTexture.dataUrl, baseTexture.width, baseTexture.height)
       .then((imageData) => {
         if (cancelled) return;
-        buffer.loadFromImageData(imageData);
+        setBuffer((current) => {
+          if (current.width !== imageData.width || current.height !== imageData.height) return current;
+          current.loadFromImageData(imageData);
+          return current;
+        });
         setVersion((v) => v + 1);
       })
       .catch((err: unknown) => {
@@ -162,7 +205,39 @@ export function Editor({ data }: EditorProps) {
     return () => {
       cancelled = true;
     };
-  }, [buffer, baseTexture.dataUrl, baseTexture.width, baseTexture.height]);
+  }, [baseTexture.dataUrl, baseTexture.width, baseTexture.height]);
+
+  // Cambio de resolucion de trabajo (ticket 009, x1-x10): re-muestrea el
+  // contenido ACTUAL del buffer (nearest-neighbor, ver `resolution.ts`
+  // para el criterio completo de escalar arriba/abajo) a las nuevas
+  // dimensiones -- `nativeWidth/Height * resolucion nueva` -- y lo
+  // reemplaza por una instancia nueva de `TextureBuffer` (sus
+  // dimensiones son `readonly`, ver arriba). Limpia el historial de
+  // undo/redo y cancela cualquier pegado pendiente porque ambos quedan
+  // atados a coordenadas del tamaño ANTERIOR (ver `PaintHistory.clear`
+  // en `history.ts` para la justificacion completa).
+  const handleResolutionChange = useCallback(
+    (next: number) => {
+      const clamped = clampResolutionMultiplier(next);
+      if (clamped === resolution) return;
+
+      const newWidth = baseTexture.width * clamped;
+      const newHeight = baseTexture.height * clamped;
+      const current: PixelSource = { width: buffer.width, height: buffer.height, data: buffer.getRawData() };
+      const resampled = resamplePixelSource(current, newWidth, newHeight);
+      const newBuffer = new TextureBuffer(newWidth, newHeight, resampled.data);
+
+      history.clear();
+      setHistoryTick((t) => t + 1);
+      setPendingPaste(null);
+      setPasteError(null);
+
+      setBuffer(newBuffer);
+      setResolutionState(clamped);
+      setVersion((v) => v + 1);
+    },
+    [resolution, buffer, baseTexture.width, baseTexture.height, history],
+  );
 
   // Escritura unificada de pixeles con soporte de simetria opcional
   // (ticket 004). Reemplaza la version del ticket 003 que llamaba
@@ -512,6 +587,16 @@ export function Editor({ data }: EditorProps) {
         <section>
           <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Color</h2>
           <ColorPicker color={color} onChange={setColor} />
+        </section>
+
+        <section>
+          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Resolucion</h2>
+          <ResolutionControls
+            resolution={resolution}
+            nativeWidth={baseTexture.width}
+            nativeHeight={baseTexture.height}
+            onChange={handleResolutionChange}
+          />
         </section>
 
         <section>
