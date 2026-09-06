@@ -299,3 +299,8 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`components/Viewer3D.tsx`** — nuevo `<Grid>` (`@react-three/drei`) como piso cuadriculado real dentro de la escena 3D — reemplaza el truco de CSS del ticket 046 (quedaba tapado por el fondo opaco de la escena). Componente compartido — beneficia también a `Editor.tsx`/`AgregarMobs.tsx`.
 - **`components/NuevoProyecto.tsx`** — `VIEWER_GRID_STYLE` renombrado a `VIEWER_FRAME_STYLE` (ya sin el truco de CSS, la cuadrícula ahora vive en `Viewer3D.tsx`); `IconInfo` usado a tamaño 28 (antes 16).
 - **`ui/icons.tsx`** — `IconInfo` rediseñado como badge relleno (círculo gris + "i" oscura), colores fijos, tamaño default 28 (antes trazo fino, 20).
+
+### Ticket 049 -- Fondo verde + cuadrícula extendida del visor 3D, ícono de Configuración corregido
+
+- **`components/Viewer3D.tsx`** — fondo de la escena a verde oscuro (`#122015`, antes gris); `<Grid>` con `args` mucho más grande (`[300,300]`, antes `[10,10]` — el plano físico era demasiado chico para la escala real de la escena) y `fadeDistance` mayor (220, antes 110); colores de la cuadrícula ajustados a verde.
+- **`ui/icons.tsx`** — `IconSettings` reconstruido con geometría radial exacta (círculo + 8 dientes rotados 45° c/u, agujero vía `<mask>` con `useId()`) en vez del `<path>` a mano de la revisión anterior (causa real del ícono "apachurrado").

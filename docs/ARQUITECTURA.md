@@ -1382,3 +1382,25 @@ Recorte ampliado de la referencia confirmó: círculo SÓLIDO gris claro (`#8b93
 Topbar compartida cruzando todo el ancho confirmada en "Nuevo proyecto" y "Mis proyectos" (misma `AppShell`), en ambos temas -- en tema claro la topbar sigue el tema (fondo blanco, texto oscuro) sin ningún bug de contraste (a diferencia del sidebar, no lleva un fondo fijo-oscuro). Cuadrícula 3D confirmada visible en el visor de "Nuevo proyecto" (recorte ampliado, perspectiva con desvanecido hacia el fondo) Y en el Editor (mismo componente compartido, sin errores de consola). Ícono de info confirmado como badge relleno más grande, coincide con la referencia.
 
 `npm run lint`, `npm test` (197, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde.
+
+## Ticket 049 -- Fondo verde + cuadrícula extendida del visor 3D, ícono de Configuración corregido
+
+Cuarta pasada de corrección visual. Esta vez Marco adjuntó una captura de pantalla PROPIA (no el mockup original) del resultado del ticket 048, señalando 2 problemas puntuales del visor 3D y 1 del ícono de Configuración.
+
+### Cuadrícula del visor 3D -- el bug real era el tamaño físico del plano, no el concepto
+
+El ticket 048 agregó `<Grid infiniteGrid>` con `args={[10, 10]}`. Hallazgo real de este ticket: `infiniteGrid` hace que el SHADER desvanezca la cuadrícula "al infinito" con un cálculo en espacio de mundo, pero el plano `<mesh>` subyacente sigue teniendo el tamaño FÍSICO de `args` -- a la escala real de esta escena (cámara en `[45, 40, 65]`, modelos de decenas de unidades de alto), un plano de 10x10 quedaba muy por debajo del área visible dentro del frustum de la cámara, cortando la cuadrícula mucho antes de que pudiera desvanecerse de forma natural -- por eso Marco la veía "solo como un piso chico bajo los pies" en vez de un piso extenso. Fix: `args={[300, 300]}` (el plano físico ahora cubre de sobra el área visible) + `fadeDistance` de 110 a 220 (el desvanecido ahora ocurre cerca del horizonte visible, no antes).
+
+### Fondo verde (`Viewer3D.tsx`)
+
+`<color attach="background">` pasa de `#2b2d36` (gris neutro) a `#122015` (verde oscuro) -- pedido directo de Marco. Los colores de la cuadrícula (`cellColor`/`sectionColor`) se ajustaron de grises a verdes (`#3a6b4d`/`#5b9e77`) para no desentonar con el nuevo fondo.
+
+### `IconSettings` -- reconstruido con geometría radial exacta
+
+El ícono "apachurrado" no era un problema de estilo (relleno vs. trazo, ya correcto desde el ticket 046) sino de PRECISIÓN: la revisión anterior era un único `<path>` con ~30 coordenadas escritas a mano, fácil de desalinear sin querer -- exactamente lo que pasó. Reemplazado por una construcción geométrica auto-simétrica: un círculo central + 8 dientes IDÉNTICOS (mismo `<rect>`, repetido) rotados en incrementos exactos de 45° via `transform="rotate(angle 12 12)"` -- la simetría queda garantizada por construcción matemática, no por precisión manual. El agujero central usa una `<mask>` real (`React.useId()` para el `id`, evita colisiones si el ícono llegara a renderizar más de una vez a la vez) en vez de "pintar" un círculo del color del fondo -- funciona sin importar qué haya detrás.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Cuadrícula extendida y fondo verde confirmados con recorte ampliado en "Nuevo proyecto" (la cuadrícula ahora cubre la mayor parte del panel, con perspectiva real hacia un horizonte visible) Y en el Editor (mismo componente compartido, `Viewer3D.tsx`, sin errores de consola). Ícono de Configuración confirmado simétrico con recorte ampliado (8 dientes iguales, agujero central limpio).
+
+`npm run lint`, `npm test` (197, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde.

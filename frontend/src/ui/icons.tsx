@@ -1,4 +1,4 @@
-import type { ReactNode, SVGProps } from 'react';
+import { useId, type ReactNode, type SVGProps } from 'react';
 
 // Set de íconos (ticket 046) -- dibujados a mano, SIN librería externa
 // (decisión explícita de Marco, ver `docs/ARQUITECTURA.md`, "Ticket
@@ -109,20 +109,37 @@ export function IconMoon(props: IconProps) {
 }
 
 /**
- * "Configuración" (topbar) -- FORMA RELLENA (engranaje/flor sólido con
- * agujero central), no trazo fino. El agujero se logra restando un
- * círculo interior con `fillRule="evenodd"` -- funciona sin importar
- * el fondo detrás (a diferencia de "pintar" el agujero del color del
- * contenedor).
+ * "Configuración" (topbar) -- FORMA RELLENA (engranaje sólido con
+ * agujero central), no trazo fino.
+ *
+ * Ticket 049 (corrección de Marco: "el ícono de configuración se ve
+ * apachurrado"): la revisión anterior era un único `<path>` con
+ * coordenadas escritas a mano -- fácil de desalinear sin querer
+ * (exactamente lo que pasó, quedó asimétrico/aplastado). Reemplazado
+ * por una construcción GEOMÉTRICA repetible: un círculo central +
+ * 8 dientes idénticos (rectángulos redondeados) rotados en incrementos
+ * exactos de 45° alrededor del centro (`transform="rotate(...)"`) --
+ * garantiza simetría perfecta por construcción, no por precisión de
+ * dedo. El agujero central se logra con una `<mask>` real (blanco
+ * visible, negro oculto) en vez de "pintar" un círculo del color del
+ * fondo -- funciona sin importar qué haya detrás del ícono.
  */
-export function IconSettings(props: IconProps) {
+export function IconSettings({ size = 20, ...rest }: IconProps) {
+  const maskId = useId();
+  const teeth = [0, 45, 90, 135, 180, 225, 270, 315];
   return (
-    <FilledIcon {...props}>
-      <path
-        fillRule="evenodd"
-        d="M9.3 2.3c.4-.3 1-.3 1.4 0l1 .8c.3.2.7.3 1 .2l1.2-.4c.5-.2 1 0 1.3.4l.7 1.1c.2.3.5.5.9.6l1.2.3c.5.1.9.6.9 1.1v1.3c0 .4.2.7.4 1l.9 1c.3.4.3 1 0 1.4l-.9 1a1.4 1.4 0 0 0-.4 1v1.3c0 .5-.4 1-.9 1.1l-1.2.3a1.4 1.4 0 0 0-.9.6l-.7 1.1c-.3.4-.8.6-1.3.4l-1.2-.4a1.4 1.4 0 0 0-1 .2l-1 .8c-.4.3-1 .3-1.4 0l-1-.8a1.4 1.4 0 0 0-1-.2l-1.2.4c-.5.2-1 0-1.3-.4l-.7-1.1a1.4 1.4 0 0 0-.9-.6l-1.2-.3c-.5-.1-.9-.6-.9-1.1v-1.3c0-.4-.2-.7-.4-1l-.9-1c-.3-.4-.3-1 0-1.4l.9-1c.2-.3.4-.6.4-1V6.9c0-.5.4-1 .9-1.1l1.2-.3c.4-.1.7-.3.9-.6l.7-1.1c.3-.4.8-.6 1.3-.4l1.2.4c.3.1.7 0 1-.2l1-.8ZM12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
-      />
-    </FilledIcon>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={size} height={size} fill="currentColor" aria-hidden="true" {...rest}>
+      <mask id={maskId} maskUnits="userSpaceOnUse">
+        <rect x={0} y={0} width={24} height={24} fill="white" />
+        <circle cx={12} cy={12} r={3.1} fill="black" />
+      </mask>
+      <g mask={`url(#${maskId})`}>
+        <circle cx={12} cy={12} r={6.3} />
+        {teeth.map((angle) => (
+          <rect key={angle} x={10.35} y={1.1} width={3.3} height={4.6} rx={1.2} transform={`rotate(${angle} 12 12)`} />
+        ))}
+      </g>
+    </svg>
   );
 }
 

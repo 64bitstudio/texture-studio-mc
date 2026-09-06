@@ -138,24 +138,40 @@ export function Viewer3D({ texture, geometry, mobLabel }: Viewer3DProps) {
       style={{ width: '100%', height: '100%' }}
     >
       <Canvas camera={{ position: [45, 40, 65], fov: 40, near: 0.1, far: 1000 }}>
-        <color attach="background" args={['#2b2d36']} />
-        {/* Ticket 048 (pedido de Marco: "quiero que el render tenga una
-            cuadricula igual que la imagen"): piso cuadriculado real
-            dentro de la escena (no un truco de CSS detrás del canvas --
-            eso quedaba tapado por el fondo opaco de `<color>` de arriba,
-            ver docs/ARQUITECTURA.md, "Ticket 048"). `position={[0, 0, 0]}`
+        {/* Ticket 049 (pedido de Marco: "el fondo del render 3d debe
+            tener un color verde") -- verde oscuro (antes gris neutro
+            `#2b2d36`), acorde a la paleta de acento de la app sin competir
+            con los colores de la textura del mob. */}
+        <color attach="background" args={['#122015']} />
+        {/* Ticket 048/049 (pedido de Marco: cuadrícula real dentro de la
+            escena, NO un truco de CSS detrás del canvas -- quedaba tapado
+            por el fondo opaco de `<color>` de arriba, ver
+            docs/ARQUITECTURA.md, "Ticket 048"). `position={[0, 0, 0]}`
             asume pies en y=0 (cierto para los 4 mobs actuales, ver
-            comentario de `computeGeometryCenter`/`geometryBounds.ts`). */}
+            comentario de `computeGeometryCenter`/`geometryBounds.ts`).
+            Ticket 049 (hallazgo real, corrección de Marco: "solo se ve
+            como si fuera un piso cuadriculado" -- se veía como un parche
+            chico bajo los pies, no un piso extenso): `args` pasó de
+            `[10, 10]` a `[300, 300]` -- ese valor es el tamaño FÍSICO real
+            del plano (aunque `infiniteGrid` desvanezca la cuadrícula
+            "al infinito" con un shader, el plano en sí sigue siendo del
+            tamaño de `args`; a la escala de esta escena -- cámara a
+            ~90 unidades del origen, modelos de decenas de unidades -- un
+            plano de 10x10 quedaba MUY por debajo del área visible dentro
+            del frustum de la cámara, cortando la cuadrícula mucho antes
+            de que pudiera desvanecerse de forma natural). `fadeDistance`
+            subió de 110 a 220 para que el desvanecido ocurra recién cerca
+            del horizonte visible, no antes. */}
         <Grid
           position={[0, 0, 0]}
-          args={[10, 10]}
+          args={[300, 300]}
           cellSize={4}
           cellThickness={0.8}
-          cellColor="#545e6b"
+          cellColor="#3a6b4d"
           sectionSize={20}
           sectionThickness={1.4}
-          sectionColor="#6b7684"
-          fadeDistance={110}
+          sectionColor="#5b9e77"
+          fadeDistance={220}
           fadeStrength={1}
           infiniteGrid
         />
