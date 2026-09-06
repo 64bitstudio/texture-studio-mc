@@ -19,3 +19,12 @@ Sale de `docs/definiciones/multi-mob-y-proyectos-guardados.md`. Agrega el Zombie
 
 ## Criterios de aceptación
 - Dado `GET /api/base-assets/zombie`, cuando se consulta, entonces devuelve la geometría de 6 cajas con los tamaños/UV correctos y (si el asset está disponible localmente) la textura real del Zombie.
+
+## Hecho
+Implementado por el agente `fullstack-dev` (PR [#38](https://github.com/64bitstudio/texture-studio-mc/pull/38)). CI de Jenkins en verde tras 2 rondas de hallazgos reales del Quality Gate de SonarQube (ninguno saltado — ver abajo).
+
+- Geometría del Zombie verificada contra `bedrock-samples/zombie.geo.json` (fetch real) — **2 correcciones reales encontradas respecto al documento de definición**: `armRight.position.x = -6` (no -5) y `legRight.position.x = -1.9` (offset asimétrico ya presente en la fuente oficial de Mojang, preservado tal cual). Verificado además empíricamente pixel a pixel contra `zombie.png` real: confirmado brazos/piernas grosor 4, y que la mitad inferior extra de la textura (filas 32-63 de 64×64) está 100% transparente (sin overlays de sleeve/pants — esos son de skins de jugador, no de este mob).
+- Refactor a `classicBipedGeometry.ts` (factory compartido) para eliminar duplicación real entre `skeletonGeometry.ts`/`zombieGeometry.ts` — encontrado por el Quality Gate de SonarQube (11% de líneas nuevas duplicadas, máximo 3%), corregido sin cambiar ningún comportamiento ya verificado.
+- Hallazgo curioso resuelto (documentado en memoria del equipo `sonar-todo-espanol-falso-positivo`): un segundo fallo del Quality Gate fue un falso positivo — la regla de SonarQube que busca comentarios `TODO` hizo match con la palabra española "todo" usada como pronombre ("identicas en todo mob de este tipo"), no un pendiente real. Se resolvió reformulando el comentario, no suprimiendo la regla.
+- **Verificado en vivo** (el agente, localmente, con el fetch temporalmente forzado a `/api/base-assets/zombie` y revertido antes de abrir el PR — confirmado con `git diff` que el frontend quedó sin cambios): silueta con brazos/piernas gruesos tipo Steve, textura real aplicada correctamente en todas las caras. El orquestador confirmó estructuralmente contra DEV (`GET /api/mobs` ya lista Zombie, `GET /api/base-assets/zombie` devuelve la geometría correcta) — `isPlaceholder: true` en DEV es esperado, el asset real se despliega en el ticket 022 (depende de que 017/020/021 cierren primero).
+- Pendiente, explícitamente fuera de este ticket: selector de mob en el frontend (018), despliegue del asset real a la VM (022).
