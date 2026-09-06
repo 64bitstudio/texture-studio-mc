@@ -1,3 +1,5 @@
+import { Checkbox } from '../ui';
+
 export interface SymmetryControlsProps {
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
@@ -10,15 +12,16 @@ export interface SymmetryControlsProps {
  * documentada en `frontend/src/symmetry.ts` y en
  * `docs/ARQUITECTURA.md`, "Ticket 004" (un eje vertical solo seria
  * geometricamente coherente para la cabeza, no para torso/brazo/
- * pierna). El checkbox esta envuelto en un `<label>` con texto visible
- * -- nombre accesible nativo, sin necesitar `aria-label` aparte (mismo
- * patron que "Color libre" en `ColorPicker`).
+ * pierna).
+ *
+ * Ticket 026: migrado a `Checkbox` (`ui/`) -- mismo markup que tenía
+ * antes, ahora centralizado (compartía literalmente el mismo patrón
+ * con `GridToggle`).
  */
 export function SymmetryControls({ enabled, onToggle }: SymmetryControlsProps) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-      <input type="checkbox" checked={enabled} onChange={(e) => onToggle(e.target.checked)} />
+    <Checkbox checked={enabled} onChange={onToggle}>
       Simetria horizontal (espejo dentro de cada region UV)
-    </label>
+    </Checkbox>
   );
 }

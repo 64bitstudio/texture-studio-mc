@@ -849,3 +849,23 @@ Sale de `docs/definiciones/rediseno-ux-ui-y-navegacion.md` (HU-4, prerrequisito 
 - Gotcha real encontrado por oxlint (`react(set-state-in-effect)`) en la primera versión de `Menu.tsx`: resetear `activeIndex` en un efecto separado que solo reaccionaba a `open` disparaba un render en cascada innecesario. Fix: el reset se mueve al mismo evento que cierra el menú (`close()`), mismo criterio ya aplicado en `App.tsx` (ticket 018) de nunca usar un efecto solo para copiar/derivar un valor de otro estado.
 - Primer consumidor real (verificación mínima pedida por el ticket, antes de la migración completa del ticket 026): `HistoryControls` (Deshacer/Rehacer) migrado a `Button`, `ResolutionControls` migrado a `FormField`+`Select` -- verificado en vivo que pintar + deshacer sigue funcionando exactamente igual que antes del refactor.
 - `Section`/`Menu`/`LoadingOverlay` no tienen todavía un consumidor real en la UI (se integran en los tickets 029/031/033 respectivamente) -- verificados en este ticket solo a nivel de compilación/tipos/lint, no interactivamente en el navegador; su verificación en vivo queda documentada en el ticket que los integre.
+
+## Ticket 026 -- Refactor de los controles existentes al sistema de componentes (HU-4)
+
+Migrados los ~15 controles del panel a `frontend/src/ui/` (cambio de MARKUP/estilo únicamente, cero cambio de lógica): `HistoryControls`/`ResolutionControls` (ya migrados en el ticket 025), `SymmetryControls`, `GridToggle`, `ZoomControls`, `PartIsolationControls`, `ImportTextureControl`, `PasteImageControls`, `ExportControls`, `ProjectControls`, `MobSelector`, `ColorPicker`.
+
+### Dos primitivas nuevas, encontradas durante el refactor (no estaban en el alcance original del ticket 025)
+
+- **`ui/Checkbox.tsx`**: `SymmetryControls` y `GridToggle` tenían el MISMO markup literal (`<label style={display:flex,...}>`) repetido palabra por palabra -- se extrajo en vez de dejarlo duplicado, mismo criterio que el resto de `ui/`.
+- **`ui/InlineError.tsx`**: `ImportTextureControl`/`PasteImageControls`/`ExportControls`/`ProjectControls` repetían el MISMO `<p role="alert" style={...}>` -- misma razón, extraído.
+- **`Button` gana la variante `danger`** (reemplaza el `dangerButtonStyle` ad-hoc de `ProjectControls.tsx`) -- usa el token `--danger` ya agregado en el ticket 025 (previsto para este uso, ver el comentario de ese ticket).
+
+### Decisiones de qué NO migrar a las primitivas genéricas
+
+- **Swatches de `ColorPicker`**: se dejan como `<button>` nativo, NO `Button` -- cada swatch necesita un color de fondo dinámico por instancia (`swatch.hex`), algo que las variantes fijas de `Button` no cubren ni deberían cubrir (agregar una prop de color arbitrario rompería su propósito de ofrecer un set cerrado de estilos consistentes).
+- **`PartIsolationControls`**: el `<label>`+`<select>` pasó de layout en fila (label al lado) a columna (label arriba, mismo patrón que `ResolutionControls` vía `FormField`) -- cambio visual menor deliberado, no un error; unifica la estructura del panel tal como pide HU-4.
+- **`ColorPicker` "Color libre"**: necesitaba layout en fila (no columna) -- se agregó `.ui-field--inline` como variante de `FormField` en vez de forzar la columna o duplicar el componente.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Recorrido funcional completo tras el refactor: toggle de "Mostrar cuadrícula" (`Checkbox`), selector "Aislar parte" → "Cara" (`FormField`+`Select`) con pintura confinada a la región (confirmado por `getImageData`, pixel en (11,11) dentro del rect esperado), botón "Mostrar todo" (`Button`), flujo completo de `ProjectControls` (guardar, confirmación de sobrescritura con `Button variant="danger"`, confirmación de eliminar) -- todas las confirmaciones inline siguen funcionando exactamente igual que antes del refactor (ningún `window.confirm` introducido). `npm run lint` (sin warnings), `npm test`, `npm run build` en verde.

@@ -1,4 +1,5 @@
 import type { MobSummary } from '../types/mobs';
+import { Button } from '../ui';
 
 export interface MobSelectorProps {
   mobs: MobSummary[];
@@ -8,17 +9,16 @@ export interface MobSelectorProps {
 
 /**
  * Menu de seleccion de mob (ticket 018, HU-1/HU-2). Deliberadamente
- * generico -- recibe el catalogo YA resuelto de `GET /api/mobs`
- * (`App.tsx`) y solo renderiza lo que ese catalogo contenga, sin ningun
- * mob hardcodeado aca (hoy Esqueleto/Zombie; si el backend agrega
- * Araña/Creeper en un ticket futuro, este componente los muestra solo
- * porque el catalogo creció, sin tocar este archivo).
+ * generico -- recibe el catalogo YA resuelto de `GET /api/mobs` y solo
+ * renderiza lo que ese catalogo contenga, sin ningun mob hardcodeado
+ * aca.
  *
- * `role="radiogroup"` + `aria-pressed` en cada boton (mismo patron de
- * "grupo de opciones exclusivas" ya usado por `ColorPicker` para la
- * paleta de swatches) -- un solo mob puede estar activo a la vez, y el
- * boton activo lo señala visual y programaticamente sin depender solo
- * del color.
+ * `role="radiogroup"` + `aria-pressed` en cada boton -- un solo mob
+ * puede estar activo a la vez.
+ *
+ * Ticket 026: migrado a `Button` (`ui/`) -- el mob activo usa
+ * `variant="primary"`, el resto `variant="secondary"` (mapeo directo
+ * del estado `isActive` que ya existia, sin variante nueva).
  */
 export function MobSelector({ mobs, selectedMobId, onSelect }: MobSelectorProps) {
   return (
@@ -26,26 +26,16 @@ export function MobSelector({ mobs, selectedMobId, onSelect }: MobSelectorProps)
       {mobs.map((mob) => {
         const isActive = mob.id === selectedMobId;
         return (
-          <button
+          <Button
             key={mob.id}
-            type="button"
+            variant={isActive ? 'primary' : 'secondary'}
             role="radio"
             aria-checked={isActive}
             aria-pressed={isActive}
             onClick={() => onSelect(mob.id)}
-            style={{
-              fontSize: 13,
-              padding: '6px 14px',
-              borderRadius: 6,
-              border: isActive ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.25)',
-              background: isActive ? 'var(--accent)' : 'var(--panel-bg)',
-              color: isActive ? '#1b1c22' : 'var(--text)',
-              fontWeight: isActive ? 600 : 400,
-              cursor: 'pointer',
-            }}
           >
             {mob.label}
-          </button>
+          </Button>
         );
       })}
     </div>

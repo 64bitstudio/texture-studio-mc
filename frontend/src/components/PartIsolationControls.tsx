@@ -1,5 +1,6 @@
 import { groupDisplayLabel } from '../partIsolation';
 import type { NamedUVRegion } from '../regionLabels';
+import { Button, FormField, Select } from '../ui';
 
 export interface PartIsolationControlsProps {
   /** Catalogo completo de regiones nombradas (ticket 011), ya escalado a la resolucion activa. */
@@ -15,24 +16,14 @@ const SHOW_ALL_VALUE = '';
 /**
  * Selector de partes para aislar (ticket 012). Reusa DIRECTAMENTE el
  * catalogo de `regionLabels.ts` (`NamedUVRegion[]`, ya calculado por
- * `Editor.tsx`) -- no redefine nombres ni rectangulos propios, tal como
- * exige el ticket.
+ * `Editor.tsx`) -- ver docs/ARQUITECTURA.md, "Ticket 012", para la
+ * decisión completa (aislar a nivel de región individual, no de caja
+ * completa; "Mostrar todo" disponible como opción Y como botón).
  *
- * DECISION: se aisla a nivel de REGION individual (una cara, ej.
- * "Cara"/"Pecho"/"Brazo — Lateral"), no a nivel de caja completa -- ver
- * `partIsolation.ts` para la justificacion completa. El `<select>`
- * agrupa las regiones por `groupKey` en `<optgroup>` (Cabeza/Torso/
- * Brazo/Pierna) unicamente para que la lista de 24 opciones sea
- * navegable, sin alterar el catalogo en si.
- *
- * "Mostrar todo" (criterio 4 del ticket) esta disponible de DOS formas
- * redundantes a proposito: como primera opcion del propio `<select>`
- * (para volver sin abrir ningun otro control) y como boton dedicado que
- * solo aparece con aislamiento activo (mas visible/rapido que reabrir el
- * dropdown y buscar la primera opcion) -- ninguna reemplaza a la otra,
- * el ticket pedia "boton/opcion" (cualquiera de las dos), se ofrecen
- * ambas por ser de costo minimo y no introducir un segundo mecanismo de
- * estado.
+ * Ticket 026: migrado a `FormField`+`Select`+`Button` (`ui/`) -- mismo
+ * comportamiento, el label pasa de estar al lado del select (fila) a
+ * estar arriba (columna, mismo patrón que `ResolutionControls`) como
+ * parte de unificar la estructura visual del panel.
  */
 export function PartIsolationControls({ regions, activeRegionId, onSelect }: PartIsolationControlsProps) {
   const groupOrder: string[] = [];
@@ -49,24 +40,10 @@ export function PartIsolationControls({ regions, activeRegionId, onSelect }: Par
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <label htmlFor="part-isolation-select" style={{ fontSize: 13, flexShrink: 0 }}>
-          Parte:
-        </label>
-        <select
-          id="part-isolation-select"
+      <FormField label="Parte">
+        <Select
           value={activeRegionId ?? SHOW_ALL_VALUE}
           onChange={(e) => onSelect(e.target.value === SHOW_ALL_VALUE ? null : e.target.value)}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            fontSize: 13,
-            padding: '4px 6px',
-            borderRadius: 4,
-            border: '1px solid rgba(255,255,255,0.25)',
-            background: 'var(--panel-bg)',
-            color: 'var(--text)',
-          }}
         >
           <option value={SHOW_ALL_VALUE}>Mostrar todo</option>
           {groupOrder.map((groupKey) => (
@@ -78,25 +55,12 @@ export function PartIsolationControls({ regions, activeRegionId, onSelect }: Par
               ))}
             </optgroup>
           ))}
-        </select>
-      </div>
+        </Select>
+      </FormField>
       {activeRegion && (
-        <button
-          type="button"
-          onClick={() => onSelect(null)}
-          style={{
-            alignSelf: 'flex-start',
-            fontSize: 12,
-            padding: '4px 10px',
-            borderRadius: 4,
-            border: '1px solid rgba(255,255,255,0.25)',
-            background: 'var(--panel-bg)',
-            color: 'var(--text)',
-            cursor: 'pointer',
-          }}
-        >
+        <Button onClick={() => onSelect(null)} style={{ alignSelf: 'flex-start' }}>
           Mostrar todo
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -141,3 +141,14 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`ui/Button.tsx`/`ui/FormField.tsx`/`ui/Select.tsx`/`ui/Section.tsx`/`ui/Menu.tsx`/`ui/LoadingOverlay.tsx`** (nuevos) — primitivas del panel, ver `docs/ARQUITECTURA.md`, "Ticket 025", para el detalle completo de cada una y los tokens de diseño que consumen.
 - **`ui/menuNavigation.ts`** (nuevo, puro) — `getNextMenuItemIndex(currentIndex, key, itemCount)`, navegación por teclado del `Menu` (flechas/Home/End con wrap), testeado en `menuNavigation.spec.ts`.
 - **`components/HistoryControls.tsx`**/**`components/ResolutionControls.tsx`** — migrados a `Button`/`FormField`+`Select` (primer consumidor real de `ui/`, resto de controles pendiente para el ticket 026).
+
+### Ticket 026 -- Refactor de los controles existentes al sistema de componentes
+
+- **`ui/Checkbox.tsx`**/**`ui/InlineError.tsx`** (nuevos, encontrados durante el refactor) — patrones duplicados literalmente entre `SymmetryControls`/`GridToggle` y entre `ImportTextureControl`/`PasteImageControls`/`ExportControls`/`ProjectControls` respectivamente. `Button` gana la variante `danger`.
+- **`SymmetryControls.tsx`/`GridToggle.tsx`** — migrados a `Checkbox`.
+- **`ZoomControls.tsx`** — botones `-`/`+` migrados a `Button variant="icon"`.
+- **`PartIsolationControls.tsx`** — migrado a `FormField`+`Select`+`Button` (layout de fila a columna, ver `docs/ARQUITECTURA.md`, "Ticket 026").
+- **`ImportTextureControl.tsx`/`PasteImageControls.tsx`/`ExportControls.tsx`** — migrados a `FormField`+`Button`+`InlineError`.
+- **`ProjectControls.tsx`** — migrado a `FormField`+`Button` (`variant="danger"` en "Sí, sobrescribir"/"Sí, eliminar")+`InlineError`; se eliminan `buttonStyle`/`dangerButtonStyle`/`inputStyle` ad-hoc.
+- **`MobSelector.tsx`** — migrado a `Button` (`variant="primary"` para el mob activo, `"secondary"` para el resto).
+- **`ColorPicker.tsx`** — los swatches de la paleta se dejan como `<button>` nativo (necesitan color de fondo dinámico por instancia, no cubierto por las variantes de `Button`); el selector "Color libre" migra a `FormField` (nueva variante `.ui-field--inline` para su layout en fila).
