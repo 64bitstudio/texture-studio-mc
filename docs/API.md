@@ -38,10 +38,10 @@ Respuesta `200`:
     "parts": {
       "head":     { "size": [8, 8, 8],   "position": [0, 28, 0], "uv": { "x": 0,  "y": 0 } },
       "body":     { "size": [8, 12, 4],  "position": [0, 18, 0], "uv": { "x": 16, "y": 16 } },
-      "armRight": { "size": [4, 12, 4],  "position": [-6, 18, 0], "uv": { "x": 40, "y": 16 } },
-      "armLeft":  { "size": [4, 12, 4],  "position": [6, 18, 0],  "uv": { "x": 40, "y": 16 }, "mirrorX": true },
-      "legRight": { "size": [4, 12, 4],  "position": [-2, 6, 0],  "uv": { "x": 0,  "y": 16 } },
-      "legLeft":  { "size": [4, 12, 4],  "position": [2, 6, 0],   "uv": { "x": 0,  "y": 16 }, "mirrorX": true }
+      "armRight": { "size": [2, 12, 2],  "position": [-5, 18, 0], "uv": { "x": 40, "y": 16 } },
+      "armLeft":  { "size": [2, 12, 2],  "position": [5, 18, 0],  "uv": { "x": 40, "y": 16 }, "mirrorX": true },
+      "legRight": { "size": [2, 12, 2],  "position": [-2, 6, 0],  "uv": { "x": 0,  "y": 16 } },
+      "legLeft":  { "size": [2, 12, 2],  "position": [2, 6, 0],   "uv": { "x": 0,  "y": 16 }, "mirrorX": true }
     }
   }
 }
@@ -51,6 +51,7 @@ Respuesta `200`:
 - `position`: centro de la caja, con el origen en el centro de los pies del modelo (`y=0`) — convención `+x` = derecha de pantalla, `+y` = arriba, `+z` = hacia la cámara (frente del personaje).
 - `uv`: origen (esquina superior izquierda) del "cross" UV clásico de esa caja, en pixeles de textura (0,0 = esquina superior izquierda de la textura).
 - `mirrorX`: `true` en `armLeft`/`legLeft` — el formato legado 64×32 no tiene región UV propia para el lado izquierdo, así que reutiliza la de `armRight`/`legRight` reflejada horizontalmente (ver `frontend/src/geometry/applyBoxUV.ts` y `docs/ARQUITECTURA.md`).
+- **Ticket 009**: `armRight`/`armLeft`/`legRight`/`legLeft` se corrigieron de `size [4,12,4]` (proporción genérica de Steve/zombie) a `[2,12,2]` (huesos delgados del Esqueleto real); `armRight.position.x`/`armLeft.position.x` de `∓6` a `∓5`. Sin cambio de forma/contrato del endpoint — mismos campos, valores corregidos. Ver `docs/ARQUITECTURA.md`, "Ticket 009", para las fuentes de verificación.
 
 Nunca responde `5xx` por falta del asset vanilla real — cae automáticamente al placeholder (ver `docs/ARQUITECTURA.md`).
 

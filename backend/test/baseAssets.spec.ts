@@ -37,9 +37,20 @@ describe('GET /api/base-assets/skeleton', () => {
     expect(head.uv).toEqual({ x: 0, y: 0 });
     expect(body.size).toEqual([8, 12, 4]);
     expect(body.uv).toEqual({ x: 16, y: 16 });
+
+    // Ticket 009: brazos/piernas delgados (size [2,12,2], no [4,12,4] --
+    // ver docs/ARQUITECTURA.md "Ticket 009" para la fuente/verificacion).
+    expect(armRight.size).toEqual([2, 12, 2]);
+    expect(armRight.position).toEqual([-5, 18, 0]);
     expect(armRight.uv).toEqual({ x: 40, y: 16 });
+    expect(armLeft.size).toEqual([2, 12, 2]);
+    expect(armLeft.position).toEqual([5, 18, 0]);
     expect(armLeft.mirrorX).toBe(true);
+    expect(legRight.size).toEqual([2, 12, 2]);
+    expect(legRight.position).toEqual([-2, 6, 0]);
     expect(legRight.uv).toEqual({ x: 0, y: 16 });
+    expect(legLeft.size).toEqual([2, 12, 2]);
+    expect(legLeft.position).toEqual([2, 6, 0]);
     expect(legLeft.mirrorX).toBe(true);
   });
 
