@@ -27,7 +27,7 @@ import { loadStoredPanelWidth, savePanelWidth } from '../panelWidth';
 import {
   computeBurnPixels,
   computeFullReplaceDiff,
-  fitRectToBox,
+  computeInitialPasteRect,
   validateImportDimensions,
   type OverlayRect,
 } from '../importImage';
@@ -566,21 +566,25 @@ export function Editor({ data }: EditorProps) {
       }
       try {
         const decoded = await decodeImageFileToImageData(fileOrBlob);
-        // Posicion inicial (criterio de este ticket, ver `fitRectToBox`
-        // en `importImage.ts`): ajustada por contencion y centrada
-        // dentro de la PRIMERA caja UV que devuelve `computeUVBoxRects`
-        // (la cabeza, en el orden actual de `skeletonGeometry.ts`).
-        const firstBox = uvBoxes[0];
-        const rect: OverlayRect = firstBox
-          ? fitRectToBox(decoded.imageData, firstBox)
-          : { x: 0, y: 0, width: decoded.imageData.width, height: decoded.imageData.height };
+        // Posicion inicial: `computeInitialPasteRect` (ticket 013)
+        // decide entre dos caminos --
+        // - Con una parte aislada activa (ticket 012, `isolatedRegion`):
+        //   ajusta EXACTO (estirado) a las dimensiones de esa region,
+        //   sin necesidad de ajuste manual previo a confirmar (criterio
+        //   de aceptacion del ticket 013).
+        // - Sin parte aislada: comportamiento EXACTO del ticket 005 sin
+        //   cambios -- ajuste por contencion, centrado dentro de la
+        //   PRIMERA caja UV que devuelve `computeUVBoxRects` (la
+        //   cabeza, en el orden actual de `skeletonGeometry.ts`), o el
+        //   tamaño original si no hay ninguna caja UV conocida.
+        const rect: OverlayRect = computeInitialPasteRect(decoded.imageData, isolatedRegion?.rect ?? null, uvBoxes[0] ?? null);
         setPasteError(null);
         setPendingPaste({ source: decoded.imageData, previewUrl: decoded.previewUrl, rect });
       } catch (err) {
         setPasteError(err instanceof Error ? err.message : 'No se pudo leer la imagen pegada/subida.');
       }
     },
-    [pendingPaste, uvBoxes],
+    [pendingPaste, uvBoxes, isolatedRegion],
   );
 
   // Revoca el object URL de vista previa exactamente cuando cambia (una
