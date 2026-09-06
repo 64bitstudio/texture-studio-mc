@@ -1428,3 +1428,27 @@ Marco: "imagina que el mob esta dentro de una caja y lo vemos justo desde la per
 Ícono de Configuración confirmado con recorte ampliado -- coincide con la imagen de referencia (6 pétalos, trazo fino, aro central suelto). Efecto de "caja" confirmado en "Nuevo proyecto" (orbitando la cámara para descartar que las paredes solo se vieran desde otro ángulo antes del fix de `DoubleSide`) Y en el Editor (mismo componente compartido, sin errores de consola).
 
 `npm run lint`, `npm test` (197, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde.
+
+## Ticket 051 -- Visor 3D: solo piso, colores homologados, material sin tone mapping
+
+Sexta pasada de corrección visual. Marco revirtió su propio pedido del ticket 050 ("mejor solo deja la cuadricula del piso") tras verlo en vivo, mandó una captura señalando que los colores de la cuadrícula seguían sin coincidir con la referencia, y reportó un problema nuevo: el modelo 3D "siempre se ve como brilloso, no se respetan los colores reales".
+
+### Reversión de las paredes (ticket 050)
+
+Las 2 paredes agregadas en el ticket 050 se retiraron -- `Viewer3D.tsx` vuelve a tener un único `<Grid>` (el piso). `BOX_GRID_PROPS` se renombra a `FLOOR_GRID_PROPS` y pierde `side: THREE.DoubleSide` (esa prop solo hacía falta para las paredes rotadas -- el piso, sin rotación, siempre se vio bien con el `BackSide` por defecto de drei).
+
+### Colores de la cuadrícula re-muestreados
+
+Se volvió a muestrear la imagen de referencia con Python/PIL (mismo método que tickets 046-047) -- esta vez enfocado específicamente en el color de las líneas del piso, no en proporciones/layout. Muestreo de la zona del piso lejos del modelo: fondo ~`rgb(17,25,29)`, pico de brillo de una línea de cuadrícula ~`rgb(30-33,50-57,44-49)` -- un verde-azulado MUY apagado, apenas por encima del fondo. Los valores del ticket 050 (`#274435`/`#3c6b4f`) resultaron considerablemente más brillantes/saturados que esto. Nuevos valores: `cellColor: '#20392c'`, `sectionColor: '#2c4d3c'` -- mucho más cerca del fondo de la escena (`#122015`, sin cambios, ya confirmado en el ticket 049).
+
+### `toneMapped: false` -- la causa real de "se ve brilloso, no respeta los colores reales"
+
+Hallazgo real (no reportado ni sospechado en ningún ticket anterior de este visor): `<Canvas>` de `@react-three/fiber` aplica `THREE.ACESFilmicToneMapping` a TODO el renderer por defecto -- una curva de tono diseñada para escenas con iluminación realista (comprime highlights, reinterpreta el rango dinámico), que altera los colores en vez de reproducirlos tal cual. Para un editor de textura pixel a pixel, donde cada píxel debe verse con su valor RGB real (no una versión "cinematográfica" de él), esto es exactamente lo contrario de lo que hace falta -- y explica el reporte de Marco con precisión: colores más "brillosos"/lavados que los reales.
+
+Fix: `toneMapped: false` en el `THREE.MeshBasicMaterial` del modelo (`MobModel`, dentro de `Viewer3D.tsx`) -- saca a ESE material específico del pipeline de tone mapping, sin tocar `<Canvas>` globalmente (más acotado/seguro que deshabilitar tone mapping para todo el renderer, por si en el futuro se agrega algo que sí lo necesite, ej. luces reales).
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Cuadrícula solo-piso con colores sutiles confirmada en "Nuevo proyecto" Y en el Editor (componente compartido, sin errores de consola). **Verificación de color real**: se seleccionó el color "rojo" de la paleta (`rgb(161,28,17)`, confirmado leyendo directamente los píxeles del `TextureBuffer` vía `getImageData` en la consola del navegador) y se pintó un parche sobre la textura de la cabeza; el parche correspondiente en el visor 3D se ve del mismo tono de rojo (comparación visual directa contra el swatch "Color libre" de la paleta, recorte ampliado) -- confirma que el material ya no altera los colores reales. (No fue posible leer el píxel exacto del canvas WebGL vía `drawImage`/`getImageData` porque `preserveDrawingBuffer` no está activado en el renderer -- comportamiento esperado/deliberado de Three.js por rendimiento, no un bug; se optó por verificación visual directa en vez de cambiar esa config del renderer solo para esta prueba puntual.)
+
+`npm run lint`, `npm test` (197, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde.
