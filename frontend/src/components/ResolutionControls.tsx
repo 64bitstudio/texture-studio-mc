@@ -1,5 +1,6 @@
 import type { ChangeEvent } from 'react';
 import { RESOLUTION_MAX, RESOLUTION_MIN } from '../resolution';
+import { FormField, Select } from '../ui';
 
 export interface ResolutionControlsProps {
   resolution: number;
@@ -16,6 +17,9 @@ export interface ResolutionControlsProps {
  * (`ColorPicker`, `ImportTextureControl`), sin introducir un segundo
  * tipo de control (slider, stepper custom) para un rango tan chico
  * (10 valores discretos).
+ *
+ * Ticket 025: segundo consumidor real de `frontend/src/ui/`
+ * (`FormField`/`Select`) -- mismo patron visual, ahora centralizado.
  */
 export function ResolutionControls({ resolution, nativeWidth, nativeHeight, onChange }: ResolutionControlsProps) {
   function handleChange(e: ChangeEvent<HTMLSelectElement>) {
@@ -28,15 +32,14 @@ export function ResolutionControls({ resolution, nativeWidth, nativeHeight, onCh
   }
 
   return (
-    <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 13 }}>
-      Resolucion de trabajo
-      <select value={resolution} onChange={handleChange} aria-label="Resolucion de trabajo del editor de textura" style={{ fontSize: 13, padding: '4px 6px' }}>
+    <FormField label="Resolucion de trabajo">
+      <Select value={resolution} onChange={handleChange} aria-label="Resolucion de trabajo del editor de textura">
         {options.map((n) => (
           <option key={n} value={n}>
             ×{n} ({nativeWidth * n}×{nativeHeight * n})
           </option>
         ))}
-      </select>
-    </label>
+      </Select>
+    </FormField>
   );
 }
