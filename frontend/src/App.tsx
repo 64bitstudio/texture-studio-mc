@@ -4,6 +4,7 @@ import { MobSelector } from './components/MobSelector';
 import { ProjectControls } from './components/ProjectControls';
 import { MisProyectos } from './components/MisProyectos';
 import { Recientes } from './components/Recientes';
+import { Proyecto } from './components/Proyecto';
 import { AppShell } from './components/AppShell';
 import type { NavView } from './components/Sidebar';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -231,6 +232,20 @@ function App() {
     handleProjectActivated(projectName, [mobId]);
   }
 
+  // Ticket 041: acciones de la vista de detalle de "Proyecto".
+  function handleAddMobs() {
+    setView('agregar-mobs');
+  }
+
+  function handleProjectRenamed(newName: string) {
+    setActiveProject((prev) => (prev ? { ...prev, name: newName } : prev));
+  }
+
+  function handleProjectDeleted() {
+    setActiveProject(null);
+    setView('mis-proyectos');
+  }
+
   // Ticket 019 (HU-4, "el mob actualmente activo se actualiza de
   // inmediato"): `ProjectControls` ya dejo el buffer restaurado de cada
   // mob del proyecto en `bufferCache` (mutacion directa del `Map`,
@@ -334,8 +349,16 @@ function App() {
             )}
           </>
         )}
-        {view === 'proyecto' && (
-          <PlaceholderScreen title={activeProject ? `Proyecto: ${activeProject.name}` : 'Proyecto'} ticket={41} />
+        {/* Ticket 041: "Proyecto" ya tiene contenido real. */}
+        {view === 'proyecto' && activeProject && mobsState.status === 'ready' && (
+          <Proyecto
+            projectName={activeProject.name}
+            mobs={mobsState.mobs}
+            onSelectMob={handleSelectMob}
+            onAddMobs={handleAddMobs}
+            onProjectRenamed={handleProjectRenamed}
+            onProjectDeleted={handleProjectDeleted}
+          />
         )}
         {view === 'agregar-mobs' && <PlaceholderScreen title="Agregar mobs" ticket={42} />}
       </AppShell>

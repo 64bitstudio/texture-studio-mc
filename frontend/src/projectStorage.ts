@@ -192,6 +192,36 @@ export function deleteProject(name: string): void {
 }
 
 /**
+ * Renombra un proyecto guardado (ticket 041, vista de detalle de
+ * "Proyecto"). El nombre ES la clave de identidad del registro (mismo
+ * criterio que el resto de este módulo) -- renombrar es mover la
+ * entrada de una clave a otra, sin tocar su contenido (`mobs`) ni su
+ * `updatedAt` (renombrar es un cambio de metadato, no de trabajo hecho
+ * sobre el proyecto -- no debería alterar su posición en "Recientes",
+ * ticket 040).
+ *
+ * Si `newName` ya existe, se lanza `ProjectAlreadyExistsError` (mismo
+ * tipo que ya usa `saveProject`) -- deliberadamente NO se ofrece
+ * "sobrescribir" aquí como sí hace guardar: fusionar o reemplazar dos
+ * proyectos con mobs potencialmente distintos bajo un mismo nombre es
+ * una operación ambigua que este ticket no define, así que se rechaza
+ * con un error claro en vez de inventar una semántica de fusión.
+ */
+export function renameProject(oldName: string, newName: string): void {
+  const all = readAllProjects();
+  if (!(oldName in all)) {
+    throw new Error(`El proyecto "${oldName}" ya no existe -- puede que se haya eliminado en otra pestaña.`);
+  }
+  if (newName in all) {
+    throw new ProjectAlreadyExistsError(newName);
+  }
+  const record = all[oldName]!;
+  delete all[oldName];
+  all[newName] = record;
+  writeAllProjects(all);
+}
+
+/**
  * Borra TODOS los proyectos guardados de una vez (ticket 036, pantalla
  * "Configuración", "Borrar todos los datos locales"). Elimina solo la
  * clave `PROJECTS_STORAGE_KEY` -- NO toca ninguna otra clave de
