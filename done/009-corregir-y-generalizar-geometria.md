@@ -36,3 +36,13 @@ Sale de feedback directo de Marco tras ver el MVP desplegado: el modelo 3D no se
 - Dado el visor 3D, cuando se compara con una captura de referencia del Esqueleto vanilla real, entonces la silueta (grosor de brazos/piernas) coincide.
 - Dado el selector de resolución, cuando se elige x4, entonces el editor pasa a trabajar sobre una cuadrícula de 256×128 sin perder lo ya pintado, y el modelo 3D sigue viéndose correcto (sin distorsión).
 - Dado un export en cualquier resolución (x1 a x10), cuando se revisa el PNG resultante, entonces sus dimensiones son exactamente `textureWidth*N x textureHeight*N`.
+
+## Hecho
+Implementado por el agente `fullstack-dev` (PR [#19](https://github.com/64bitstudio/texture-studio-mc/pull/19)). CI de Jenkins en verde, sin hallazgos del gate de QA automático.
+
+- Geometría corregida (`armRight`/`armLeft`/`legRight`/`legLeft` a `size [2,12,2]`, posición de brazos ajustada a x=∓5) — verificada contra `bedrock-samples` oficial de Mojang y empíricamente contra el PNG vanilla real.
+- Auditoría de hardcodes: no se encontró ningún `64`/`32` real en lógica — el frontend ya derivaba todo de `textureWidth`/`textureHeight` desde tickets anteriores.
+- Selector de resolución ×1 a ×10, con re-muestreo nearest-neighbor (downscale toma el pixel del centro de cada bloque) preservando el contenido pintado.
+- Dos bugs reales de por medio encontrados y corregidos en el camino (documentados en `docs/ARQUITECTURA.md`): el canvas offscreen de `useCanvasTexture` no se redimensionaba al cambiar el tamaño del buffer, y un guard por `ref` rompía el doble-invoke de `<StrictMode>` dejando el modelo 3D en negro.
+- **Verificado en vivo contra el deploy real de DEV** (el orquestador repitió la verificación tras el merge): el modelo 3D ya tiene la silueta correcta del Esqueleto vanilla (brazos/piernas delgados, ya no proporción Steve/zombie); cambiar de ×1 a ×4 (256×128) preserva exactamente un pixel de prueba pintado antes del cambio, escalado proporcionalmente a un bloque 4×4.
+- Pendiente, explícitamente fuera de este ticket: regiones UV nombradas (011), aislar partes (012), pegado con ajuste automático (013) — el panel lateral redimensionable (010) es independiente y sigue en el backlog.
