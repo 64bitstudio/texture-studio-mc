@@ -13,10 +13,19 @@
 
   --radius-sm: 4px;
   --radius-md: 8px;
+  /* Ticket 046: tarjetas grandes del rediseño (mob cards de "Nuevo
+     proyecto", tarjeta de marca del sidebar, botones ícono-cuadrado del
+     topbar) usan un radio más generoso que `--radius-md` -- token
+     nuevo en vez de subir `--radius-md` a secas para no re-redondear de
+     paso cada botón/select/menú chico ya existente en toda la app
+     (fuera del alcance "solo visual" de estas 3 áreas, ver ticket). */
+  --radius-lg: 14px;
 
   --font-xs: 11px;
   --font-sm: 13px;
   --font-md: 14px;
+  --font-lg: 20px;
+  --font-xl: 28px;
 
   --transition-fast: 150ms ease;
 
@@ -55,23 +64,34 @@
      porque el SO seguía en modo oscuro). Fijarlo por bloque de tema
      hace que los controles nativos sigan SIEMPRE el tema de la app. */
   color-scheme: dark;
-  --bg: #1b1c22;
-  --panel-bg: #24262e;
-  --text: #e8e6f0;
-  --text-dim: #9d9aab;
-  /* Ticket 035: acento verde (mockup de referencia) reemplaza el morado
-     original (#c084fc) -- mismo valor en ambos temas (ver bloque
-     `[data-theme='light']` de abajo), verificado visualmente en ambos
-     antes de cerrar el ticket. Solo se usa como BORDE/fondo-con-texto-
-     oscuro-fijo en toda la app (nunca como texto sobre el fondo del
-     tema), así que un único verde funciona sin ajustar el tono por
-     tema (ver docs/ARQUITECTURA.md, "Ticket 035"). */
-  --accent: #4ade80;
-  --border: rgba(255, 255, 255, 0.14);
-  --border-strong: rgba(255, 255, 255, 0.28);
-  --surface-raised: #2c2f3a;
-  --hover-overlay: rgba(255, 255, 255, 0.08);
-  --overlay-bg: rgba(27, 28, 34, 0.75);
+  /* Ticket 046: fondo/paneles bastante más oscuros que antes (mockup de
+     referencia nuevo, casi negro) -- reemplaza los valores del ticket
+     034. Como `--bg`/`--panel-bg`/`--accent` son compartidos por TODA
+     la app (no solo las 3 áreas que este ticket rediseña), el resto de
+     pantallas hereda la paleta refrescada "gratis"; su LAYOUT/tarjetas
+     siguen sin tocar hasta un ticket de seguimiento (ver
+     docs/ARQUITECTURA.md, "Ticket 046"). */
+  --bg: #0b0e13;
+  --panel-bg: #12161d;
+  --text: #eef1f5;
+  --text-dim: #8b93a1;
+  /* Ticket 035 introdujo el acento verde; ticket 046 lo afina hacia un
+     verde-esmeralda más saturado (mockup nuevo) -- sigue siendo un
+     único valor compartido entre ambos temas (mismo criterio del
+     ticket 035, usado como borde/fondo-con-texto-oscuro-fijo, nunca
+     como texto sobre el fondo del tema). `--accent-soft`/
+     `--accent-soft-strong` (nuevos) son ese mismo verde en baja
+     opacidad -- para el relleno de un item de navegación activo o una
+     tarjeta seleccionada, donde un fondo 100% opaco del acento se vería
+     demasiado fuerte (ver `Sidebar.tsx`/`NuevoProyecto.tsx`). */
+  --accent: #34d399;
+  --accent-soft: rgba(52, 211, 153, 0.14);
+  --accent-soft-strong: rgba(52, 211, 153, 0.32);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --surface-raised: #1a1f28;
+  --hover-overlay: rgba(255, 255, 255, 0.06);
+  --overlay-bg: rgba(11, 14, 19, 0.75);
   --danger: #f87171;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
@@ -83,7 +103,12 @@
   --panel-bg: #ffffff;
   --text: #1e1f26;
   --text-dim: #62636f;
-  --accent: #4ade80;
+  /* Ticket 046: mismo acento esmeralda que el tema oscuro (ver ese
+     bloque para el porqué) -- `--accent-soft`/`--accent-soft-strong`
+     bajan la opacidad sobre blanco en vez de sobre negro. */
+  --accent: #34d399;
+  --accent-soft: rgba(16, 185, 129, 0.12);
+  --accent-soft-strong: rgba(16, 185, 129, 0.24);
   --border: rgba(0, 0, 0, 0.12);
   --border-strong: rgba(0, 0, 0, 0.22);
   --surface-raised: #ffffff;
@@ -123,6 +148,25 @@
      invalida toda la declaracion completa (bug real encontrado en vivo:
      `getComputedStyle` reportaba `animation: none`). */
   animation: ts-fade-in var(--transition-fast);
+}
+
+/* Ticket 046: oculta VISUALMENTE contenido sin quitarlo del árbol de
+   accesibilidad (a diferencia de `display: none`/`aria-hidden`, que sí
+   lo esconden de lectores de pantalla) -- técnica estándar "sr-only".
+   Usada por `.ui-button--icon-square` para conservar el nombre
+   accesible de un botón (ticket 032: "nunca un botón sin nombre
+   accesible") cuando el mockup de referencia no muestra texto visible
+   junto al ícono. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 html,
@@ -177,6 +221,20 @@ body {
 
 .ui-button--icon {
   padding: var(--space-2);
+}
+
+/* Ticket 046: caja cuadrada de tamaño fijo, ícono centrado, texto
+   accesible oculto via `.sr-only` (ver esa clase) -- topbar (tema/
+   Configuración) del mockup de referencia. `border-radius: var(--radius-lg)`
+   (no `--radius-sm` como el resto de `.ui-button*`) para el mismo
+   redondeo generoso que las tarjetas grandes del rediseño. */
+.ui-button--icon-square {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
 }
 
 .ui-button--danger {

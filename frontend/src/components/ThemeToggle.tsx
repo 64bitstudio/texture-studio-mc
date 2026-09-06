@@ -1,4 +1,5 @@
 import { Button } from '../ui';
+import { IconMoon, IconSun } from '../ui/icons';
 import { toggleTheme, type Theme } from '../theme';
 
 export interface ThemeToggleProps {
@@ -18,8 +19,13 @@ export interface ThemeToggleProps {
 }
 
 /**
- * Toggle de tema claro/oscuro (ticket 034, HU-5) -- botón compacto
- * (ícono + texto, nunca solo ícono, mismo criterio del ticket 032).
+ * Toggle de tema claro/oscuro (ticket 034, HU-5) -- botón compacto.
+ *
+ * Ticket 046: `variant="icon-square"` (antes `"icon"`, ícono + texto
+ * SIEMPRE visible) -- el mockup de referencia muestra solo el ícono en
+ * una caja cuadrada. El texto/nombre accesible NO desaparece (regla
+ * del ticket 032: "nunca un botón sin nombre accesible") -- sigue en
+ * el DOM, solo oculto visualmente con `.sr-only`.
  */
 export function ThemeToggle({ theme, onThemeChange }: ThemeToggleProps) {
   function handleClick() {
@@ -33,9 +39,9 @@ export function ThemeToggle({ theme, onThemeChange }: ThemeToggleProps) {
   const label = isDark ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro';
 
   return (
-    <Button variant="icon" title={label} onClick={handleClick}>
-      <span aria-hidden="true">{isDark ? '☀️' : '🌙'}</span>
-      {label}
+    <Button variant="icon-square" title={label} onClick={handleClick}>
+      {isDark ? <IconSun /> : <IconMoon />}
+      <span className="sr-only">{label}</span>
     </Button>
   );
 }

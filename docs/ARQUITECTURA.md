@@ -1258,3 +1258,50 @@ Retirar `ProjectControls` dejó tres piezas más sin ningún consumidor real, re
 Con el proyecto real "Set Nether" ya guardado: se navegó Mis proyectos → Set Nether → Esqueleto (editor). El editor cargó normalmente; ya NO existe ninguna fila/menú "💾 Proyecto" entre el header y los paneles de herramientas (antes ocupaba una fila propia justo debajo del header). Búsqueda explícita (`find`) de un menú de proyecto standalone confirmó que no existe ningún elemento así en el árbol de accesibilidad -- solo queda el menú "Archivo" (import/paste/export, sin cambios). Sin errores en consola durante la carga completa de la página ni la navegación.
 
 `npm run lint`, `npm test` (197, sin tests nuevos -- cambio de eliminación de UI/estado muerto, verificado en vivo), `npm run build` en verde (630 módulos, uno menos que antes de este ticket).
+
+## Ticket 046 -- Rediseño visual: topbar, sidebar y "Nuevo proyecto"
+
+Pedido directo de Marco con imagen de referencia (mockup nuevo, paleta más oscura, íconos de línea fina, tarjetas redondeadas con miniaturas reales de mob) -- alcance explícitamente **solo visual**, limitado a 3 áreas: topbar, sidebar y "Nuevo proyecto". Dos decisiones reales se resolvieron con Marco antes de escribir código (`AskUserQuestion`):
+
+1. **Sistema de íconos**: SVG dibujados a mano (`ui/icons.tsx`), sin librería nueva -- mismo criterio "todo hand-rolled" del resto de `ui/`.
+2. **Miniaturas de mob**: Marco pidió buscar las miniaturas OFICIALES en internet en vez de renderizarlas en vivo (4 escenas WebGL simultáneas, trabajo nuevo real) o usar un ícono genérico.
+
+### Miniaturas oficiales de mob (`assets/mob-icons/`, `mobIcons.ts`)
+
+Se descargaron los renders oficiales de cada mob directo de Minecraft Wiki -- el MISMO render que usa la wiki en el infobox de cada entidad (ángulo/iluminación/estilo consistente entre los 4, fondo transparente): `Creeper_JE3_BE1.png`, `Skeleton_JE6_BE4.png`, `Zombie_JE5_BE2.png`, `Spider_JE5_BE4.png` (`https://minecraft.wiki/images/<archivo>`). Se importan como assets estáticos de Vite (`import creeperIcon from './assets/mob-icons/creeper.png'` -- `vite/client`, ya incluido en `tsconfig.app.json`, provee los tipos de módulo para `*.png` sin configuración adicional) -- quedan hasheados/optimizados en el build igual que cualquier otro asset, sin round-trip a ningún servidor en producción. `mobIcons.ts` expone `MOB_ICONS`/`MOB_DESCRIPTIONS` (`Record<string, ...>`, indexado por `mobId`) -- contenido puramente presentacional del frontend, mismo criterio que `DEFAULT_PACK_DESCRIPTION` (`exportPack.ts`): no viene de `GET /api/mobs` ni de ningún endpoint.
+
+### Set de íconos (`ui/icons.tsx`)
+
+Componentes SVG de trazo fino (`currentColor`, 1.8px, viewBox 24x24) para reemplazar los emoji existentes en las 3 áreas del ticket: `IconPlus`/`IconFolder`/`IconClock` (sidebar), `IconSun`/`IconMoon`/`IconSettings` (topbar), `IconCube`/`IconEye`/`IconCheck`/`IconInfo`/`IconX` ("Nuevo proyecto"). `IconGrassBlockLogo` es la excepción -- ícono de RELLENO (imita el bloque de pasto de Minecraft, varios colores fijos) en vez de trazo `currentColor`, usado en la marca del sidebar (header + tarjeta de pie).
+
+### Tokens de tema oscuro más oscuros + acento afinado (`index.css`)
+
+`--bg`/`--panel-bg`/`--surface-raised` bajan considerablemente (mockup casi negro); `--accent` pasa de `#4ade80` (ticket 035) a `#34d399`, un verde-esmeralda más saturado que matchea mejor el mockup nuevo -- sigue siendo un único valor compartido entre ambos temas (mismo criterio del ticket 035). Nuevos `--accent-soft`/`--accent-soft-strong` (el mismo acento en baja opacidad) para rellenos de fila/tarjeta activa donde un fondo 100% opaco se vería demasiado fuerte (item de nav activo, tarjeta de mob seleccionada). Nuevo `--radius-lg` (14px) para las tarjetas grandes del rediseño -- deliberadamente NO se subió `--radius-md` a secas, para no re-redondear de paso cada botón/select/menú chico ya existente fuera del alcance de este ticket.
+
+**Como `--bg`/`--panel-bg`/`--accent` son compartidos por TODA la app** (no solo las 3 áreas rediseñadas), el resto de pantallas (Mis proyectos/Recientes/Proyecto/Agregar mobs/Editor/Settings) hereda la paleta refrescada "gratis" -- verificado en vivo que siguen legibles/funcionales en ambos temas, aunque su LAYOUT/tarjetas siguen con el estilo viejo hasta un ticket de seguimiento (ver "Qué NO hacer" abajo).
+
+### Botón `icon-square` + `.sr-only` (`ui/Button.tsx`, `index.css`)
+
+Nuevo `variant="icon-square"` (caja 40x40, `--radius-lg`, solo ícono visible) para el topbar -- a diferencia de `variant="icon"` (ícono + texto SIEMPRE visible, ticket 032), este oculta el texto con la clase nueva `.sr-only` (técnica estándar: fuera de la vista, dentro del árbol de accesibilidad) en vez de quitarlo del DOM. Conserva la regla del ticket 032 ("nunca un botón sin nombre accesible") sin el texto visible que el mockup no muestra. Verificado en vivo con `find` ("Cambiar a tema oscuro" resuelto por su nombre accesible pese a no verse en pantalla).
+
+### Decisión real: Configuración se separa del avatar (`AppShell.tsx`, `Avatar.tsx`)
+
+Antes de este ticket, el avatar estaba envuelto en un `<button onClick={onOpenSettings}>` -- único punto de entrada a Configuración, sin ícono/etiqueta visible de "Configuración" en ningún lado. El mockup separa claramente 3 controles (tema/engranaje/avatar). Se agregó un botón "⚙️ Configuración" PROPIO (`IconSettings`, `variant="icon-square"`) y el avatar volvió a ser puramente decorativo (sin `onClick`, como cualquier indicador de identidad) -- Configuración sigue 100% alcanzable, ahora por su propio control correctamente etiquetado. Sin pérdida de funcionalidad, señalado explícitamente (no es un cambio silencioso).
+
+### Botón "limpiar" del campo de nombre (`NuevoProyecto.tsx`)
+
+Pequeña adición de interacción (no 100% "solo visual" en sentido estricto) -- un ícono `✕` visible sin funcionalidad hubiera sido peor UX que no tenerlo. Bajo riesgo, comportamiento obvio/esperado (`setName('')`), señalado explícitamente en vez de agregado en silencio.
+
+### Copy nueva del frontend (sin tocar el backend)
+
+Subtítulos de sección ("Elige el mob que quieres editar.", "Así se verá el mob en el juego (solo vista previa)."), badge "Minecraft Java Edition" y descripciones cortas por mob (`MOB_DESCRIPTIONS`) -- contenido estático, mismo criterio que `DEFAULT_PACK_DESCRIPTION`.
+
+### Qué NO hacer (alcance explícito)
+
+`AgregarMobs.tsx`/`MobSelector.tsx`/`Mis proyectos`/`Recientes`/`Proyecto`/`Editor`/`Settings` NO se tocaron en este ticket -- comparten patrones visuales (tarjetas de mob, botones) con las 3 áreas rediseñadas y van a verse visualmente inconsistentes (estilo viejo, con emoji) hasta un ticket de seguimiento que extienda el mismo sistema. Señalado explícitamente a Marco al cerrar -- no es un olvido, es el alcance pedido.
+
+### Verificación en vivo (Claude in Chrome, local, ambos temas)
+
+Comparación directa contra la imagen de referencia en tema oscuro: paleta, tipografía, espaciado, íconos, tarjetas de mob con miniatura real + badge de check al seleccionar, header de sidebar, item de nav activo, tarjeta de marca con fondo decorativo, topbar con 3 controles cuadrados -- coincide en cada punto comparado. Se probó el flujo completo: escribir "Creeper_personalizado" en el campo de nombre (botón limpiar aparece), seleccionar Creeper (badge de check + borde de acento + tarjeta informativa "Creeper -- Explota al acercarse al jugador." + vista 3D), confirmar que "Configuración" sigue abriendo la pantalla de Configuración desde su botón propio. Se ajustó el ancho del sidebar (240px -> 272px) tras ver en vivo que "Texture Studio MC" se partía en dos líneas. Se verificó tema claro (paleta propia sin romperse) y que Mis proyectos/Proyecto/Editor (fuera de alcance) siguen legibles/funcionales con la paleta heredada. Sin errores de consola.
+
+`npm run lint`, `npm test` (197, sin tests nuevos -- cambio 100% visual/presentacional, verificado en vivo), `npm run build` en verde (636 módulos, +4 assets PNG de mob-icons).
