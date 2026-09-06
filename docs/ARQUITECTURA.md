@@ -869,3 +869,25 @@ Migrados los ~15 controles del panel a `frontend/src/ui/` (cambio de MARKUP/esti
 ### Verificación en vivo (Claude in Chrome, local)
 
 Recorrido funcional completo tras el refactor: toggle de "Mostrar cuadrícula" (`Checkbox`), selector "Aislar parte" → "Cara" (`FormField`+`Select`) con pintura confinada a la región (confirmado por `getImageData`, pixel en (11,11) dentro del rect esperado), botón "Mostrar todo" (`Button`), flujo completo de `ProjectControls` (guardar, confirmación de sobrescritura con `Button variant="danger"`, confirmación de eliminar) -- todas las confirmaciones inline siguen funcionando exactamente igual que antes del refactor (ningún `window.confirm` introducido). `npm run lint` (sin warnings), `npm test`, `npm run build` en verde.
+
+## Ticket 027 -- Pantalla de inicio + navegación Home/Editor (HU-1)
+
+### `view: 'home' | 'editor'` en `App.tsx` -- sin router
+
+`App.tsx` gana un estado `view` (sin `react-router` -- ver `docs/definiciones/rediseno-ux-ui-y-navegacion.md`, "Diseño técnico", para la justificación completa: no hay necesidad real de URLs navegables para este flujo). `mobsState`/`bufferCache`/`geometryCache` viven POR ENCIMA de `view` (declarados antes, sin depender de él) -- volver al inicio y elegir el mismo mob de nuevo no pierde nada ya pintado, y cargar un proyecto desde el inicio puebla `bufferCache` exactamente igual que `ProjectControls` lo hace desde la vista de editor.
+
+- `handleSelectMob` (único punto de entrada para "activar este mob y mostrar el editor", usado tanto por `MobSelector` del header como por `HomeScreen.tsx`) ahora siempre llama a `setView('editor')`, incluso si el mob elegido ya era el `selectedMobId` por default -- necesario para el caso "el usuario vuelve al inicio y hace click en el MISMO mob que ya tenía activo".
+- `handleProjectOpenedFromHome` (nuevo, paralelo a `handleProjectLoaded` que ya usaba `ProjectControls`): NO necesita bump de `loadGeneration` -- `Editor` está desmontado mientras `view === 'home'`, así que el próximo montaje ya lee `bufferCache` desde cero vía su inicializador perezoso, sin una instancia vieja que forzar a remontar.
+- Limpieza real encontrada al introducir la vista 'home': los bloques `mobsState.status === 'loading'/'error'` dentro de la vista de editor quedaron INALCANZABLES (solo se llega a `view === 'editor'` desde `HomeScreen`/`MobSelector`, y ambos solo renderizan con `mobsState.status === 'ready'`) -- se eliminaron en vez de dejar código muerto.
+
+### `HomeScreen.tsx` (nuevo)
+
+Dos secciones (`Section` de `ui/`): "Selección de mob" (un `Button` por mob del catálogo) y "Guardados" (lista simple, click para abrir directo en el editor -- la búsqueda/filtro/orden completos son el ticket 028, este ticket solo cubre el punto de entrada). La carga de un proyecto guardado reusa `loadProject`/`restoreProjectBuffers` (ticket 019) -- misma lógica que `ProjectControls.handleLoad`, pero aquí el resultado hace transicionar a la vista de editor en vez de quedarse en el mismo lugar.
+
+### `ProjectSummary` gana `mobIds` (ensanchamiento aditivo, ver `projectStorage.ts`)
+
+`listProjects()` ya leía el registro completo de cada proyecto para extraer `updatedAt` -- exponer `Object.keys(record.mobs)` como `mobIds` no cuesta una decodificación adicional (los PNGs de cada mob no se tocan). Necesario para que `HomeScreen` muestre qué mobs contiene cada proyecto guardado, y para que el filtro por mob del ticket 028 pueda filtrar sin cargar/decodificar cada proyecto uno por uno. Test nuevo en `projectStorage.spec.ts`.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Flujo completo: la app abre en la pantalla de inicio (no directo al editor); click en "Zombie" navega al editor con ese mob; se pintó un pixel distintivo y se confirmó por `getImageData`; click en "← Volver al inicio" regresa a Home; se volvió a entrar a Zombie y el pixel seguía exactamente igual (`getImageData` idéntico) mientras que "Deshacer" aparecía deshabilitado (confirma que el historial se resetea con el remount de `Editor`, pero el buffer sobrevive -- comportamiento ya establecido en el ticket 018, sin regresión). Se guardó un proyecto ("prueba-027") desde el editor, se volvió al inicio, apareció en la sección "Guardados" con fecha y el mob correcto, y al hacer click abrió directo el editor con el buffer restaurado (`getImageData` idéntico al guardado). `npm run lint`, `npm test`, `npm run build` en verde.

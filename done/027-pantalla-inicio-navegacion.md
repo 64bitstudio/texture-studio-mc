@@ -20,3 +20,12 @@ Sale de `docs/definiciones/rediseno-ux-ui-y-navegacion.md` (HU-1, Diseño técni
 ## Criterios de aceptación
 - Dado que abro la app, cuando carga, entonces veo la pantalla de inicio, no el editor.
 - Dado que elijo un mob y pinto algo, cuando vuelvo al inicio y vuelvo a entrar al mismo mob, entonces mi pintura sigue ahí.
+
+## Hecho
+
+- `App.tsx`: estado `view: 'home' | 'editor'` (sin router). `handleSelectMob` unificado (header + `HomeScreen`), `handleProjectOpenedFromHome` nuevo. Botón "← Volver al inicio". Código inalcanzable eliminado (bloques `mobsState.status` duplicados que ya no podían ocurrir en la vista de editor).
+- `components/HomeScreen.tsx` (nuevo): "Selección de mob" + "Guardados" (punto de entrada simple, búsqueda/filtro completos en el ticket 028).
+- `projectStorage.ts`: `ProjectSummary` gana `mobIds` (ensanchamiento aditivo, sin decodificar PNGs) -- test nuevo.
+- `npm run lint`, `npm test`, `npm run build` en verde.
+
+**Verificación en vivo (local)**: flujo completo -- app abre en Home, seleccionar Zombie navega al editor, se pintó un pixel y se confirmó por `getImageData`, "Volver al inicio" + reentrar al mismo mob conserva el pixel exacto (con "Deshacer" deshabilitado, confirmando que el historial se resetea pero el buffer no). Se guardó un proyecto, apareció en "Guardados" con fecha+mob, y abrirlo desde ahí restauró el buffer exacto. Ver `docs/ARQUITECTURA.md`, "Ticket 027".

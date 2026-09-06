@@ -2,11 +2,16 @@ import { useEffect, useState } from 'react';
 import { Editor } from './components/Editor';
 import { MobSelector } from './components/MobSelector';
 import { ProjectControls } from './components/ProjectControls';
+import { HomeScreen } from './components/HomeScreen';
 import { fetchMobBaseAssets } from './api/baseAssets';
 import { fetchMobs } from './api/mobs';
 import type { MobBaseAssetsResponse, MobGeometry } from './types/baseAssets';
 import type { MobSummary } from './types/mobs';
 import { TextureBuffer } from './textureBuffer';
+import { Button } from './ui';
+
+/** Ticket 027, HU-1: pantalla de inicio en vez de cargar directo al editor. Estado interno, sin router (ver docs/definiciones/rediseno-ux-ui-y-navegacion.md, "Diseño técnico"). */
+type View = 'home' | 'editor';
 
 type MobsState =
   | { status: 'loading' }
@@ -19,6 +24,9 @@ type AssetState =
   | { status: 'ready'; data: MobBaseAssetsResponse };
 
 function App() {
+  // Ticket 027, HU-1: arranca en 'home', no directo al editor.
+  const [view, setView] = useState<View>('home');
+
   // Catalogo de mobs (ticket 018, HU-1) -- `GET /api/mobs`. El menu no
   // hardcodea ninguna lista: muestra exactamente lo que este fetch
   // devuelva (hoy Esqueleto/Zombie, ver `pending/018-...md`, "Que NO
@@ -142,10 +150,38 @@ function App() {
     setAssetRetryCount((c) => c + 1);
   }
 
+  // Ticket 027: unico punto de entrada para "activar este mob y mostrar
+  // el editor" -- lo usan tanto `MobSelector` del header (mob ya en
+  // vista de editor) como `HomeScreen` (primera eleccion desde el
+  // inicio). `setView('editor')` es incondicional (barato si ya estaba
+  // en 'editor') porque, a diferencia del cambio de mob en si, SIEMPRE
+  // debe pasar -- incluso si `mobId` ya era el `selectedMobId` por
+  // default (ej. el usuario vuelve al inicio y hace click en el MISMO
+  // mob que ya tenia activo).
   function handleSelectMob(mobId: string) {
-    if (mobId === selectedMobId) return;
-    setAssetState({ status: 'loading' });
-    setSelectedMobIdOverride(mobId);
+    if (mobId !== selectedMobId) {
+      setAssetState({ status: 'loading' });
+      setSelectedMobIdOverride(mobId);
+    }
+    setView('editor');
+  }
+
+  // Ticket 027: `HomeScreen` ya dejo los buffers restaurados en
+  // `bufferCache` (mismo mecanismo que `handleProjectLoaded` de abajo,
+  // ver `HomeScreen.tsx`) -- este callback solo decide a que mob
+  // navegar (el primero del proyecto cargado) y cambia la vista a
+  // 'editor'. NO necesita bump de `loadGeneration`: `Editor` esta
+  // desmontado mientras `view === 'home'` (ver el render de abajo), asi
+  // que el proximo montaje ya lee `bufferCache` desde cero via su
+  // inicializador perezoso -- sin una instancia vieja que forzar a
+  // remontar.
+  function handleProjectOpenedFromHome(loadedMobIds: string[]) {
+    const targetMobId = loadedMobIds[0] ?? selectedMobId;
+    if (targetMobId && targetMobId !== selectedMobId) {
+      setAssetState({ status: 'loading' });
+      setSelectedMobIdOverride(targetMobId);
+    }
+    setView('editor');
   }
 
   // Ticket 019 (HU-4, "el mob actualmente activo se actualiza de
@@ -170,6 +206,42 @@ function App() {
   const selectedMobLabel =
     (mobsState.status === 'ready' && mobsState.mobs.find((m) => m.id === selectedMobId)?.label) || null;
 
+  // Ticket 027, HU-1: pantalla de inicio en vez del editor directo.
+  // `mobsState`/`bufferCache`/`geometryCache` viven POR ENCIMA de
+  // `view` (declarados antes, sin depender de el) -- por eso volver al
+  // inicio y elegir el mismo mob de nuevo no pierde nada ya pintado.
+  if (view === 'home') {
+    return (
+      <main style={{ width: '100vw', height: '100vh', overflow: 'auto' }}>
+        <header style={{ padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <h1 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Texture Studio MC</h1>
+        </header>
+
+        {mobsState.status === 'loading' && (
+          <div style={{ display: 'grid', placeItems: 'center', padding: 48 }}>
+            <p>Cargando catálogo de mobs…</p>
+          </div>
+        )}
+
+        {mobsState.status === 'error' && (
+          <div style={{ display: 'grid', placeItems: 'center', padding: 48, gap: 12 }}>
+            <p role="alert">No se pudo cargar el catálogo de mobs: {mobsState.message}</p>
+            <Button onClick={handleRetryMobs}>Reintentar</Button>
+          </div>
+        )}
+
+        {mobsState.status === 'ready' && (
+          <HomeScreen
+            mobs={mobsState.mobs}
+            onSelectMob={handleSelectMob}
+            bufferCache={bufferCache}
+            onProjectOpened={handleProjectOpenedFromHome}
+          />
+        )}
+      </main>
+    );
+  }
+
   return (
     <main style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
       <header
@@ -184,9 +256,14 @@ function App() {
           borderBottom: '1px solid rgba(255,255,255,0.08)',
         }}
       >
-        <h1 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>
-          Texture Studio MC{selectedMobLabel ? ` — ${selectedMobLabel}` : ''}
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <Button variant="icon" aria-label="Volver al inicio" title="Volver al inicio" onClick={() => setView('home')}>
+            ←
+          </Button>
+          <h1 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>
+            Texture Studio MC{selectedMobLabel ? ` — ${selectedMobLabel}` : ''}
+          </h1>
+        </div>
 
         {mobsState.status === 'ready' && selectedMobId && (
           <MobSelector mobs={mobsState.mobs} selectedMobId={selectedMobId} onSelect={handleSelectMob} />
@@ -223,22 +300,12 @@ function App() {
         </div>
       )}
 
+      {/* `mobsState.status === 'loading'/'error'` no se manejan aca --
+          ya no son alcanzables en la vista de editor (ticket 027): solo
+          se llega a `view === 'editor'` desde `HomeScreen`/`MobSelector`,
+          y ambos solo renderizan con `mobsState.status === 'ready'`. Esos
+          dos estados se manejan en la vista 'home' de arriba. */}
       <div style={{ flex: 1, minHeight: 0 }}>
-        {mobsState.status === 'loading' && (
-          <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%' }}>
-            <p>Cargando catálogo de mobs…</p>
-          </div>
-        )}
-
-        {mobsState.status === 'error' && (
-          <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%', gap: 12 }}>
-            <p role="alert">No se pudo cargar el catálogo de mobs: {mobsState.message}</p>
-            <button type="button" onClick={handleRetryMobs}>
-              Reintentar
-            </button>
-          </div>
-        )}
-
         {mobsState.status === 'ready' && selectedMobId && assetState.status === 'loading' && (
           <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%' }}>
             <p>Cargando modelo…</p>
@@ -248,9 +315,7 @@ function App() {
         {mobsState.status === 'ready' && selectedMobId && assetState.status === 'error' && (
           <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%', gap: 12 }}>
             <p role="alert">No se pudo cargar el modelo: {assetState.message}</p>
-            <button type="button" onClick={handleRetryAsset}>
-              Reintentar
-            </button>
+            <Button onClick={handleRetryAsset}>Reintentar</Button>
           </div>
         )}
 
