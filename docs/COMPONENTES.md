@@ -246,3 +246,9 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`components/Proyecto.tsx`** (nuevo) — lista de mobs con miniatura real (`<img src={pngDataUrl}>`), elegir uno navega al editor; acciones "Agregar mobs" (navega a `'agregar-mobs'`), "Exportar proyecto (.zip)" (deshabilitado hasta el ticket 044), "Renombrar" (`renameProject`, nuevo) y "Eliminar proyecto" (`deleteProject`, con confirmación inline).
 - **`projectStorage.ts`** — gana `renameProject(oldName, newName)`: mueve la entrada de clave, sin tocar `mobs`/`updatedAt`; lanza `ProjectAlreadyExistsError` si el nombre destino ya existe (sin ofrecer sobrescribir -- decisión real documentada en `docs/ARQUITECTURA.md`).
 - **`App.tsx`** — "Proyecto" usa `Proyecto` (reemplaza el `PlaceholderScreen` del ticket 037); nuevos handlers `handleAddMobs`/`handleProjectRenamed`/`handleProjectDeleted`.
+
+### Ticket 042 -- Flujo "Agregar mobs" (selección múltiple)
+
+- **`components/AgregarMobs.tsx`** (nuevo) — mismo layout de `NuevoProyecto.tsx` (038) con selección MÚLTIPLE (`Set<string>`, toggle por tarjeta); excluye del grid los mobs que el proyecto ya tiene; agrega los seleccionados mezclando con el registro existente vía `saveProject(..., {overwrite: true})`.
+- **`components/PlaceholderScreen.tsx`** — **eliminado** (`git rm`) -- sin consumidores tras este ticket (040/041 ya habían reemplazado "Recientes"/"Proyecto").
+- **`App.tsx`** — "Agregar mobs" usa `AgregarMobs`; nuevos handlers `handleMobsAdded`/`handleCancelAddMobs`.

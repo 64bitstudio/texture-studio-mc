@@ -1143,3 +1143,25 @@ El botón "Exportar proyecto (.zip)" está `disabled` con `title="Disponible cua
 ### Verificación en vivo (Claude in Chrome, local)
 
 Abrir el proyecto "Set Nether" (creado en el ticket 038) mostró su único mob (Esqueleto) con miniatura real de la textura guardada; hacer click en el mob navegó correctamente al editor (buffer restaurado, contenido visible idéntico al guardado); "Renombrar" cambió el nombre en pantalla Y en `localStorage` (confirmado leyendo la clave real); "Eliminar proyecto" mostró la confirmación en línea, y al confirmar navegó de vuelta a "Mis proyectos" mostrando "Todavía no hay proyectos guardados" (el proyecto realmente desapareció de `localStorage`). `npm run lint`, `npm test` (188, incluye 4 tests nuevos de `renameProject`), `npm run build` en verde.
+
+### Hallazgo real de QA automático en el PR (post-merge de este ticket)
+
+El gate `🔍 QA Review (auto)` marcó la miniatura de mob (`<img>`) por llevar `alt=""` + `aria-hidden="true"`. Al revisarlo, la imagen SÍ aporta información real (qué textura tiene guardada ese mob) que el texto adyacente no repite -- no era decorativa. Corregido con un `alt` descriptivo real (`Miniatura de la textura guardada de <mob>`) en vez de documentar la exclusión, en un commit de seguimiento sobre el mismo PR -- confirmado el fix con `git diff`/lint/build/tests antes de mergear (el bot de QA no volvió a comentar sobre el commit de seguimiento, pero el estado real del código en el PR sí quedó verificado directamente).
+
+## Ticket 042 -- Flujo "Agregar mobs" (selección múltiple) (HU-3)
+
+### `AgregarMobs.tsx` (nuevo) -- mismo layout de "Nuevo proyecto" (038), selección MÚLTIPLE
+
+Reusa el mismo patrón de vista previa 3D en vivo + `assetCache` local que `NuevoProyecto.tsx`, pero el estado de selección es un `Set<string>` (toggle por tarjeta, `aria-pressed`) en vez de un único id -- a diferencia de "Nuevo proyecto", que es de a uno. `existingMobIds` (viene de `activeProject.mobIds`) filtra el grid ANTES de renderizarlo (`mobs.filter(...)`) -- los mobs que el proyecto ya tiene ni siquiera aparecen como tarjetas, no solo deshabilitadas (cumple "Qué NO hacer": la restricción es estructural).
+
+### Agregar mezcla el registro existente con el nuevo, vía el mismo `saveProject`
+
+`saveProject(projectName, { ...record.mobs, ...newMobsSnapshot }, { overwrite: true })` -- lee el registro actual fresco (`loadProject`), arma el snapshot de SOLO los mobs recién seleccionados (mismo mecanismo de `Map` locales que `NuevoProyecto.tsx`, ticket 038 -- nunca el `bufferCache` compartido de la sesión) y los mezcla con el registro existente antes de guardar con `overwrite: true` -- sin lógica de guardado nueva, reusa `saveProject`/`buildProjectSnapshot` tal cual.
+
+### `PlaceholderScreen.tsx` eliminado -- los 7 destinos ya tienen contenido real
+
+Con `'agregar-mobs'` (este ticket) siendo el último de los tres destinos que todavía usaban el placeholder genérico (`'recientes'` en el 040, `'proyecto'` en el 041), `PlaceholderScreen.tsx` quedó sin ningún consumidor -- se retira por completo (`git rm`), mismo criterio ya aplicado a `HomeScreen.tsx` (ticket 039) y `PanelResizeHandle.tsx` (ticket 029): no dejar código muerto esperando el ticket de limpieza final (045) cuando ya no tiene ninguna razón de seguir ahí.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Con el proyecto "Set Nether" (1 mob, Esqueleto) recién creado, "Agregar mobs" mostró únicamente Zombie/Araña/Creeper -- Esqueleto NO apareció en el grid (confirmando la exclusión estructural). Seleccionar Zombie y Creeper (multi-selección, `✓` visible en ambos, botón "Agregar (2)") y confirmar navegó de vuelta a "Proyecto: Set Nether" mostrando los 3 mobs con miniaturas reales y distintas -- confirmado con `localStorage` real que el registro del proyecto tiene exactamente `["skeleton", "zombie", "creeper"]`. `npm run lint`, `npm test` (188, sin tests nuevos -- mismo criterio que `NuevoProyecto.tsx`), `npm run build` en verde (confirmó también que ningún import roto quedó apuntando a `PlaceholderScreen.tsx` tras eliminarlo).

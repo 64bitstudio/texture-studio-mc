@@ -18,3 +18,17 @@ Sale de `docs/definiciones/proyectos-y-navegacion.md` (HU-3). Depende del ticket
 ## Criterios de aceptación
 - Dado un proyecto abierto, cuando abro "Agregar mobs", entonces veo únicamente los mobs que todavía no pertenecen a este proyecto.
 - Dado que selecciono uno o varios mobs y confirmo, entonces esos mobs quedan agregados al proyecto y disponibles en el selector del editor (ticket 043).
+
+## Hecho
+
+Implementado tal como estaba alcanzado, con una limpieza real adicional documentada:
+
+- `AgregarMobs.tsx` (nuevo): mismo layout de `NuevoProyecto.tsx` (038) con selección MÚLTIPLE (`Set<string>`, toggle por tarjeta con `aria-pressed`). `existingMobIds` filtra el grid ANTES de renderizarlo -- los mobs ya presentes en el proyecto ni aparecen como tarjetas (restricción estructural, no solo deshabilitada).
+- Agregar mezcla el snapshot de los mobs nuevos (mismo mecanismo de `Map` locales que `NuevoProyecto.tsx`, nunca el `bufferCache` compartido) con el registro existente vía `saveProject(..., {overwrite: true})` -- sin lógica de guardado nueva.
+- `PlaceholderScreen.tsx` **eliminado por completo** (`git rm`) -- con `'agregar-mobs'` (el último de los 3 destinos que lo usaban) ya con contenido real, quedó sin consumidores. Mismo criterio ya aplicado a `HomeScreen.tsx` (ticket 039)/`PanelResizeHandle.tsx` (ticket 029) -- adelanta esta limpieza en vez de esperar al ticket 045.
+
+Tests: 188/188 en verde (sin tests nuevos -- mismo criterio que `NuevoProyecto.tsx`, verificado en vivo), `npm run lint` y `npm run build` en verde (`build` confirmó que ningún import roto quedó apuntando al archivo eliminado).
+
+Verificación en vivo (Claude in Chrome, local): con un proyecto de 1 mob (Esqueleto), "Agregar mobs" mostró solo los 3 restantes; seleccionar Zombie + Creeper y confirmar navegó de vuelta a la vista de detalle mostrando los 3 mobs con miniaturas reales y distintas; confirmado con `localStorage` real que el registro quedó con exactamente `["skeleton", "zombie", "creeper"]`.
+
+Sin hallazgos de QA pendientes.
