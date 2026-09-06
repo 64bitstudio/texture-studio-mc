@@ -96,6 +96,21 @@ export interface MobBoxPart {
   mirrorX?: boolean;
   faceLabels: FaceLabels;
   group?: string;
+  /**
+   * Punto de rotacion (ticket 024) -- SOLO afecta el visor 3D, nunca el
+   * mapa de pixeles/UV/export. Opcional: sin `pivot`, la caja se
+   * posiciona directamente en `position` sin rotacion, igual
+   * comportamiento que antes de este ticket (Esqueleto/Zombie/Creeper).
+   * Con `pivot`, `Viewer3D.tsx` envuelve la caja en un grupo posicionado
+   * ahi y rotado segun `rotation`, con la caja posicionada relativa a
+   * ese pivote -- necesario para replicar poses oficiales de Mojang
+   * (ej. `animation.spider.default_leg_pose`) que solo tienen sentido
+   * geometrico rotando alrededor del punto de union con el cuerpo, no
+   * del centro de la propia caja.
+   */
+  pivot?: [number, number, number];
+  /** Rotacion en grados (orden XYZ), aplicada alrededor de `pivot`. Ignorado si `pivot` no esta presente. */
+  rotation?: [number, number, number];
 }
 
 /**

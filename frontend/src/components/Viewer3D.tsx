@@ -13,6 +13,8 @@ interface MobPartMeshProps {
   material: THREE.Material;
 }
 
+const DEG_TO_RAD = Math.PI / 180;
+
 /** Una caja del modelo (cabeza/cuerpo/brazo/pierna) con su UV clasico ya aplicado. */
 function MobPartMesh({ part, textureWidth, textureHeight, material }: MobPartMeshProps) {
   const geometry = useMemo(() => {
@@ -31,7 +33,33 @@ function MobPartMesh({ part, textureWidth, textureHeight, material }: MobPartMes
     return box;
   }, [part.size, part.uv.x, part.uv.y, part.mirrorX, textureWidth, textureHeight]);
 
-  return <mesh geometry={geometry} material={material} position={part.position} />;
+  // Sin `pivot`: comportamiento identico al de antes del ticket 024
+  // (Esqueleto/Zombie/Creeper) -- la caja se posiciona directamente,
+  // sin rotacion.
+  if (!part.pivot) {
+    return <mesh geometry={geometry} material={material} position={part.position} />;
+  }
+
+  // Con `pivot` (ticket 024, ej. patas de la Araña): la caja se envuelve
+  // en un grupo posicionado en el pivote y rotado segun `rotation`
+  // (grados -> radianes), con la caja posicionada RELATIVA a ese pivote
+  // -- reproduce la misma jerarquia bone-pivot-cubo que usa el .geo.json
+  // + la animacion oficial de Mojang (ver `spiderGeometry.ts`), en vez
+  // de rotar alrededor del centro de la propia caja (que produciria una
+  // pose incorrecta).
+  const [px, py, pz] = part.pivot;
+  const [rx = 0, ry = 0, rz = 0] = part.rotation ?? [0, 0, 0];
+  const relativePosition: [number, number, number] = [
+    part.position[0] - px,
+    part.position[1] - py,
+    part.position[2] - pz,
+  ];
+
+  return (
+    <group position={[px, py, pz]} rotation={[rx * DEG_TO_RAD, ry * DEG_TO_RAD, rz * DEG_TO_RAD]}>
+      <mesh geometry={geometry} material={material} position={relativePosition} />
+    </group>
+  );
 }
 
 interface MobModelProps {

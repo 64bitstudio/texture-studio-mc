@@ -217,6 +217,37 @@ describe('GET /api/base-assets/:mobId', () => {
       }
       expect(firstLabels.front).not.toMatch(/derech|izquierd/i);
     });
+
+    it('las 8 patas traen pivot/rotation (ticket 024, pose oficial de animation.spider.default_leg_pose)', async () => {
+      const app = createApp();
+      const res = await request(app).get('/api/base-assets/spider');
+      const { parts } = res.body.geometry;
+      const legKeys = Object.keys(parts).filter((k) => k.startsWith('leg'));
+
+      for (const key of legKeys) {
+        const leg = parts[key];
+        expect(leg.pivot).toHaveLength(3);
+        expect(leg.rotation).toHaveLength(3);
+        // El eje X nunca lo toca la animacion oficial (rotar una pata
+        // sobre su propio eje de extension no mueve su punta).
+        expect(leg.rotation[0]).toBe(0);
+        // El pivote es el punto de union con el cuerpo (cerca de
+        // position.x/z, NO el centro de la caja -- la caja se extiende
+        // 7 unidades desde ahi).
+        expect(Math.abs(leg.pivot[0])).toBe(4);
+        expect(leg.pivot[1]).toBe(9);
+        expect(leg.pivot[2]).toBe(leg.position[2]);
+      }
+
+      // Lado derecho (mirrorX ausente) y su contraparte izquierda
+      // (mirrorX) deben tener la MISMA rotacion en Y y Z con signo
+      // invertido (reflejo especular real, no solo el `mirrorX` de la
+      // textura) -- ej. leg1Right/leg1Left.
+      const right = parts.leg1Right;
+      const left = parts.leg1Left;
+      expect(left.rotation[1]).toBe(-right.rotation[1]);
+      expect(left.rotation[2]).toBe(-right.rotation[2]);
+    });
   });
 
   // El Creeper (ticket 021) es la segunda anatomia no-biped: cabeza +

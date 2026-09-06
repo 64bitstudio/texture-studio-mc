@@ -155,13 +155,53 @@ export const SPIDER_GEOMETRY: MobGeometry = {
     // (ver nota de orden espacial arriba). "Right"/"Left" = lado
     // ANATOMICO del personaje (x negativo = derecho), misma convencion
     // que armRight/legRight.
-    leg1Right: { size: LEG_SIZE, position: [-11, 9, -1], uv: LEG_UV, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg' },
-    leg1Left: { size: LEG_SIZE, position: [11, 9, -1], uv: LEG_UV, mirrorX: true, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg' },
-    leg2Right: { size: LEG_SIZE, position: [-11, 9, 0], uv: LEG_UV, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg' },
-    leg2Left: { size: LEG_SIZE, position: [11, 9, 0], uv: LEG_UV, mirrorX: true, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg' },
-    leg3Right: { size: LEG_SIZE, position: [-11, 9, 1], uv: LEG_UV, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg' },
-    leg3Left: { size: LEG_SIZE, position: [11, 9, 1], uv: LEG_UV, mirrorX: true, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg' },
-    leg4Right: { size: LEG_SIZE, position: [-11, 9, 2], uv: LEG_UV, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg' },
-    leg4Left: { size: LEG_SIZE, position: [11, 9, 2], uv: LEG_UV, mirrorX: true, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg' },
+    //
+    // TICKET 024 -- `pivot`/`rotation`: el `.geo.json` base (arriba) solo
+    // define la pose "bind" (patas practicamente pegadas al cuerpo,
+    // diferenciadas por apenas 1 unidad en `z` -- se ven amontonadas en
+    // el visor sin rotacion). La separacion real de las 8 patas la
+    // aplica Mojang en tiempo de ejecucion via
+    // `animation.spider.default_leg_pose`
+    // (`resource_pack/animations/spider.animation.json`, fetch real) --
+    // confirmado en `resource_pack/animation_controllers/
+    // spider.animation_controllers.json` que es la UNICA animacion del
+    // UNICO estado del UNICO controller del Creeper, es decir, SIEMPRE
+    // esta activa (no es una animacion condicional de combate/
+    // movimiento) -- por eso es la pose de reposo real, no una pose
+    // inventada. `pivot` = el `pivot` de cada bone en el .geo.json
+    // (punto de union con el cuerpo, no el centro de la caja). Mapeo
+    // `legN` (indice oficial) -> nombre de este archivo, por `pivot.z`
+    // (ver nota de orden espacial arriba): leg6->leg1Right,
+    // leg7->leg1Left, leg4->leg2Right, leg5->leg2Left, leg2->leg3Right,
+    // leg3->leg3Left, leg0->leg4Right, leg1->leg4Left.
+    //
+    // `rotation`: el eje X siempre es `0` (la animacion oficial nunca lo
+    // toca -- rotar una pata alrededor de su propio eje X, que coincide
+    // con la direccion en la que se extiende desde el pivote, no
+    // moveria su punta, asi que no tendria efecto visible; consistente
+    // con que Mojang tampoco lo anime). El eje Y SI coincide tal cual
+    // con el valor de la animacion (`"45.0 - this"` evalua a `45.0`
+    // porque la pose bind arranca en `this=0`; Y controla el abanico
+    // hacia adelante/atras, ya correcto con el signo oficial). El eje Z
+    // (controla si la pata apunta hacia ARRIBA o hacia ABAJO) se
+    // invierte respecto al valor oficial -- verificado EN VIVO, no
+    // asumido: aplicando el signo original las 8 patas quedaban
+    // separadas pero apuntando hacia ARRIBA (como una araña muerta boca
+    // arriba); invirtiendo unicamente Z quedaron apuntando hacia abajo,
+    // apoyadas naturalmente, silueta reconocible desde cualquier angulo
+    // (confirmado por captura de pantalla). Gotcha ya conocido al portar
+    // animaciones Bedrock a un motor de terceros: la convencion de signo
+    // de rotacion de Bedrock no siempre coincide con la de three.js para
+    // todos los ejes -- por eso el ANGULO (dato oficial, verificado) se
+    // preserva intacto y solo se ajusta el SIGNO de aplicacion en este
+    // motor especifico (informacion de implementacion, no de contenido).
+    leg1Right: { size: LEG_SIZE, position: [-11, 9, -1], uv: LEG_UV, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg', pivot: [-4, 9, -1], rotation: [0, -45, 45] },
+    leg1Left: { size: LEG_SIZE, position: [11, 9, -1], uv: LEG_UV, mirrorX: true, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg', pivot: [4, 9, -1], rotation: [0, 45, -45] },
+    leg2Right: { size: LEG_SIZE, position: [-11, 9, 0], uv: LEG_UV, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg', pivot: [-4, 9, 0], rotation: [0, -22.5, 33.3] },
+    leg2Left: { size: LEG_SIZE, position: [11, 9, 0], uv: LEG_UV, mirrorX: true, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg', pivot: [4, 9, 0], rotation: [0, 22.5, -33.3] },
+    leg3Right: { size: LEG_SIZE, position: [-11, 9, 1], uv: LEG_UV, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg', pivot: [-4, 9, 1], rotation: [0, 22.5, 33.3] },
+    leg3Left: { size: LEG_SIZE, position: [11, 9, 1], uv: LEG_UV, mirrorX: true, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg', pivot: [4, 9, 1], rotation: [0, -22.5, -33.3] },
+    leg4Right: { size: LEG_SIZE, position: [-11, 9, 2], uv: LEG_UV, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg', pivot: [-4, 9, 2], rotation: [0, 45, 45] },
+    leg4Left: { size: LEG_SIZE, position: [11, 9, 2], uv: LEG_UV, mirrorX: true, faceLabels: SPIDER_LEG_FACE_LABELS, group: 'spiderLeg', pivot: [4, 9, 2], rotation: [0, -45, -45] },
   },
 };

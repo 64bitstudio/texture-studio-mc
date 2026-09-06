@@ -816,3 +816,25 @@ Esta corrección aplica por igual a CUALQUIER mob (no solo el Esqueleto) porque 
 ### Verificación en vivo
 
 Se repintó la región ahora etiquetada "Lateral derecho" (misma clave interna `right`, antes etiquetada "Lateral izquierdo") en la cabeza del Esqueleto -- confirmado por captura de pantalla que ahora aparece en el lado DERECHO de la pantalla con el modelo de frente a la cámara. `npm run lint`, `npm test`, `npm run build` en verde en backend y frontend (tests actualizados para reflejar el nuevo texto esperado, ninguna lógica de cálculo tocada).
+
+## Ticket 024 -- Corregir la pose 3D de las patas de la Araña (rotación oficial, no bind pose cruda)
+
+### Diagnóstico
+
+Feedback de Marco: "Su modelo 3D ni el mapa de pixeles corresponde al real, investiga mas". La geometría de cajas (ticket 020) seguía siendo correcta (verificada de nuevo, sin cambios) -- el problema real, ya anticipado como hallazgo conocido al cerrar el ticket 020, es que el `.geo.json` base solo define la pose "bind" sin rotación, y las 8 patas de la Araña difieren solo 1 unidad entre sí en esa pose, por lo que se ven amontonadas.
+
+### Fuente oficial encontrada (no inventada)
+
+`resource_pack/animations/spider.animation.json` (fetch real) define `animation.spider.default_leg_pose`, con una rotación fija por pata. Se confirmó en `resource_pack/animation_controllers/spider.animation_controllers.json` que es la ÚNICA animación del ÚNICO estado del ÚNICO `animation_controller` de la Araña -- **siempre activa**, no una animación condicional de combate/movimiento. Es, por lo tanto, la pose de reposo real que usa el juego, verificable y no inventada.
+
+### Cambio de arquitectura: `pivot`/`rotation` opcionales en `MobBoxPart`
+
+Se agregan dos campos opcionales a `MobBoxPart` (backend + frontend, mismo criterio de ensanchamiento de contrato que `group` en el ticket 020 -- no rompe Esqueleto/Zombie/Creeper, que no los usan): `pivot: [x,y,z]` (punto de rotación) y `rotation: [x,y,z]` en grados. `Viewer3D.tsx` (`MobPartMesh`): sin `pivot`, comportamiento idéntico a antes (mesh posicionado directamente en `position`); con `pivot`, la caja se envuelve en un `<group>` posicionado en el pivote y rotado, con la caja posicionada RELATIVA a ese pivote -- reproduce la jerarquía bone-pivot-cubo real de Bedrock (rotar alrededor del centro de la propia caja, en vez de su punto de unión con el cuerpo, produciría una pose incorrecta).
+
+### Gotcha real encontrado y corregido empíricamente: signo de rotación Bedrock vs. three.js
+
+Aplicando los valores `[x,y,z]` de la animación oficial tal cual, las 8 patas quedaban correctamente SEPARADAS (ya no amontonadas) pero apuntando hacia ARRIBA (como una araña muerta boca arriba), no hacia el suelo. Verificado en vivo (captura de pantalla) que invirtiendo únicamente el signo del eje Z (el que controla si la pata sube o baja, dado que su desplazamiento respecto al pivote es puramente en X) el resultado queda correcto -- patas apoyadas naturalmente, apuntando hacia abajo y hacia afuera, silueta de araña reconocible desde cualquier ángulo. El eje Y (controla el abanico adelante/atrás) y el eje X (siempre `0`, rotar una pata sobre su propio eje de extensión no mueve su punta) se aplicaron sin cambios respecto al valor oficial. Esto es un gotcha ya conocido al portar animaciones Bedrock a un motor de terceros (la convención de signo no siempre coincide eje por eje) -- el ÁNGULO en sí (dato oficial) se preserva intacto, solo se ajustó el signo de APLICACIÓN en este motor específico, documentado explícitamente en `spiderGeometry.ts` para que no se repita el mismo tanteo si un mob futuro necesita rotaciones.
+
+### Verificación en vivo
+
+Confirmado por captura de pantalla desde múltiples ángulos (incluida una vista superior) que las 8 patas se ven claramente separadas en un patrón simétrico (4 a cada lado), apoyadas naturalmente hacia abajo, con el abdomen y la cabeza (ojos rojos) claramente distinguibles -- silueta de araña reconocible, resolviendo la limitación documentada en el cierre del ticket 020. `npm run lint`, `npm test`, `npm run build` en verde en backend y frontend (test nuevo: verifica `pivot`/`rotation` de las 8 patas, incluida la simetría de signo entre cada pareja derecha/izquierda).
