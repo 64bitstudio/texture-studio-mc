@@ -327,3 +327,8 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`projectStorage.ts`** — nueva función `duplicateProject(name)`: copia profunda con nombre autogenerado (`" (copia)"`, `" (copia 2)"`, ...).
 - **`ui/Menu.tsx`** — nuevo prop opcional `triggerVariant` (aditivo, default no rompe `Editor.tsx`) para un disparador compacto (`'icon-square'`).
 - **`ui/icons.tsx`** — nuevos íconos: `IconSearch`, `IconDots`, `IconGridView`, `IconListView`, `IconPencil`.
+
+### Ticket 054 -- Íconos SVG en el menú ⋮ + botón Editar menos redondeado
+
+- **`ui/icons.tsx`** — nuevos íconos: `IconDuplicate`, `IconExport`, `IconTrash` (reemplazan emoji en el menú "⋮" de `ProjectCard.tsx`).
+- **`components/ProjectCard.tsx`** — menú "⋮" usa los íconos SVG de arriba (más `IconPencil` para "Renombrar") en vez de emoji; botón "Editar" con `border-radius: var(--radius-md)` (antes `--radius-lg`).

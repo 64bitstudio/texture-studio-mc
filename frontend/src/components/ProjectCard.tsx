@@ -5,7 +5,7 @@ import { ProjectAlreadyExistsError, deleteProject, duplicateProject, loadProject
 import { exportProjectZip } from '../export';
 import { MOB_ICONS } from '../mobIcons';
 import { Button, InlineError, Menu } from '../ui';
-import { IconDots, IconFolder, IconPencil } from '../ui/icons';
+import { IconDots, IconDuplicate, IconExport, IconFolder, IconPencil, IconTrash } from '../ui/icons';
 
 /** Máximo de miniaturas de mob visibles antes de colapsar a un badge "+N" (ver crop de la referencia -- siempre 3 + badge, nunca más de 3 sueltas). */
 const MAX_VISIBLE_THUMBS = 3;
@@ -206,18 +206,18 @@ export function ProjectCard({ project, mobs, layout, busy, onOpen, onEdit, onCha
         {menuMode === 'default' && (
           <>
             <button type="button" className="ui-menu__item" onClick={handleStartRename}>
-              <span aria-hidden="true">✏️</span> Renombrar
+              <IconPencil size={16} /> Renombrar
             </button>
             <button type="button" className="ui-menu__item" onClick={handleDuplicate}>
-              <span aria-hidden="true">🗂️</span> Duplicar
+              <IconDuplicate size={16} /> Duplicar
             </button>
             <button type="button" className="ui-menu__item" onClick={() => void handleExport()} disabled={exporting}>
-              <span aria-hidden="true">📦</span> {exporting ? 'Exportando…' : 'Exportar proyecto / Resource Pack'}
+              <IconExport size={16} /> {exporting ? 'Exportando…' : 'Exportar proyecto / Resource Pack'}
             </button>
             {/* Separada visualmente (línea + color de peligro) por ser destructiva -- pedido explícito de Marco. */}
             <div style={{ height: 1, background: 'var(--border)', margin: '4px 2px' }} />
             <button type="button" className="ui-menu__item" style={{ color: 'var(--danger)' }} onClick={() => setMenuMode('delete')}>
-              <span aria-hidden="true">🗑</span> Eliminar
+              <IconTrash size={16} /> Eliminar
             </button>
           </>
         )}
@@ -303,7 +303,11 @@ export function ProjectCard({ project, mobs, layout, busy, onOpen, onEdit, onCha
         gap: 8,
         padding: isList ? '8px 16px' : '10px 16px',
         flex: isList ? '0 0 auto' : 1,
-        borderRadius: 'var(--radius-lg)',
+        // Ticket 054 (corrección de Marco: "el boton de editar debe estar
+        // menos redondeado"): `--radius-md` (8px), no `--radius-lg` (14px,
+        // valor original del ticket 053) -- esquinas notablemente menos
+        // curvas sin volverse un rectángulo recto.
+        borderRadius: 'var(--radius-md)',
         border: '1px solid var(--accent)',
         background: 'var(--accent-soft)',
         color: 'var(--accent)',
