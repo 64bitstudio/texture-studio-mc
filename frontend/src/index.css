@@ -46,7 +46,7 @@
 :root[data-theme='dark'] {
   /* `color-scheme` (no solo los tokens de color de abajo) controla el
      tema NATIVO de controles de formulario sin estilo propio
-     (`<select>`/`<input>` de `HomeScreen.tsx`, que no pasan por
+     (`<select>`/`<input>` de `MisProyectos.tsx`, que no pasan por
      `ui/Select` -- ver ese archivo) -- un valor estatico `light dark`
      en `:root` (como estaba antes de este ticket) deja que el
      navegador elija segun el SISTEMA operativo, ignorando el

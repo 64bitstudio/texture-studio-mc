@@ -229,3 +229,9 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 
 - **`components/NuevoProyecto.tsx`** (nuevo) — nombre + selección de UN mob + vista previa 3D en vivo (`Viewer3D`/`useCanvasTexture`, mismo pipeline que `Editor.tsx`); crea el proyecto con `saveProject` (sin cambio de forma) usando `Map` locales de un solo mob, no el `bufferCache`/`geometryCache` compartido.
 - **`App.tsx`** — "Nuevo proyecto" ya no muestra el `HomeScreen` temporal (reemplazado por `NuevoProyecto`); "Mis proyectos" lo sigue mostrando (hasta el ticket 039). Nuevo estado `activeProject` (adelanto mínimo del ticket 041) y handler `handleProjectCreated`.
+
+### Ticket 039 -- Pantalla "Mis proyectos"
+
+- **`components/MisProyectos.tsx`** (nuevo) — traslado de la sección "Guardados" de `HomeScreen.tsx` (buscar/filtrar/ordenar, sin cambios de lógica); elegir un proyecto navega a su vista de detalle en vez de al editor.
+- **`components/HomeScreen.tsx`** — **eliminado** (`git rm`) -- sin consumidores tras este ticket (038 ya había reemplazado "Nuevo proyecto").
+- **`App.tsx`** — "Mis proyectos" usa `MisProyectos`; `handleProjectOpenedFromHome` se elimina, reemplazado por `handleProjectActivated` (compartido con `handleProjectCreated` del ticket 038).

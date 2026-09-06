@@ -1093,3 +1093,21 @@ A diferencia del flujo viejo (guardar era una acción aparte, al final de una se
 ### Verificación en vivo (Claude in Chrome, local)
 
 Confirmado con capturas: seleccionar cada uno de los 4 mobs actualiza la vista previa 3D en vivo (incluyendo el WebGL context-lost transitorio ya documentado de este entorno de automatización, que se recupera solo en unos segundos); crear sin nombre muestra "Ingresa un nombre para el proyecto." y no crea nada; crear con nombre+mob navega a "Proyecto: Set Nether" (confirmando `activeProject` poblado); confirmado con `localStorage` real que el proyecto se guardó con exactamente 1 mob (`skeleton`) y un PNG válido; repetir el mismo nombre con OTRO mob dispara el aviso de sobrescritura ya existente del ticket 019 ("¿Sobrescribirlo?"), cancelado sin sobrescribir. `npm run lint`, `npm test` (184, sin tests nuevos -- este componente depende de canvas/DOM/fetch de punta a punta, verificado en vivo en vez de con mocks, mismo criterio ya aplicado a `projectSnapshot.ts`), `npm run build` en verde.
+
+## Ticket 039 -- Pantalla "Mis proyectos" (HU-5)
+
+### `MisProyectos.tsx` (nuevo) -- traslado de UI, misma lógica pura
+
+Extraído de la sección "Guardados" de `HomeScreen.tsx` (tickets 027/028) SIN cambios de lógica -- reusa `filterAndSortProjects`/`collectMobIdsInProjects` (`projectFilter.ts`, ticket 028) tal cual. El único cambio de comportamiento real: `handleOpenProject` sigue restaurando los buffers en `bufferCache` (misma lógica de `loadProject`/`restoreProjectBuffers`, ticket 019) pero ahora llama a `onProjectSelected(projectName, loadedMobIds)` en vez de `onProjectOpened` -- `App.tsx` navega a `'proyecto'` (vista de detalle, ticket 041) en vez de directo a `'editor'`.
+
+### `handleProjectActivated` -- fuente única compartida entre 038 y 039
+
+`App.tsx` unifica el "un proyecto quedó activo, navegar a su detalle" en una sola función (`handleProjectActivated(projectName, mobIds)`) que usan tanto `NuevoProyecto.tsx` (038, siempre `mobIds` de un elemento, vía `handleProjectCreated`) como `MisProyectos.tsx` (039, los mobIds que efectivamente se restauraron) -- en vez de dos handlers casi idénticos.
+
+### `HomeScreen.tsx` eliminado en este ticket -- ya sin consumidores
+
+Con "Nuevo proyecto" (038) y "Mis proyectos" (039) mostrando cada uno su contenido real, `HomeScreen.tsx` quedó sin ningún camino que lo monte (confirmado con `grep` antes de borrarlo -- ningún test ni componente lo importaba). Se retira por completo (`git rm`, no solo se deja de usar) en vez de quedar como código muerto hasta el ticket 045 -- mismo criterio ya aplicado en el ticket 029 (`PanelResizeHandle.tsx`). `handleProjectOpenedFromHome` (su único consumidor en `App.tsx`, navegaba a `'editor'`) también se elimina -- reemplazado por `handleProjectActivated`, que navega a `'proyecto'`. Comentarios que referenciaban `HomeScreen.tsx` en `index.css`/`projectStorage.ts` se actualizaron para apuntar a `MisProyectos.tsx`.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Confirmado con capturas: "Mis proyectos" lista el proyecto guardado en el ticket 038 con buscar/orden (el filtro por mob no se muestra -- solo hay un mob entre los proyectos guardados, comportamiento ya esperado del ticket 028); buscar un texto que no coincide con ningún proyecto muestra "Ningún proyecto coincide con la búsqueda/filtro."; elegir el proyecto navega a "Proyecto: Set Nether" (la vista de detalle placeholder, NO al editor). `npm run build` sirvió también como verificación de que ningún import roto quedó apuntando a `HomeScreen.tsx` tras borrarlo. `npm run lint`, `npm test` (184, sin tests nuevos -- mismo criterio que `NuevoProyecto.tsx`), `npm run build` en verde.

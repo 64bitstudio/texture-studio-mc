@@ -45,9 +45,10 @@ export interface ProjectRecord {
  * `docs/ARQUITECTURA.md`, "Ticket 027"): las claves de `mobs` de ese
  * proyecto YA estan disponibles en el registro crudo sin decodificar
  * ningun PNG (`Object.keys(record.mobs)`, ver `listProjects`) -- se
- * exponen aca para que la pantalla de inicio (`HomeScreen.tsx`) muestre
- * que mobs contiene cada proyecto, y para que el filtro por mob del
- * ticket 028 (HU-2) pueda filtrar sin cargar/decodificar cada proyecto.
+ * exponen aca para que "Mis proyectos" (`MisProyectos.tsx`, ticket 039
+ * -- reemplaza a `HomeScreen.tsx`, ticket 027) muestre que mobs
+ * contiene cada proyecto, y para que el filtro por mob del ticket 028
+ * (HU-2) pueda filtrar sin cargar/decodificar cada proyecto.
  */
 export interface ProjectSummary {
   name: string;
