@@ -33,6 +33,13 @@
       }
     },
     {
+      "name": "Base assets - Araña (ticket 020)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/base-assets/spider"
+      }
+    },
+    {
       "name": "Base assets - Mob inexistente (404)",
       "request": {
         "method": "GET",
