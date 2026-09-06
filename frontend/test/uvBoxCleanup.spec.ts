@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { isInsideAnyUVBox, maskPixelsOutsideUVBoxes } from '../src/uvBoxCleanup';
 import { computeUVBoxRects, type UVBoxRect } from '../src/symmetry';
 import type { PixelSource, RGBA } from '../src/textureBuffer';
-import type { SkeletonGeometry } from '../src/types/baseAssets';
+import type { MobGeometry } from '../src/types/baseAssets';
 
 // Mismos valores que `backend/src/geometry/skeletonGeometry.ts` (ver
 // `test/symmetry.spec.ts`, duplicados aca por el mismo criterio ya
 // establecido en ese archivo).
 const NOOP_FACE_LABELS = { front: 'f', back: 'b', top: 't', bottom: 'bo', left: 'l', right: 'r' };
 
-const SKELETON_GEOMETRY: SkeletonGeometry = {
+const SKELETON_GEOMETRY: MobGeometry = {
   textureWidth: 64,
   textureHeight: 32,
   parts: {

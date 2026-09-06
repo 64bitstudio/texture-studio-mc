@@ -31,7 +31,7 @@
 // exactamente frente-con-frente).
 
 import type { PixelPoint } from './textureBuffer';
-import type { SkeletonGeometry } from './types/baseAssets';
+import type { MobGeometry } from './types/baseAssets';
 
 /** Rectangulo de pixeles de textura, semiabierto: [x0,x1) x [y0,y1). */
 export interface UVBoxRect {
@@ -68,7 +68,7 @@ export interface UVBoxRect {
  * por separado antes de sumarlos, porque la formula del rectangulo es
  * lineal en esos terminos.
  */
-export function computeUVBoxRects(geometry: SkeletonGeometry, scale: number = 1): UVBoxRect[] {
+export function computeUVBoxRects(geometry: MobGeometry, scale: number = 1): UVBoxRect[] {
   const seen = new Set<string>();
   const rects: UVBoxRect[] = [];
 

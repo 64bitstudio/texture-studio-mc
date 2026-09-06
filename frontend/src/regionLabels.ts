@@ -16,7 +16,7 @@
 
 import { computeBoxFaceRects, type PixelRect } from './geometry/applyBoxUV';
 import type { PixelPoint } from './textureBuffer';
-import type { SkeletonGeometry } from './types/baseAssets';
+import type { MobGeometry } from './types/baseAssets';
 
 /** Claves de las 6 caras de una caja -- mismos nombres que ya usa `applyBoxUV.ts`/`FaceLabels`. */
 export type BoxFaceKey = 'front' | 'back' | 'top' | 'bottom' | 'left' | 'right';
@@ -30,7 +30,7 @@ const FACE_KEYS: BoxFaceKey[] = ['front', 'back', 'top', 'bottom', 'left', 'righ
  * para generar un `id` estable por region que no duplique entradas
  * identicas entre el lado derecho/izquierdo de brazo y pierna.
  */
-const PART_GROUP_KEY: Record<keyof SkeletonGeometry['parts'], string> = {
+const PART_GROUP_KEY: Record<keyof MobGeometry['parts'], string> = {
   head: 'head',
   body: 'body',
   armRight: 'arm',
@@ -71,11 +71,11 @@ function scaleRect(rect: PixelRect, scale: number): PixelRect {
  * deben escalarse proporcionalmente para corresponder a las
  * coordenadas reales del `TextureBuffer` activo.
  */
-export function computeNamedRegions(geometry: SkeletonGeometry, scale: number = 1): NamedUVRegion[] {
+export function computeNamedRegions(geometry: MobGeometry, scale: number = 1): NamedUVRegion[] {
   const seen = new Set<string>();
   const regions: NamedUVRegion[] = [];
 
-  (Object.keys(geometry.parts) as Array<keyof SkeletonGeometry['parts']>).forEach((partKey) => {
+  (Object.keys(geometry.parts) as Array<keyof MobGeometry['parts']>).forEach((partKey) => {
     const part = geometry.parts[partKey];
     const [w, h, d] = part.size;
     const faceRects = computeBoxFaceRects(part.uv.x, part.uv.y, w, h, d);
