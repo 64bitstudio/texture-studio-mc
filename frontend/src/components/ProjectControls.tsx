@@ -1,8 +1,9 @@
-import { useCallback, useState, type ChangeEvent, type CSSProperties } from 'react';
+import { useCallback, useState, type ChangeEvent } from 'react';
 import type { TextureBuffer } from '../textureBuffer';
 import type { MobGeometry } from '../types/baseAssets';
 import { buildProjectSnapshot, restoreProjectBuffers } from '../projectSnapshot';
 import { ProjectAlreadyExistsError, deleteProject, listProjects, loadProject, projectExists, saveProject } from '../projectStorage';
+import { Button, FormField, InlineError } from '../ui';
 
 export interface ProjectControlsProps {
   /** Cache compartida de buffers por mob visitado en la sesion (ticket 018) -- fuente de lo que se guarda, y destino de lo que se carga. */
@@ -13,48 +14,23 @@ export interface ProjectControlsProps {
   onProjectLoaded: (loadedMobIds: string[]) => void;
 }
 
-const buttonStyle: CSSProperties = {
-  padding: '4px 10px',
-  fontSize: 12,
-  borderRadius: 4,
-  border: '1px solid rgba(255,255,255,0.25)',
-  background: 'var(--panel-bg)',
-  color: 'var(--text)',
-  cursor: 'pointer',
-};
-
-const dangerButtonStyle: CSSProperties = {
-  ...buttonStyle,
-  border: '1px solid rgba(255, 214, 89, 0.6)',
-};
-
-const inputStyle: CSSProperties = { fontSize: 12, padding: '4px 6px', minWidth: 140 };
-
 /**
  * Guardar/listar/cargar/eliminar proyectos (ticket 019, HU-3/HU-4/HU-5).
  * Vive en `App.tsx` (no dentro de `Editor.tsx`): un proyecto agrupa
- * VARIOS mobs a la vez (ver formato en
- * `docs/definiciones/multi-mob-y-proyectos-guardados.md`), y `Editor` se
- * remonta por completo al cambiar de mob (`key={mobId}`, ticket 018) --
- * este control necesita sobrevivir esos remounts para seguir mostrando
- * la lista de proyectos sin importar que mob este activo.
+ * VARIOS mobs a la vez, y `Editor` se remonta por completo al cambiar
+ * de mob (`key={mobId}`, ticket 018) -- este control necesita sobrevivir
+ * esos remounts para seguir mostrando la lista de proyectos.
  *
- * Confirmaciones (HU-3 "sobrescribir", HU-5 "eliminar"): DECISION de
- * este ticket -- confirmacion EN LINEA (reemplaza el boton por
- * "¿Seguro? Si/No" hasta que el usuario responde), NO `window.confirm`
- * nativo. Se probo primero con `window.confirm` (mas simple, cero UI
- * nueva) pero se descarto por un hallazgo real durante la revision en
- * vivo de este ticket (Claude in Chrome): un dialogo nativo bloquea el
- * hilo de JS de la pagina hasta que se resuelve, y la automatizacion de
- * este proyecto (via el protocolo de DevTools que usa Claude in Chrome)
- * no tiene forma de aceptarlo/cancelarlo -- la pestaña queda
- * completamente congelada (ni `Runtime.evaluate` ni `Input.dispatchMouseEvent`
- * responden) hasta cerrarla a la fuerza. Un modal nativo que ninguna
- * herramienta de QA automatizada de este equipo puede resolver es un
- * riesgo real para el checklist de cierre de CUALQUIER ticket futuro
- * que toque este control -- se opto por una confirmacion 100% en el
- * DOM de la pagina (totalmente scriptable) en vez de arriesgar ese
- * mismo bloqueo cada vez. Ver docs/ARQUITECTURA.md, "Ticket 019".
+ * Confirmaciones (HU-3 "sobrescribir", HU-5 "eliminar"): confirmación EN
+ * LÍNEA (reemplaza el botón por "¿Seguro? Sí/No"), NUNCA `window.confirm`
+ * nativo -- congela la pestaña de Claude in Chrome sin forma de
+ * responder (ver memoria `texture-studio-mc-sin-dialogos-nativos` y
+ * docs/ARQUITECTURA.md, "Ticket 019").
+ *
+ * Ticket 026: migrado a `FormField`+`Button` (variantes `primary`/
+ * `danger`)+`InlineError` (`ui/`) -- mismo comportamiento exacto,
+ * `dangerButtonStyle`/`buttonStyle`/`inputStyle` ad-hoc de este archivo
+ * se eliminan (reemplazados por `Button` variant="danger"/`FormField`).
  */
 export function ProjectControls({ bufferCache, geometryCache, onProjectLoaded }: ProjectControlsProps) {
   const [name, setName] = useState('');
@@ -162,49 +138,32 @@ export function ProjectControls({ bufferCache, geometryCache, onProjectLoaded }:
 
   return (
     <section aria-label="Proyectos guardados" style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12 }} data-refresh-tick={refreshTick}>
-      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ color: 'var(--text-dim)' }}>Nombre del proyecto</span>
-          <input type="text" value={name} placeholder="ej. Set Nether" aria-label="Nombre del proyecto" onChange={handleNameChange} style={inputStyle} />
-        </label>
-        <button type="button" style={{ ...buttonStyle, alignSelf: 'flex-end' }} disabled={pending !== null} onClick={handleSaveClick}>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <FormField label="Nombre del proyecto">
+          <input type="text" value={name} placeholder="ej. Set Nether" aria-label="Nombre del proyecto" onChange={handleNameChange} style={{ fontSize: 12, padding: '4px 6px', minWidth: 140 }} />
+        </FormField>
+        <Button disabled={pending !== null} onClick={handleSaveClick}>
           {pending === 'save' ? 'Guardando…' : 'Guardar'}
-        </button>
+        </Button>
 
         {confirmOverwrite && (
           <span
             role="alertdialog"
             aria-label={`Confirmar sobrescritura del proyecto ${confirmOverwrite}`}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-end' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
           >
-            <span>
-              ¿Sobrescribir «{confirmOverwrite}»?
-            </span>
-            <button type="button" style={dangerButtonStyle} disabled={pending !== null} onClick={handleConfirmOverwrite}>
+            <span>¿Sobrescribir «{confirmOverwrite}»?</span>
+            <Button variant="danger" disabled={pending !== null} onClick={handleConfirmOverwrite}>
               Sí, sobrescribir
-            </button>
-            <button type="button" style={buttonStyle} disabled={pending !== null} onClick={() => setConfirmOverwrite(null)}>
+            </Button>
+            <Button disabled={pending !== null} onClick={() => setConfirmOverwrite(null)}>
               Cancelar
-            </button>
+            </Button>
           </span>
         )}
       </div>
 
-      {error && (
-        <p
-          role="alert"
-          style={{
-            margin: 0,
-            padding: '6px 8px',
-            fontSize: 12,
-            color: 'var(--text)',
-            background: 'rgba(200, 60, 60, 0.25)',
-            borderRadius: 4,
-          }}
-        >
-          {error}
-        </p>
-      )}
+      {error && <InlineError message={error} />}
 
       {projects.length > 0 && (
         <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -229,21 +188,19 @@ export function ProjectControls({ bufferCache, geometryCache, onProjectLoaded }:
               {confirmDelete === project.name ? (
                 <span role="alertdialog" aria-label={`Confirmar eliminacion del proyecto ${project.name}`} style={{ display: 'flex', gap: 6 }}>
                   <span>¿Eliminar?</span>
-                  <button type="button" style={dangerButtonStyle} onClick={() => handleConfirmDelete(project.name)}>
+                  <Button variant="danger" onClick={() => handleConfirmDelete(project.name)}>
                     Sí, eliminar
-                  </button>
-                  <button type="button" style={buttonStyle} onClick={() => setConfirmDelete(null)}>
-                    Cancelar
-                  </button>
+                  </Button>
+                  <Button onClick={() => setConfirmDelete(null)}>Cancelar</Button>
                 </span>
               ) : (
                 <>
-                  <button type="button" style={buttonStyle} disabled={pending !== null} onClick={() => void handleLoad(project.name)}>
+                  <Button disabled={pending !== null} onClick={() => void handleLoad(project.name)}>
                     {pending === project.name ? 'Cargando…' : 'Cargar'}
-                  </button>
-                  <button type="button" style={buttonStyle} disabled={pending !== null} onClick={() => setConfirmDelete(project.name)}>
+                  </Button>
+                  <Button disabled={pending !== null} onClick={() => setConfirmDelete(project.name)}>
                     Eliminar
-                  </button>
+                  </Button>
                 </>
               )}
             </li>

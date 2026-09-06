@@ -17,3 +17,11 @@ Migrar los ~15 controles existentes del panel lateral a las primitivas de `front
 
 ## Criterios de aceptación
 - Dado cualquier control del panel ya migrado, cuando se usa, entonces su comportamiento es exactamente el mismo que antes de este ticket — solo cambia su estructura visual/HTML.
+
+## Hecho
+
+- Migrados los ~15 controles: `SymmetryControls`/`GridToggle` (`Checkbox`, nuevo), `ZoomControls` (`Button variant="icon"`), `PartIsolationControls` (`FormField`+`Select`+`Button`), `ImportTextureControl`/`PasteImageControls`/`ExportControls` (`FormField`+`Button`+`InlineError`, nuevo), `ProjectControls` (`FormField`+`Button` con `variant="danger"` nueva+`InlineError`), `MobSelector` (`Button` primary/secondary), `ColorPicker` (swatches quedan custom -- color dinámico por instancia, "Color libre" migra a `FormField`).
+- Dos primitivas nuevas encontradas durante el refactor (duplicación real, no prevista en el ticket 025): `Checkbox`, `InlineError`. `Button` gana la variante `danger`.
+- `npm run lint` (sin warnings), `npm test`, `npm run build` en verde.
+
+**Verificación en vivo (local)**: recorrido funcional completo -- toggle de cuadrícula, aislar parte + pintar confinado (confirmado por `getImageData`), botón "Mostrar todo", flujo completo de guardar/sobrescribir/eliminar proyecto con las confirmaciones inline (nunca `window.confirm`) funcionando exactamente igual que antes. Ver `docs/ARQUITECTURA.md`, "Ticket 026", para el detalle completo.

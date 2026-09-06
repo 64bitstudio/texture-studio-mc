@@ -1,8 +1,15 @@
 import type { ButtonHTMLAttributes } from 'react';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  /** `'secondary'` (default) para acciones normales, `'primary'` para LA acción principal de un flujo, `'icon'` para botones compactos (ícono + texto corto). */
-  variant?: 'secondary' | 'primary' | 'icon';
+  /**
+   * `'secondary'` (default) para acciones normales, `'primary'` para LA
+   * acción principal de un flujo, `'icon'` para botones compactos
+   * (ícono/símbolo + texto corto), `'danger'` para una acción
+   * destructiva ya confirmada en línea (ej. "Sí, eliminar" -- ticket
+   * 026, reemplaza el `dangerButtonStyle` ad-hoc que tenía
+   * `ProjectControls.tsx`).
+   */
+  variant?: 'secondary' | 'primary' | 'icon' | 'danger';
 }
 
 /**
@@ -15,7 +22,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
  * directamente).
  */
 export function Button({ variant = 'secondary', className, type = 'button', ...rest }: ButtonProps) {
-  const variantClass = variant === 'primary' ? 'ui-button--primary' : variant === 'icon' ? 'ui-button--icon' : '';
+  const variantClass = variant === 'secondary' ? '' : `ui-button--${variant}`;
   const classes = ['ui-button', variantClass, className].filter(Boolean).join(' ');
   return <button type={type} className={classes} {...rest} />;
 }

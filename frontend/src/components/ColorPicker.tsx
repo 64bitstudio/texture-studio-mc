@@ -1,4 +1,5 @@
 import { MINECRAFT_PALETTE } from '../colors';
+import { FormField } from '../ui';
 
 export interface ColorPickerProps {
   /** Color actualmente seleccionado, como `#rrggbb`. */
@@ -10,6 +11,14 @@ export interface ColorPickerProps {
  * Selector de color (HU-5): paleta predefinida "estilo Minecraft" +
  * selector libre (`<input type="color">` nativo -- cubre hex/RGB sin
  * construir un color picker custom, ver ticket 002 "no sobre-construyas").
+ *
+ * Ticket 026: los swatches de la paleta se dejan como `<button>` nativo
+ * -- NO migran a `Button` (`ui/`) porque cada uno necesita un color de
+ * fondo dinámico por swatch (`swatch.hex`), algo que las variantes fijas
+ * de `Button` (primario/secundario/ícono/danger) no cubren y no
+ * deberían cubrir (agregar una prop de color arbitrario a `Button`
+ * rompería su propósito de tener un set cerrado de estilos
+ * consistentes). El selector libre sí migra a `FormField`.
  */
 export function ColorPicker({ color, onChange }: ColorPickerProps) {
   return (
@@ -43,10 +52,9 @@ export function ColorPicker({ color, onChange }: ColorPickerProps) {
         })}
       </div>
 
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, fontSize: 13 }}>
-        Color libre
+      <FormField label="Color libre" className="ui-field--inline">
         <input type="color" value={color} onChange={(e) => onChange(e.target.value)} style={{ cursor: 'pointer' }} />
-      </label>
+      </FormField>
     </div>
   );
 }
