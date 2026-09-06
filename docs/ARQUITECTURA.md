@@ -792,3 +792,11 @@ A diferencia de la Araña (ticket 020), donde las 8 patas quedaban visualmente a
 - `npm run lint`, `npm test`, `npm run build` en verde en `backend/` y `frontend/` (tests nuevos: bloque dedicado a `creeper` en `backend/test/baseAssets.spec.ts` -- incluye assert explicito de que ninguna pata tiene `mirrorX`, para dejar la diferencia con la Araña cubierta por test, no solo documentada).
 - `creeper.png` copiado a `backend/vanilla-assets/` (no versionado) para desarrollo local -- el despliegue del asset real a la VM (DEV/QA/PROD) sigue siendo responsabilidad del ticket 022, junto con Zombie y Araña.
 - En vivo (local): `GET /api/base-assets/creeper` responde `isPlaceholder: false` con las 6 partes esperadas; selector de mob muestra "Creeper"; visor 3D muestra un Creeper reconocible de inmediato (ver arriba).
+
+## Ticket 022 -- Poblar assets vanilla reales de Zombie/Araña/Creeper en la VM
+
+Puramente despliegue de infraestructura -- sin ningún cambio de código, mismo mecanismo ya establecido por el ticket 007 para el Esqueleto. El volumen de host `/home/ubuntu/vanilla-assets/texture-studio-mc/` ya estaba montado `:ro` en los 3 `docker-compose.*.yml` desde el ticket 007 cubriendo CUALQUIER archivo del directorio -- no hizo falta tocar ningún compose ni redesplegar contenedores (un bind mount refleja cambios del filesystem del host de inmediato).
+
+- `zombie.png`, `spider.png`, `creeper.png` copiados por `scp` desde `~/tools/minecraft-texture-pack/vanilla-cache/` a `/home/ubuntu/vanilla-assets/texture-studio-mc/` en la VM (alias SSH `ampere-free`).
+- Permisos ajustados igual que el Esqueleto: `chown ubuntu:ubuntu`, `chmod 644`.
+- Verificado en vivo en DEV (`https://texture-studio-dev.64bitstudio.com/`) inmediatamente después de copiar los archivos, sin ningún redeploy: los 4 mobs (`GET /api/base-assets/skeleton|zombie|spider|creeper`) responden `isPlaceholder: false`, y el visor 3D de cada uno muestra su textura vanilla real correctamente aplicada (Esqueleto con huesos visibles, Zombie con piel verde y ropa característica, Araña con ojos rojos, Creeper con camuflaje verde y cara fruncida icónica).
