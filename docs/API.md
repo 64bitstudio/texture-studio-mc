@@ -5,7 +5,8 @@ El backend es deliberadamente mínimo (sin lógica de negocio real — toda la e
 | Método | Ruta | Descripción |
 |---|---|---|
 | `GET` | `/health` | Healthcheck para `corePipeline` (Jenkins) y Traefik. |
-| `GET` | `/api/base-assets/skeleton` | Textura vanilla base (real o placeholder) + definición de geometría/UV del Esqueleto. |
+| `GET` | `/api/mobs` | Catálogo de mobs soportados (ticket 016), para el selector de mob del frontend (ticket 018). |
+| `GET` | `/api/base-assets/:mobId` | Textura vanilla base (real o placeholder) + definición de geometría/UV del mob solicitado. `404` si `mobId` no existe en el registro. |
 | `GET` | `/*` | Sirve el build estático de la SPA (frontend). |
 
 ## `GET /health`
@@ -18,11 +19,32 @@ Respuesta `200`:
 
 Sin dependencias externas (no hay DB/cache en este proyecto) — un `200` certifica que el proceso Node está arriba y sirviendo requests.
 
-## `GET /api/base-assets/skeleton`
+## `GET /api/mobs`
 
-Ver `docs/ARQUITECTURA.md` ("Contrato de `GET /api/base-assets/skeleton`") para la decisión de diseño de este endpoint.
+Nuevo en el ticket 016. Catálogo de los mobs soportados por el backend (`MOB_REGISTRY`), para que el frontend arme el menú de selección (ticket 018). No incluye geometría ni ningún otro detalle interno — solo lo que el menú necesita.
 
 Respuesta `200`:
+
+```jsonc
+{
+  "mobs": [
+    { "id": "skeleton", "label": "Esqueleto" }
+    // Zombie/Araña/Creeper se agregan en sus propios tickets (017/020/021).
+  ]
+}
+```
+
+## `GET /api/base-assets/:mobId`
+
+Generaliza el endpoint literal `GET /api/base-assets/skeleton` del ticket 001 (ticket 016) — ver `docs/ARQUITECTURA.md` ("Contrato de `GET /api/base-assets/:mobId`") para la decisión de diseño. `mobId` es cualquier `id` del catálogo de `GET /api/mobs` (por ahora, solo `"skeleton"`).
+
+Respuesta `404` si `mobId` no existe en el registro:
+
+```jsonc
+{ "error": "El mob \"mob-inexistente\" no existe. Ver GET /api/mobs para el catalogo disponible." }
+```
+
+Respuesta `200` (idéntica en forma y valores a la que ya existía para `/api/base-assets/skeleton` antes del ticket 016 — sin cambio de contrato):
 
 ```jsonc
 {

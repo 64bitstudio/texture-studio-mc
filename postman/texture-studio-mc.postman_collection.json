@@ -12,10 +12,24 @@
       }
     },
     {
+      "name": "Mobs - Catalogo",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/mobs"
+      }
+    },
+    {
       "name": "Base assets - Skeleton",
       "request": {
         "method": "GET",
         "url": "{{baseUrl}}/api/base-assets/skeleton"
+      }
+    },
+    {
+      "name": "Base assets - Mob inexistente (404)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/base-assets/mob-inexistente"
       }
     }
   ]
