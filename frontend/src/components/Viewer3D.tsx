@@ -180,11 +180,17 @@ export function Viewer3D({ texture, geometry, mobLabel }: Viewer3DProps) {
       style={{ width: '100%', height: '100%' }}
     >
       <Canvas camera={{ position: [45, 40, 65], fov: 40, near: 0.1, far: 1000 }}>
-        {/* Ticket 049 (pedido de Marco: "el fondo del render 3d debe
-            tener un color verde") -- verde oscuro (antes gris neutro
-            `#2b2d36`), acorde a la paleta de acento de la app sin competir
-            con los colores de la textura del mob. */}
-        <color attach="background" args={['#122015']} />
+        {/* Ticket 049 había puesto un fondo verde oscuro (pedido
+            explícito de Marco en ese momento). Ticket 052 lo revierte:
+            Marco mandó captura + imagen de referencia lado a lado
+            señalando que el color no coincidía -- muestreo real de la
+            referencia (Python/PIL, zona de fondo lejos del modelo y la
+            cuadrícula) dio un promedio de `rgb(16,21,26)`, un dark
+            NEUTRO/azulado, no verde. `#0f171d` -- el mismo `--bg` que ya
+            usa el resto de la app (`index.css`) -- es prácticamente
+            idéntico a ese muestreo, así que se reusa ese valor en vez de
+            inventar uno nuevo. */}
+        <color attach="background" args={['#0f171d']} />
         {/* Ticket 048/049 (pedido de Marco: cuadrícula real dentro de la
             escena, NO un truco de CSS detrás del canvas -- quedaba tapado
             por el fondo opaco de `<color>` de arriba, ver

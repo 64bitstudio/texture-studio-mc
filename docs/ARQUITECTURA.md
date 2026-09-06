@@ -1452,3 +1452,25 @@ Fix: `toneMapped: false` en el `THREE.MeshBasicMaterial` del modelo (`MobModel`,
 Cuadrícula solo-piso con colores sutiles confirmada en "Nuevo proyecto" Y en el Editor (componente compartido, sin errores de consola). **Verificación de color real**: se seleccionó el color "rojo" de la paleta (`rgb(161,28,17)`, confirmado leyendo directamente los píxeles del `TextureBuffer` vía `getImageData` en la consola del navegador) y se pintó un parche sobre la textura de la cabeza; el parche correspondiente en el visor 3D se ve del mismo tono de rojo (comparación visual directa contra el swatch "Color libre" de la paleta, recorte ampliado) -- confirma que el material ya no altera los colores reales. (No fue posible leer el píxel exacto del canvas WebGL vía `drawImage`/`getImageData` porque `preserveDrawingBuffer` no está activado en el renderer -- comportamiento esperado/deliberado de Three.js por rendimiento, no un bug; se optó por verificación visual directa en vez de cambiar esa config del renderer solo para esta prueba puntual.)
 
 `npm run lint`, `npm test` (197, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde.
+
+## Ticket 052 -- Color space de la textura 3D + fondo neutro del visor
+
+Séptima pasada de corrección visual. Marco mandó una captura de la app junto a la imagen de referencia, lado a lado, señalando: "tal vez en código son idénticos pero visualmente no lo son ni para el fondo ni para el modelo 3D". Confirmado con muestreo de píxeles (Python/PIL) -- había 2 causas reales distintas, ninguna cubierta por el `toneMapped: false` del ticket 051.
+
+### Causa real del modelo "lavado": `colorSpace` de la textura, no el tone mapping
+
+El ticket 051 ya había corregido el tone mapping (`toneMapped: false`), pero el modelo seguía viéndose con menos saturación/contraste que la referencia. Causa real, distinta: `THREE.Texture` (la clase base de `CanvasTexture`, ver `node_modules/three/src/textures/Texture.js`) trae `colorSpace = THREE.NoColorSpace` por default. El `<canvas>` 2D que respalda esta textura (`useCanvasTexture.ts`) tiene sus píxeles codificados en sRGB estándar (como cualquier `ImageData`/PNG en la web) -- pero con `colorSpace = NoColorSpace`, el shader del renderer NO decodifica sRGB→lineal al muestrear esos píxeles, mientras que `WebGLRenderer.outputColorSpace` (sRGB por default desde three.js r152) SÍ codifica lineal→sRGB a la salida. Ese descalce de un solo sentido en el pipeline de color es exactamente el tipo de bug que produce una apariencia "lavada"/de bajo contraste -- coincide con precisión con el reporte de Marco.
+
+Fix: `texture.colorSpace = THREE.SRGBColorSpace` explícito en `createCanvasTexture()` (`useCanvasTexture.ts`) -- con esto el pipeline hace el redondeo completo (decodifica al entrar, codifica al salir) en vez de solo la mitad. `useCanvasTexture.ts` es compartido por Editor/Viewer3D en todos sus consumidores, así que el fix aplica a toda la app de una sola vez.
+
+### Fondo: revierte el verde del ticket 049
+
+Muestreo directo de la imagen de referencia que mandó Marco esta vez (zona de fondo lejos del modelo y la cuadrícula, Python/PIL): promedio `rgb(16,21,26)` -- un dark NEUTRO/azulado (canal B más alto que G), no verde. El ticket 049 había puesto `#122015` (verde) por pedido explícito de Marco en ese momento -- esta imagen de referencia nueva contradice eso directamente, así que se revierte a `#0f171d`, el mismo `--bg` que ya usa el resto de la app (`index.css`) -- prácticamente idéntico al muestreo, se reusa en vez de inventar un valor nuevo.
+
+Los colores de la cuadrícula del piso (ticket 051, `#20392c`/`#2c4d3c`) NO se tocaron -- un re-muestreo de la misma imagen de referencia confirmó que ya estaban correctos (casi idénticos al pico de brillo muestreado de una línea de cuadrícula real).
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Comparación directa contra la imagen de referencia en "Nuevo proyecto" (recorte ampliado) y en el Editor (mismo componente/hook compartido, sin errores de consola) -- fondo y saturación/contraste del modelo ahora coinciden visiblemente con la referencia, una mejora sustancial sobre el resultado del ticket 051.
+
+`npm run lint`, `npm test` (197, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde.
