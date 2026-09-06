@@ -9,6 +9,7 @@ import { ThemeToggle } from './components/ThemeToggle';
 import { Avatar } from './components/Avatar';
 import { Settings } from './components/Settings';
 import { PlaceholderScreen } from './components/PlaceholderScreen';
+import { NuevoProyecto } from './components/NuevoProyecto';
 import { getUserPrefs } from './userPrefs';
 import { getTheme, type Theme } from './theme';
 import { fetchMobBaseAssets } from './api/baseAssets';
@@ -59,6 +60,15 @@ function App() {
   // cambiar el tema desde Configuración no actualizaba el texto del
   // toggle rapido, que tenia su propio `useState` desincronizado).
   const [theme, setTheme] = useState<Theme>(() => getTheme());
+
+  // Ticket 038 (adelanta una pieza minima del ticket 041, "vista de
+  // detalle de Proyecto"): cual proyecto esta activo ahora mismo --
+  // poblado al crearlo (`handleProjectCreated` mas abajo). El ticket
+  // 041 construye el contenido REAL de la vista `'proyecto'` sobre este
+  // mismo estado (sin cambiar su forma) -- por ahora solo alcanza para
+  // que el `PlaceholderScreen` de esa vista muestre el nombre del
+  // proyecto recien creado, en vez de un texto generico.
+  const [activeProject, setActiveProject] = useState<{ name: string; mobIds: string[] } | null>(null);
 
   // Catalogo de mobs (ticket 018, HU-1) -- `GET /api/mobs`. El menu no
   // hardcodea ninguna lista: muestra exactamente lo que este fetch
@@ -216,6 +226,17 @@ function App() {
   // abajo), asi que el proximo montaje ya lee `bufferCache` desde cero
   // via su inicializador perezoso -- sin una instancia vieja que
   // forzar a remontar.
+  // Ticket 038: `NuevoProyecto.tsx` ya llamo a `saveProject` con exito
+  // ANTES de este callback (mismo orden que `handleProjectOpenedFromHome`
+  // de abajo: guardar/restaurar primero, navegar despues) -- esto solo
+  // registra cual proyecto quedo activo y navega a su vista de detalle
+  // (`'proyecto'`, ticket 041 construye el contenido real sobre
+  // `activeProject`).
+  function handleProjectCreated(projectName: string, mobId: string) {
+    setActiveProject({ name: projectName, mobIds: [mobId] });
+    setView('proyecto');
+  }
+
   function handleProjectOpenedFromHome(loadedMobIds: string[]) {
     const targetMobId = loadedMobIds[0] ?? selectedMobId;
     if (targetMobId && targetMobId !== selectedMobId) {
@@ -272,14 +293,30 @@ function App() {
           <Settings displayName={displayName} onDisplayNameSaved={setDisplayName} theme={theme} onThemeChange={setTheme} />
         )}
 
-        {/* Ticket 037, decisión real (documentada, no silenciosa -- ver
-            docs/ARQUITECTURA.md, "Ticket 037"): "Nuevo proyecto" y "Mis
-            proyectos" muestran TEMPORALMENTE el mismo `HomeScreen` ya
-            existente (selección de mob + Guardados, tickets 027/028)
-            para no dejar la app sin poder editar/abrir nada mientras
-            el resto del epic (038/039) construye el contenido real y
-            diferenciado de cada destino. */}
-        {(view === 'nuevo-proyecto' || view === 'mis-proyectos') && (
+        {/* Ticket 038: "Nuevo proyecto" ya tiene contenido real (antes
+            mostraba temporalmente el mismo `HomeScreen` que "Mis
+            proyectos", ver `docs/ARQUITECTURA.md`, "Ticket 037"). */}
+        {view === 'nuevo-proyecto' && (
+          <>
+            {mobsState.status === 'loading' && <LoadingOverlay message="Cargando catálogo de mobs…" />}
+
+            {mobsState.status === 'error' && (
+              <div style={{ display: 'grid', placeItems: 'center', padding: 48, gap: 12 }}>
+                <p role="alert">No se pudo cargar el catálogo de mobs: {mobsState.message}</p>
+                <Button onClick={handleRetryMobs}>Reintentar</Button>
+              </div>
+            )}
+
+            {mobsState.status === 'ready' && <NuevoProyecto mobs={mobsState.mobs} onProjectCreated={handleProjectCreated} />}
+          </>
+        )}
+
+        {/* Ticket 037, decisión real (documentada -- ver
+            docs/ARQUITECTURA.md, "Ticket 037"): "Mis proyectos" sigue
+            mostrando TEMPORALMENTE el mismo `HomeScreen` ya existente
+            (selección de mob + Guardados, tickets 027/028) hasta que el
+            ticket 039 construya su contenido real y diferenciado. */}
+        {view === 'mis-proyectos' && (
           <>
             {mobsState.status === 'loading' && <LoadingOverlay message="Cargando catálogo de mobs…" />}
 
@@ -302,7 +339,9 @@ function App() {
         )}
 
         {view === 'recientes' && <PlaceholderScreen title="Recientes" ticket={40} />}
-        {view === 'proyecto' && <PlaceholderScreen title="Proyecto" ticket={41} />}
+        {view === 'proyecto' && (
+          <PlaceholderScreen title={activeProject ? `Proyecto: ${activeProject.name}` : 'Proyecto'} ticket={41} />
+        )}
         {view === 'agregar-mobs' && <PlaceholderScreen title="Agregar mobs" ticket={42} />}
       </AppShell>
     );

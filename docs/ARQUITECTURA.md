@@ -1071,3 +1071,25 @@ Los tickets 038 (Nuevo proyecto real) y 039 (Mis proyectos real) todavía no exi
 ### Verificación en vivo (Claude in Chrome, local)
 
 Confirmado con capturas: sidebar muestra los 3 destinos, el activo resaltado en verde cambia correctamente al navegar entre ellos; "Recientes" muestra el placeholder ("Esta pantalla todavía no está implementada -- ver ticket 040"); el avatar del header navega a Configuración, que se renderiza como vista real (sidebar/header siguen visibles alrededor, no un modal); seleccionar un mob desde "Nuevo proyecto" entra al editor con su layout dedicado sin sidebar; "Volver al inicio" regresa a "Nuevo proyecto" con el sidebar de nuevo resaltado correctamente. `npm run lint`, `npm test` (184, sin tests nuevos -- cambio de layout/routing interno, verificado en vivo), `npm run build` en verde.
+
+## Ticket 038 -- Pantalla "Nuevo proyecto" (HU-1)
+
+### `NuevoProyecto.tsx` (nuevo) -- crea el proyecto EN EL MOMENTO, no al final
+
+A diferencia del flujo viejo (guardar era una acción aparte, al final de una sesión de edición libre), esta pantalla llama a `saveProject` (ticket 019, sin cambio de forma) en el momento mismo de "Crear proyecto" -- el proyecto nace como una entidad explícita desde su primer mob, consistente con el diseño técnico del documento de definición ("el proyecto pasa a ser una entidad explícita desde su creación").
+
+### Maps LOCALES de un solo mob -- NO el `bufferCache`/`geometryCache` compartido de `App.tsx`
+
+`buildProjectSnapshot` (ticket 019) itera TODOS los mobs de los `Map` que recibe -- si se le hubiera pasado el `bufferCache`/`geometryCache` compartido de `App.tsx` (que acumula cualquier mob visitado en la sesión, incluso de ediciones sin relación), el proyecto nuevo habría arrastrado mobs que el usuario nunca eligió para él. `NuevoProyecto.tsx` arma sus propios `Map` de una sola entrada (el mob recién elegido, con su textura base recién decodificada) antes de llamar a `buildProjectSnapshot` -- aislado a propósito del estado de sesión del resto de la app.
+
+### Vista previa 3D: mismo patrón que `Editor.tsx`, con caché de assets propia
+
+`fetchMobBaseAssets(mobId)` -- decode con `decodePngDataUrlToImageData` -- `TextureBuffer` -- `useCanvasTexture` -- `<Viewer3D>`, exactamente el mismo pipeline que ya usa `Editor.tsx` para su propio buffer inicial. `assetCache` (un `Map` local al componente, no compartido) evita re-pedir el asset de un mob ya visitado dentro de esta misma pantalla al alternar la selección. El hook `useCanvasTexture` se llama SIEMPRE (nunca condicional, regla de hooks) con un `TextureBuffer` de 1×1 (`EMPTY_BUFFER`, constante a nivel de módulo) hasta que haya una vista previa real que mostrar -- `<Viewer3D>` en sí solo se renderiza una vez que el asset+buffer están listos.
+
+### `activeProject` (adelanto mínimo del ticket 041)
+
+`App.tsx` gana `activeProject: {name, mobIds} | null`, poblado por `handleProjectCreated` al crear con éxito. El ticket 041 construirá el contenido real de la vista `'proyecto'` sobre este mismo estado (sin cambiar su forma) -- por ahora solo alcanza para que `PlaceholderScreen` muestre el nombre del proyecto recién creado ("Proyecto: Set Nether") en vez de un texto genérico, satisfaciendo el criterio de aceptación de este ticket ("navego a la vista de detalle de ese proyecto, que ya muestra el mob elegido") sin construir la vista de detalle completa todavía.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Confirmado con capturas: seleccionar cada uno de los 4 mobs actualiza la vista previa 3D en vivo (incluyendo el WebGL context-lost transitorio ya documentado de este entorno de automatización, que se recupera solo en unos segundos); crear sin nombre muestra "Ingresa un nombre para el proyecto." y no crea nada; crear con nombre+mob navega a "Proyecto: Set Nether" (confirmando `activeProject` poblado); confirmado con `localStorage` real que el proyecto se guardó con exactamente 1 mob (`skeleton`) y un PNG válido; repetir el mismo nombre con OTRO mob dispara el aviso de sobrescritura ya existente del ticket 019 ("¿Sobrescribirlo?"), cancelado sin sobrescribir. `npm run lint`, `npm test` (184, sin tests nuevos -- este componente depende de canvas/DOM/fetch de punta a punta, verificado en vivo en vez de con mocks, mismo criterio ya aplicado a `projectSnapshot.ts`), `npm run build` en verde.
