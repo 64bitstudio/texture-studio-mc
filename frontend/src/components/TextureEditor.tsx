@@ -397,8 +397,14 @@ export function TextureEditor({
         />
       )}
       {isolatedRegion && (
+        // `ts-fade-in` (ticket 032, HU-7): transicion corta al activar
+        // "aislar parte" -- este canvas se monta/desmonta segun
+        // `isolatedRegion` (nunca se re-monta al cambiar DE una parte a
+        // otra mientras sigue activo, solo al pasar de null a una
+        // region), asi que un fundido por montaje es lo que corresponde.
         <canvas
           ref={isolationCanvasRef}
+          className="ts-fade-in"
           width={displayWidth}
           height={displayHeight}
           aria-hidden="true"

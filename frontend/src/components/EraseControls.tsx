@@ -18,6 +18,10 @@ export const ERASE_BRUSH_SIZE_MAX = 5;
  * pincel expande el punto pintado a un bloque N×N). El selector de
  * tamaño solo aparece con el modo activo (no aplica si no se está
  * borrando).
+ *
+ * Ticket 032 (HU-7): ícono 🗑 junto al texto (nunca solo ícono, ver
+ * `aria-hidden` -- el texto sigue siendo el nombre accesible real) y
+ * fundido corto (`ts-fade-in`) al aparecer el selector de tamaño.
  */
 export function EraseControls({ active, onToggle, brushSize, onBrushSizeChange }: EraseControlsProps) {
   const sizes: number[] = [];
@@ -26,18 +30,21 @@ export function EraseControls({ active, onToggle, brushSize, onBrushSizeChange }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <Button variant={active ? 'primary' : 'secondary'} aria-pressed={active} onClick={() => onToggle(!active)}>
+        <span aria-hidden="true">🗑</span>
         {active ? 'Borrar (activo)' : 'Borrar'}
       </Button>
       {active && (
-        <FormField label="Tamaño de pincel">
-          <Select value={brushSize} onChange={(e) => onBrushSizeChange(Number(e.target.value))} aria-label="Tamaño del pincel de borrado">
-            {sizes.map((n) => (
-              <option key={n} value={n}>
-                {n}×{n}
-              </option>
-            ))}
-          </Select>
-        </FormField>
+        <div className="ts-fade-in">
+          <FormField label="Tamaño de pincel">
+            <Select value={brushSize} onChange={(e) => onBrushSizeChange(Number(e.target.value))} aria-label="Tamaño del pincel de borrado">
+              {sizes.map((n) => (
+                <option key={n} value={n}>
+                  {n}×{n}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        </div>
       )}
     </div>
   );

@@ -182,3 +182,12 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`ui/Menu.tsx`** — gana `children?: ReactNode` (contenido libre, para acciones con UI rica que no encajan como `items` planos de ARIA "menu") e `items` pasa a ser opcional. Anclaje del panel (`left`/`right`) ahora se decide en runtime (`toggleOpen`, mide `getBoundingClientRect()` antes de abrir) en vez de fijo por CSS -- ver `docs/ARQUITECTURA.md`, "Ticket 031", para el bug real que esto corrige.
 - **`components/Editor.tsx`** — las secciones "Importar / pegar imagen" y "Exportar" se reemplazan por una única `Section title="Archivo"` con un `Menu` cuyo `children` renderiza `ImportTextureControl`/`PasteImageControls`/`ExportControls` tal cual (sin cambios de lógica).
 - **`App.tsx`** — la fila donde vivía `ProjectControls` siempre expandida ahora envuelve ese mismo componente (sin cambios de lógica) en un `Menu` label="Proyecto".
+
+### Ticket 032 -- Iconografía y transiciones
+
+- **`components/HistoryControls.tsx`** — íconos ↶/↷ junto a "Deshacer"/"Rehacer".
+- **`components/EraseControls.tsx`** — ícono 🗑 junto al texto del botón; el selector de tamaño de pincel gana `.ts-fade-in`.
+- **`components/ProjectControls.tsx`** — ícono 💾 junto al botón "Guardar".
+- **`components/Editor.tsx`**/**`App.tsx`** — íconos 📁/💾 en los `label` de los menús "Archivo"/"Proyecto"; contenedor raíz de `Editor` gana `.ts-fade-in` (fundido al cambiar de mob).
+- **`components/TextureEditor.tsx`** — el canvas de "aislar parte" gana `.ts-fade-in` (fundido al activarse).
+- **`App.tsx`** — "Volver al inicio" gana texto visible junto al ícono (antes ícono-solo); pierde `aria-label` (redundante, el texto real es ahora el nombre accesible).
