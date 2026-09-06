@@ -21,6 +21,7 @@ Que la pantalla de detalle de un proyecto (el lugar donde Marco pasa más tiempo
 - Pestaña "Configuración del proyecto" -- se omite por completo (confirmado con Marco). Las acciones de gestión (renombrar/duplicar/exportar/eliminar) viven en el panel lateral de "Acciones" de la pantalla principal, no en una pestaña aparte.
 - Selector "Minecraft Java Edition" funcional -- queda como badge fijo, sin dropdown ni soporte Bedrock (confirmado con Marco).
 - Cambios a `Recientes.tsx`, `Mis proyectos` (ya rediseñada), `AgregarMobs.tsx`, o al flujo de "Nuevo proyecto" (su preview 3D en vivo se queda igual -- ahí SÍ tiene sentido un render 3D real, porque el usuario está eligiendo/creando, no navegando una lista).
+- **El editor de texturas (`Editor.tsx`) NO se toca -- confirmado explícitamente con Marco.** El botón "Editar textura" de cada tarjeta sigue llevando exactamente al mismo editor que existe hoy, con su visor 3D en vivo (`Viewer3D.tsx`) intacto, historial, simetría, paleta de color, aislar parte, resolución, etc. -- sin ningún cambio. El preview 2D de este documento es SOLO para la miniatura dentro de la tarjeta y el modal del ícono de "ojo" (HU-1) -- dos superficies nuevas, no un reemplazo del editor real.
 - El campo "Modelo: <nombre>" que aparece en la imagen de referencia se OMITE de la tarjeta de mob (ver "Riesgos y preguntas abiertas") -- sin soporte de múltiples skins por tipo, ese dato es 100% redundante con el nombre del mob que ya se muestra como título de la tarjeta.
 
 ## Historias de Usuario
