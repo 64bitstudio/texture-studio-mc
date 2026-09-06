@@ -20,17 +20,15 @@ export interface NuevoProyectoProps {
 
 const EMPTY_BUFFER = new TextureBuffer(1, 1);
 
-/** Caja de ícono compartida por los encabezados de sección (ticket 046) -- "Selecciona un mob"/"Vista previa". */
-const SECTION_ICON_BOX_STYLE = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  width: 36,
-  height: 36,
-  borderRadius: 'var(--radius-md)',
-  background: 'var(--accent-soft)',
-  color: 'var(--accent)',
-  flexShrink: 0,
+/** Fondo cuadriculado sutil del panel del visor 3D (ticket 046, revisión 2 -- detalle de la referencia). */
+const VIEWER_GRID_STYLE = {
+  height: 300,
+  borderRadius: 'var(--radius-lg)',
+  overflow: 'hidden',
+  border: '1px solid var(--border)',
+  backgroundColor: 'var(--bg)',
+  backgroundImage: 'linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)',
+  backgroundSize: '24px 24px',
 } as const;
 
 /**
@@ -48,15 +46,28 @@ const SECTION_ICON_BOX_STYLE = {
  * por primera vez -- mismo punto de partida, sin inventar un segundo
  * "blanco" distinto.
  *
- * Ticket 046 (rediseño visual, mockup nuevo de Marco): tarjetas de mob
- * con la miniatura OFICIAL real de cada mob (`mobIcons.ts` -- renders
- * descargados de Minecraft Wiki, decisión explícita de Marco, ver
- * `docs/ARQUITECTURA.md`, "Ticket 046") + badge de check al
- * seleccionar; encabezados de sección con ícono + subtítulo; tarjeta
- * informativa del mob elegido (ícono + nombre + descripción corta,
- * copy nueva del frontend); campo de nombre con botón "limpiar". Toda
- * la lógica de arriba (estado/handlers) es exactamente la misma que
- * antes de este ticket -- solo cambia el JSX/estilos de abajo.
+ * Ticket 046, revisión 2 (correcciones pedidas por Marco tras ver el
+ * resultado en vivo -- todas las diferencias se verificaron con
+ * recortes ampliados de la imagen de referencia, no a ojo):
+ * - El contenedor ya NO tiene `maxWidth` -- ocupa todo el ancho
+ *   disponible (la columna de "Vista previa" queda con un ancho
+ *   acotado, `minmax(340px, 460px)`, la izquierda absorbe el resto).
+ * - "Crear proyecto" se movió DEBAJO de la tarjeta "Vista previa" (2da
+ *   fila del mismo grid de 2 columnas, columna derecha) -- antes vivía
+ *   debajo de "Selecciona un mob" (columna izquierda).
+ * - El ícono del botón ahora es un círculo oscuro con el "+" en verde
+ *   adentro (antes el ícono iba suelto).
+ * - Los encabezados de sección ("Selecciona un mob"/"Vista previa") ya
+ *   NO envuelven su ícono en una caja con fondo -- el ícono va suelto,
+ *   igual que en la referencia (confirmado con recorte ampliado).
+ * - El badge "Minecraft Java Edition" pasa de pastilla con borde a
+ *   rectángulo redondeado con relleno sólido (`--chip-bg`).
+ * - El campo de nombre usa fondo `--bg` (no `--surface-raised`) y borde
+ *   con tinte de acento; el botón "limpiar" ahora es un círculo con
+ *   borde propio.
+ *
+ * Toda la lógica de estado/handlers de abajo es EXACTAMENTE la misma
+ * que antes de este ticket -- solo cambia el JSX/estilos.
  */
 export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
   const [name, setName] = useState('');
@@ -181,7 +192,7 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
   const selectedMobLabel = mobs.find((m) => m.id === selectedMobId)?.label ?? '';
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(360px, 1fr) minmax(300px, 420px)', gap: 28, padding: 28, maxWidth: 1200 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(340px, 460px)', gap: 28, padding: 28, alignItems: 'start' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
           <h2 style={{ margin: '0 0 6px', fontSize: 'var(--font-xl)' }}>Nuevo proyecto</h2>
@@ -198,7 +209,14 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
               onChange={handleNameChange}
               aria-label="Nombre del proyecto"
               placeholder="ej. Set Nether"
-              style={{ fontSize: 13, padding: '10px 36px 10px 12px', width: '100%', borderRadius: 'var(--radius-md)' }}
+              style={{
+                fontSize: 13,
+                padding: '10px 36px 10px 12px',
+                width: '100%',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--bg)',
+                border: '1px solid var(--accent-soft-strong)',
+              }}
             />
             {name && (
               <button
@@ -208,22 +226,22 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
                 title="Limpiar nombre del proyecto"
                 style={{
                   position: 'absolute',
-                  right: 8,
+                  right: 7,
                   top: '50%',
                   transform: 'translateY(-50%)',
-                  width: 22,
-                  height: 22,
+                  width: 24,
+                  height: 24,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  border: 'none',
+                  border: '1px solid var(--border-strong)',
                   background: 'transparent',
                   color: 'var(--text-dim)',
                   cursor: 'pointer',
                   borderRadius: '50%',
                 }}
               >
-                <IconX size={14} />
+                <IconX size={12} />
               </button>
             )}
           </div>
@@ -231,8 +249,8 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
 
         <Section>
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 4 }}>
-            <span style={SECTION_ICON_BOX_STYLE} aria-hidden="true">
-              <IconCube size={18} />
+            <span aria-hidden="true" style={{ display: 'inline-flex', paddingTop: 1 }}>
+              <IconCube size={22} />
             </span>
             <div>
               <div style={{ fontWeight: 700, fontSize: 'var(--font-md)' }}>Selecciona un mob</div>
@@ -240,7 +258,7 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
             {mobs.map((mob) => {
               const isSelected = mob.id === selectedMobId;
               const icon = MOB_ICONS[mob.id];
@@ -256,10 +274,11 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: 8,
-                    padding: '18px 10px 12px',
+                    padding: '16px 10px 12px',
                     borderRadius: 'var(--radius-lg)',
+                    background: isSelected ? 'var(--accent-soft)' : 'transparent',
                     border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border)',
-                    background: isSelected ? 'var(--accent-soft)' : 'var(--surface-raised)',
+                    boxShadow: isSelected ? '0 0 20px -4px var(--accent-soft-strong)' : 'none',
                   }}
                 >
                   {isSelected && (
@@ -273,7 +292,7 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
                         height: 22,
                         borderRadius: '50%',
                         background: 'var(--accent)',
-                        color: '#0b0e13',
+                        color: '#0f171d',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -282,7 +301,7 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
                       <IconCheck size={13} />
                     </span>
                   )}
-                  {icon && <img src={icon} alt="" style={{ width: 64, height: 88, objectFit: 'contain' }} />}
+                  {icon && <img src={icon} alt="" style={{ width: '100%', height: 128, objectFit: 'contain' }} />}
                   <span style={{ fontSize: 'var(--font-sm)', fontWeight: 600, color: isSelected ? 'var(--accent)' : 'var(--text)' }}>
                     {mob.label}
                   </span>
@@ -305,22 +324,13 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
             </Button>
           </span>
         )}
-
-        <Button
-          variant="primary"
-          disabled={pending}
-          onClick={handleCreateClick}
-          style={{ justifyContent: 'center', padding: '12px 16px', borderRadius: 'var(--radius-lg)', fontSize: 'var(--font-sm)' }}
-        >
-          <IconPlus size={18} /> {pending ? 'Creando…' : 'Crear proyecto'}
-        </Button>
       </div>
 
       <Section>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <span style={SECTION_ICON_BOX_STYLE} aria-hidden="true">
-              <IconEye size={18} />
+            <span aria-hidden="true" style={{ display: 'inline-flex', paddingTop: 1 }}>
+              <IconEye size={20} />
             </span>
             <div>
               <div style={{ fontWeight: 700, fontSize: 'var(--font-md)' }}>Vista previa</div>
@@ -330,10 +340,10 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
           <span
             style={{
               fontSize: 'var(--font-xs)',
-              color: 'var(--text-dim)',
-              border: '1px solid var(--border)',
-              borderRadius: 999,
-              padding: '4px 10px',
+              color: 'var(--text)',
+              background: 'var(--chip-bg)',
+              borderRadius: 10,
+              padding: '6px 12px',
               flexShrink: 0,
               whiteSpace: 'nowrap',
             }}
@@ -348,7 +358,7 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
         )}
         {selectedMobId && previewAsset && previewBuffer && (
           <>
-            <div style={{ height: 300, borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--border)' }}>
+            <div style={VIEWER_GRID_STYLE}>
               <Viewer3D texture={previewTexture} geometry={previewAsset.geometry} mobLabel={selectedMobLabel} />
             </div>
 
@@ -361,7 +371,6 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
                 marginTop: 12,
                 borderRadius: 'var(--radius-lg)',
                 border: '1px solid var(--border)',
-                background: 'var(--surface-raised)',
               }}
             >
               {MOB_ICONS[selectedMobId] && (
@@ -385,7 +394,6 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
                 padding: 12,
                 marginTop: 12,
                 borderRadius: 'var(--radius-md)',
-                background: 'var(--surface-raised)',
                 border: '1px solid var(--border)',
               }}
             >
@@ -399,6 +407,32 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
           </>
         )}
       </Section>
+
+      <div aria-hidden="true" />
+      <Button
+        variant="primary"
+        disabled={pending}
+        onClick={handleCreateClick}
+        style={{ justifyContent: 'center', padding: '12px 16px', borderRadius: 'var(--radius-lg)', fontSize: 'var(--font-sm)' }}
+      >
+        <span
+          aria-hidden="true"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 24,
+            height: 24,
+            borderRadius: '50%',
+            background: '#0f171d',
+            color: 'var(--accent)',
+            flexShrink: 0,
+          }}
+        >
+          <IconPlus size={14} />
+        </span>
+        {pending ? 'Creando…' : 'Crear proyecto'}
+      </Button>
     </div>
   );
 }

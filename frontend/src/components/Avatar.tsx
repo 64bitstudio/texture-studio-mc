@@ -32,8 +32,12 @@ export function Avatar({ displayName }: AvatarProps) {
         width: 40,
         height: 40,
         borderRadius: '50%',
-        background: 'var(--accent)',
-        color: '#0b0e13',
+        // Ticket 046, revisión 2: degradado (antes verde plano) --
+        // confirmado contra la referencia con muestreo de píxeles, el
+        // avatar va de `--accent` (arriba-izquierda) a un verde oliva
+        // apagado (abajo-derecha), no un solo color sólido.
+        background: 'linear-gradient(135deg, var(--accent), #6b7c4a)',
+        color: '#0f171d',
         fontSize: 15,
         fontWeight: 700,
         flexShrink: 0,

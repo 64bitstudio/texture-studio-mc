@@ -282,3 +282,12 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`components/Avatar.tsx`** — 40px (antes 28px), ya no envuelto en un botón que abría Configuración.
 - **`components/ThemeToggle.tsx`** — `variant="icon-square"` + `IconSun`/`IconMoon` (antes emoji + texto visible).
 - **`components/NuevoProyecto.tsx`** — tarjetas de mob con miniatura oficial real + badge de check, encabezados de sección con ícono, badge "Minecraft Java Edition", tarjeta informativa del mob elegido, callout con ícono, campo de nombre con botón "limpiar".
+
+### Ticket 047 -- Correcciones de fidelidad visual (segunda pasada)
+
+- **`assets/brand/{sidebar-bg,logo}.png`** (nuevos) — assets reales de Marco, reemplazan el gradiente CSS y el `IconGrassBlockLogo` hechos a mano.
+- **`ui/icons.tsx`** — `IconGrassBlockLogo` eliminado; `IconPlus`/`IconSun`/`IconSettings`/`IconCube` pasan de trazo fino a forma rellena (mezcla real de estilos confirmada en la referencia).
+- **`index.css`** — `--bg`/`--panel-bg` re-muestreados (`#0f171d`, iguales entre sí), `--accent` afinado a `#60ef9b`, nuevo `--chip-bg`, `.ui-button--primary` con texto fijo (no ligado al tema).
+- **`components/Sidebar.tsx`** — fondo/logo reales; texto FIJO (`SIDEBAR_TEXT`/`SIDEBAR_TEXT_DIM`, no ligado al tema — bug real de contraste en tema claro, corregido); ítems inactivos sin caja alrededor del ícono.
+- **`components/Avatar.tsx`** — degradado (antes verde plano), muestreado de la referencia.
+- **`components/NuevoProyecto.tsx`** — sin `maxWidth`; "Crear proyecto" movido a una segunda fila del grid (bajo "Vista previa"); ícono del botón en círculo; encabezados sin caja; badge "Minecraft Java Edition" como chip sólido; input restyleado; tarjetas de mob más grandes; fondo cuadriculado en el visor.
