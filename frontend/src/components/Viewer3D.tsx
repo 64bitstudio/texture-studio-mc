@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { Grid, OrbitControls } from '@react-three/drei';
 import { applyBoxUV } from '../geometry/applyBoxUV';
 import { computeGeometryCenter } from '../geometry/geometryBounds';
 import type { MobGeometry, MobBoxPart } from '../types/baseAssets';
@@ -139,6 +139,26 @@ export function Viewer3D({ texture, geometry, mobLabel }: Viewer3DProps) {
     >
       <Canvas camera={{ position: [45, 40, 65], fov: 40, near: 0.1, far: 1000 }}>
         <color attach="background" args={['#2b2d36']} />
+        {/* Ticket 048 (pedido de Marco: "quiero que el render tenga una
+            cuadricula igual que la imagen"): piso cuadriculado real
+            dentro de la escena (no un truco de CSS detrás del canvas --
+            eso quedaba tapado por el fondo opaco de `<color>` de arriba,
+            ver docs/ARQUITECTURA.md, "Ticket 048"). `position={[0, 0, 0]}`
+            asume pies en y=0 (cierto para los 4 mobs actuales, ver
+            comentario de `computeGeometryCenter`/`geometryBounds.ts`). */}
+        <Grid
+          position={[0, 0, 0]}
+          args={[10, 10]}
+          cellSize={4}
+          cellThickness={0.8}
+          cellColor="#545e6b"
+          sectionSize={20}
+          sectionThickness={1.4}
+          sectionColor="#6b7684"
+          fadeDistance={110}
+          fadeStrength={1}
+          infiniteGrid
+        />
         <MobModel texture={texture} geometry={geometry} />
         <OrbitControls target={target} enableDamping />
       </Canvas>

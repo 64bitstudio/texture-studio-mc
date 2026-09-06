@@ -163,14 +163,24 @@ export function IconCheck(props: IconProps) {
   );
 }
 
-/** Callout "vista previa aproximada" (Nuevo proyecto) -- trazo fino. */
-export function IconInfo(props: IconProps) {
+/**
+ * Callout "vista previa aproximada" (Nuevo proyecto). Ticket 048
+ * (corrección de Marco: "el ícono de info... es diferente y más
+ * grande"): la revisión 1 lo había hecho de trazo fino, chico,
+ * `currentColor` -- la referencia (recorte ampliado) muestra un badge
+ * RELLENO -- círculo sólido gris claro con una "i" oscura adentro, más
+ * grande. Colores FIJOS (no `currentColor`) por el mismo motivo que
+ * `IconCube`/`IconGrassBlockLogo`: en la referencia este badge se ve
+ * siempre igual, no es un ícono que deba adaptarse al texto de quien
+ * lo use. `size` default sube de 20 a 28.
+ */
+export function IconInfo({ size = 28, ...rest }: IconProps) {
   return (
-    <LineIcon {...props}>
-      <circle cx={12} cy={12} r={8.25} />
-      <path d="M12 11v5.5" />
-      <circle cx={12} cy={7.75} r={0.25} fill="currentColor" stroke="none" />
-    </LineIcon>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" {...rest}>
+      <circle cx={12} cy={12} r={12} fill="#8b93a1" />
+      <rect x={10.75} y={6.5} width={2.5} height={2.5} rx={1.25} fill="#0f171d" />
+      <rect x={10.75} y={10.5} width={2.5} height={7} rx={1.25} fill="#0f171d" />
+    </svg>
   );
 }
 

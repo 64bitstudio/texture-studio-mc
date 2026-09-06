@@ -48,6 +48,14 @@ const SIDEBAR_TEXT_DIM = 'rgba(238, 241, 245, 0.62)';
  *   alrededor del ícono (confirmado contra la referencia, recorte
  *   ampliado: el ícono va suelto, sin caja) -- la caja sólida
  *   (`--accent`, ícono oscuro adentro) es EXCLUSIVA del item activo.
+ *
+ * Ticket 048 (corrección de Marco): el bloque de marca superior (logo +
+ * título + subtítulo) se MUDÓ de aquí a la topbar compartida
+ * (`AppShell.tsx`) -- este componente ya no lo renderiza, solo queda
+ * el logo chico de la tarjeta de marca al pie. `height: '100%'` (antes
+ * `'100vh'`) porque este `<nav>` ya no ocupa la ventana completa desde
+ * arriba -- vive DEBAJO de la topbar, dentro de un contenedor flex que
+ * le da el alto restante.
  */
 export function Sidebar({ activeNav, onNavigate }: SidebarProps) {
   return (
@@ -62,19 +70,11 @@ export function Sidebar({ activeNav, onNavigate }: SidebarProps) {
         gap: 4,
         background: `#0f171d url(${sidebarBgUrl}) no-repeat left bottom / cover`,
         borderRight: '1px solid rgba(255, 255, 255, 0.08)',
-        height: '100vh',
+        height: '100%',
         overflowY: 'auto',
         color: SIDEBAR_TEXT,
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 28 }}>
-        <img src={logoUrl} alt="" width={38} height={38} style={{ flexShrink: 0 }} />
-        <div>
-          <div style={{ fontSize: 'var(--font-lg)', fontWeight: 700, lineHeight: 1.2, whiteSpace: 'nowrap' }}>Texture Studio MC</div>
-          <div style={{ fontSize: 'var(--font-xs)', color: SIDEBAR_TEXT_DIM }}>Editor de texturas para Minecraft</div>
-        </div>
-      </div>
-
       {NAV_ITEMS.map(({ id, label, Icon }) => {
         const isActive = activeNav === id;
         return (

@@ -291,3 +291,11 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`components/Sidebar.tsx`** — fondo/logo reales; texto FIJO (`SIDEBAR_TEXT`/`SIDEBAR_TEXT_DIM`, no ligado al tema — bug real de contraste en tema claro, corregido); ítems inactivos sin caja alrededor del ícono.
 - **`components/Avatar.tsx`** — degradado (antes verde plano), muestreado de la referencia.
 - **`components/NuevoProyecto.tsx`** — sin `maxWidth`; "Crear proyecto" movido a una segunda fila del grid (bajo "Vista previa"); ícono del botón en círculo; encabezados sin caja; badge "Minecraft Java Edition" como chip sólido; input restyleado; tarjetas de mob más grandes; fondo cuadriculado en el visor.
+
+### Ticket 048 -- Topbar compartida, cuadrícula 3D real e ícono de info corregido
+
+- **`components/AppShell.tsx`** — reestructurado: nueva topbar compartida (logo + tema/Configuración/avatar) cruzando todo el ancho, arriba de `Sidebar` + contenido (antes el logo vivía en `Sidebar` y los íconos en un header aparte que no cruzaba el ancho completo).
+- **`components/Sidebar.tsx`** — pierde el bloque de marca superior (mudado a `AppShell.tsx`); `height: '100%'` (antes `'100vh'`); conserva la tarjeta de marca del pie.
+- **`components/Viewer3D.tsx`** — nuevo `<Grid>` (`@react-three/drei`) como piso cuadriculado real dentro de la escena 3D — reemplaza el truco de CSS del ticket 046 (quedaba tapado por el fondo opaco de la escena). Componente compartido — beneficia también a `Editor.tsx`/`AgregarMobs.tsx`.
+- **`components/NuevoProyecto.tsx`** — `VIEWER_GRID_STYLE` renombrado a `VIEWER_FRAME_STYLE` (ya sin el truco de CSS, la cuadrícula ahora vive en `Viewer3D.tsx`); `IconInfo` usado a tamaño 28 (antes 16).
+- **`ui/icons.tsx`** — `IconInfo` rediseñado como badge relleno (círculo gris + "i" oscura), colores fijos, tamaño default 28 (antes trazo fino, 20).
