@@ -264,3 +264,8 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`export.ts`** — `exportResourcePackZip` (un solo mob) **eliminada**; nueva `exportProjectZip(projectName, mobs)` itera todos los mobs del proyecto y arma el ZIP reusando cada `pngDataUrl` ya guardado.
 - **`components/ExportControls.tsx`** — pierde el botón "Exportar pack (.zip)" (retirado); solo queda "Exportar PNG" (HU-10, sin cambios).
 - **`components/Proyecto.tsx`** — "Exportar proyecto (.zip)" deja de estar `disabled`, llama a `exportProjectZip`.
+
+### Ticket 045 -- Retiro del flujo de edición libre sin proyecto (cierre del epic 034-045)
+
+- **`components/ProjectControls.tsx`** — **eliminado** (`git rm`) — menú "💾 Proyecto" del editor (guardar/cargar/eliminar un proyecto directo, independiente de `activeProject`); reemplazado por completo por el flujo `NuevoProyecto`/`MisProyectos`/`Recientes`/`Proyecto`/`AgregarMobs` (038-042).
+- **`App.tsx`** — retira el import/render de `ProjectControls` y el `<Menu>` que lo alojaba; retira el estado `geometryCache` (compartido de sesión, sin consumidores tras la migración de 038/042 a Maps locales) y `loadGeneration`/`handleProjectLoaded` (solo existían para el remount que forzaba `ProjectControls`); `key` de `<Editor>` vuelve a ser `selectedMobId` a secas.

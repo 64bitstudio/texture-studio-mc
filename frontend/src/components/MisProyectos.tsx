@@ -8,7 +8,7 @@ import { Button, InlineError, Section } from '../ui';
 
 export interface MisProyectosProps {
   mobs: MobSummary[];
-  /** Cache compartida de buffers por mob (ticket 018) -- mismo `Map` que usa `ProjectControls`, se puebla aca al abrir un proyecto. */
+  /** Cache compartida de buffers por mob (ticket 018) -- el mismo `Map` que usa `Editor`/`App.tsx`, se puebla aca al abrir un proyecto. */
   bufferCache: Map<string, TextureBuffer>;
   /** Se llama tras abrir un proyecto con éxito, con su nombre y los ids de mob que quedaron restaurados en `bufferCache`. */
   onProjectSelected: (projectName: string, loadedMobIds: string[]) => void;

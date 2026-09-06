@@ -131,7 +131,7 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
   // `RESOLUTION_DEFAULT` (x1) sin importar el tamaño real del buffer
   // recuperado de `bufferCache` -- si un buffer cacheado (de una visita
   // anterior al mob, o de un proyecto recien cargado, ver
-  // `App.tsx`/`ProjectControls.tsx`) tenia una resolucion de trabajo
+  // `MisProyectos.tsx`/`Recientes.tsx`) tenia una resolucion de trabajo
   // distinta de x1, `resolution` quedaba DESINCRONIZADO del tamaño real
   // del buffer. Como `uvBoxes`/`namedRegions` (mas abajo) se escalan por
   // `resolution`, no por `buffer.width`, esto rompia silenciosamente la
