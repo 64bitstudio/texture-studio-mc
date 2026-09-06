@@ -123,7 +123,7 @@ describe('GET /api/base-assets/:mobId', () => {
       expect(legLeft.mirrorX).toBe(true);
     });
 
-    it('incluye faceLabels legibles por cada caja, sin lateralidad en brazo/pierna (ticket 011)', async () => {
+    it('incluye faceLabels legibles por cada caja, sin lateralidad en brazo/pierna (ticket 011), left/right relativos a la pantalla (ticket 023)', async () => {
       const app = createApp();
       const res = await request(app).get(`/api/base-assets/${mobId}`);
       const { head, body, armRight, armLeft, legRight, legLeft } = res.body.geometry.parts;
@@ -133,8 +133,8 @@ describe('GET /api/base-assets/:mobId', () => {
         back: 'Nuca',
         top: 'Parte superior',
         bottom: 'Parte inferior',
-        left: 'Lateral derecho',
-        right: 'Lateral izquierdo',
+        left: 'Lateral izquierdo',
+        right: 'Lateral derecho',
       });
       expect(body.faceLabels).toMatchObject({ front: 'Pecho', back: 'Espalda' });
 

@@ -37,23 +37,34 @@ import type { FaceLabels, MobGeometry } from '../types/baseAssets.js';
 // cubrir cualquier mob futuro -- se reemplaza por este campo explicito
 // por parte, mismo dato, sin tabla aparte que mantener sincronizada.
 //
-// Convencion `left`/`right` de `faceLabels` (ticket 011): lado ANATOMICO
-// del personaje (izquierdo/derecho), no pantalla-izquierda/derecha. Como
-// el personaje esta de frente a la camara, la cara `right` (+x,
-// pantalla-derecha) es el lado IZQUIERDO del personaje, y la cara `left`
-// (-x, pantalla-izquierda) es su lado DERECHO -- verificado en vivo (ver
-// docs/ARQUITECTURA.md, "Ticket 011"). `armRight`/`armLeft` (y
-// `legRight`/`legLeft`) comparten EXACTAMENTE la misma region UV (mismo
-// `uv`, mismo tamaño): pintar ahi afecta a ambos lados 3D a la vez, por
-// eso sus `faceLabels` son deliberadamente SIN lateralidad ("Brazo --
-// ...", no "Brazo derecho -- ...").
+// Convencion `left`/`right` de `faceLabels` (ticket 011, REVERTIDA en el
+// ticket 023): entre el ticket 011 y el 023, estas etiquetas describian
+// el lado ANATOMICO del personaje (izquierdo/derecho), no
+// pantalla-izquierda/derecha -- decision explicita de ese momento,
+// "verificada en vivo". Feedback directo de Marco (ticket 023, con
+// evidencia empirica: se pinto la region etiquetada "Lateral derecho" y
+// se confirmo por `getImageData` + captura que aparecia en el lado
+// IZQUIERDO de la pantalla con el modelo de frente a la camara):
+// prefiere que el TEXTO coincida con lo que se ve en pantalla, no con el
+// lado anatomico del personaje. Cambio 100% cosmetico -- `left`/`right`
+// (las claves internas, usadas por `computeBoxFaceRects`/`applyBoxUV`/
+// el mapeo UV/export) NO cambian, solo el texto que les corresponde en
+// este catalogo. La cara `right` (+x, pantalla-derecha) ahora se
+// etiqueta "...derecho" (coincide con pantalla); la cara `left` (-x,
+// pantalla-izquierda) se etiqueta "...izquierdo". Verificado en vivo que
+// el PNG exportado es identico antes/despues (ver docs/ARQUITECTURA.md,
+// "Ticket 023"). `armRight`/`armLeft` (y `legRight`/`legLeft`) comparten
+// EXACTAMENTE la misma region UV (mismo `uv`, mismo tamaño): pintar ahi
+// afecta a ambos lados 3D a la vez, por eso sus `faceLabels` son
+// deliberadamente SIN lateralidad ("Brazo -- ...", no "Brazo derecho --
+// ...") -- sin cambios en este ticket.
 export const HEAD_FACE_LABELS: FaceLabels = {
   front: 'Cara',
   back: 'Nuca',
   top: 'Parte superior',
   bottom: 'Parte inferior',
-  left: 'Lateral derecho',
-  right: 'Lateral izquierdo',
+  left: 'Lateral izquierdo',
+  right: 'Lateral derecho',
 };
 
 export const BODY_FACE_LABELS: FaceLabels = {
@@ -61,8 +72,8 @@ export const BODY_FACE_LABELS: FaceLabels = {
   back: 'Espalda',
   top: 'Parte superior',
   bottom: 'Parte inferior',
-  left: 'Costado derecho',
-  right: 'Costado izquierdo',
+  left: 'Costado izquierdo',
+  right: 'Costado derecho',
 };
 
 export const ARM_FACE_LABELS: FaceLabels = {

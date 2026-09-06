@@ -83,13 +83,17 @@ import type { FaceLabels, MobGeometry } from '../types/baseAssets.js';
 // (no 24-31) y que las filas 24-31 son el abdomen (no las patas). Se
 // deja constancia aqui para que nadie la reuse en otro mob sin releer
 // este comentario.
+// Ticket 023: `left`/`right` describen el lado de PANTALLA (no el lado
+// anatomico del personaje) -- ver `classicBipedGeometry.ts` para la
+// justificacion completa de este cambio, aplicado por igual a cualquier
+// mob porque la camara del visor 3D es la misma para todos.
 const SPIDER_HEAD_FACE_LABELS: FaceLabels = {
   front: 'Cara',
   back: 'Nuca',
   top: 'Parte superior',
   bottom: 'Parte inferior',
-  left: 'Lateral derecho',
-  right: 'Lateral izquierdo',
+  left: 'Lateral izquierdo',
+  right: 'Lateral derecho',
 };
 
 const SPIDER_THORAX_FACE_LABELS: FaceLabels = {
@@ -97,8 +101,8 @@ const SPIDER_THORAX_FACE_LABELS: FaceLabels = {
   back: 'Tórax — Atrás',
   top: 'Tórax — Superior',
   bottom: 'Tórax — Inferior',
-  left: 'Tórax — Costado derecho',
-  right: 'Tórax — Costado izquierdo',
+  left: 'Tórax — Costado izquierdo',
+  right: 'Tórax — Costado derecho',
 };
 
 const SPIDER_ABDOMEN_FACE_LABELS: FaceLabels = {
@@ -106,8 +110,8 @@ const SPIDER_ABDOMEN_FACE_LABELS: FaceLabels = {
   back: 'Abdomen — Atrás',
   top: 'Abdomen — Superior',
   bottom: 'Abdomen — Inferior',
-  left: 'Abdomen — Costado derecho',
-  right: 'Abdomen — Costado izquierdo',
+  left: 'Abdomen — Costado izquierdo',
+  right: 'Abdomen — Costado derecho',
 };
 
 // Sin lateralidad (mismo criterio que ARM_FACE_LABELS/LEG_FACE_LABELS
