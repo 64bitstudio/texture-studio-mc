@@ -8,28 +8,43 @@
 // navegador. No tiene tests unitarios dedicados: mockear `Image`/canvas
 // para probar esto es mas ruido que valor dado su tamaño; se valida en
 // la revision visual en vivo (ver checklist de cierre del ticket).
-
-export function decodePngDataUrlToImageData(dataUrl: string, width: number, height: number): Promise<ImageData> {
+//
+// EXTENSION ticket 019 (guardado de proyectos): `width`/`height` ahora
+// son OPCIONALES -- si se omiten, decodifica a la resolucion NATURAL del
+// PNG (`img.naturalWidth/Height`), sin forzar ningun `drawImage`
+// escalado. Necesario para `projectSnapshot.ts` (`restoreProjectBuffers`):
+// un PNG guardado por un proyecto YA mide exactamente
+// `nativeWidth*resolucion x nativeHeight*resolucion` (es el mismo
+// buffer codificado tal cual, ver `export.ts`), asi que no hace falta
+// conocer de antemano las dimensiones nativas del mob (que requeriria
+// volver a pedirle al backend la geometria de CADA mob del proyecto,
+// no solo la del mob activo) para decodificarlo correctamente -- el
+// propio archivo ya las contiene. El caso existente (llamado con
+// `width`/`height` explicitos desde `Editor.tsx` para la textura base)
+// sigue exactamente igual, sin cambio de comportamiento.
+export function decodePngDataUrlToImageData(dataUrl: string, width?: number, height?: number): Promise<ImageData> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
+      const targetWidth = width ?? img.naturalWidth;
+      const targetHeight = height ?? img.naturalHeight;
       const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         reject(new Error('No se pudo obtener el contexto 2D del canvas de decodificacion.'));
         return;
       }
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, 0, 0, width, height);
+      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
       try {
-        resolve(ctx.getImageData(0, 0, width, height));
+        resolve(ctx.getImageData(0, 0, targetWidth, targetHeight));
       } catch (err) {
-        reject(err instanceof Error ? err : new Error('No se pudo leer los pixeles de la textura base.'));
+        reject(err instanceof Error ? err : new Error('No se pudo leer los pixeles de la textura.'));
       }
     };
-    img.onerror = () => reject(new Error('No se pudo decodificar la textura base del Esqueleto.'));
+    img.onerror = () => reject(new Error('No se pudo decodificar la textura.'));
     img.src = dataUrl;
   });
 }
