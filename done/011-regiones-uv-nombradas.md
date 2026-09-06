@@ -21,3 +21,13 @@ Sale de feedback directo de Marco: quiere que la cuadrícula tenga indicadores d
 ## Criterios de aceptación
 - Dado el editor de textura, cuando el cursor pasa sobre cualquier pixel, entonces se identifica claramente a qué región nombrada pertenece.
 - Dado el overlay de regiones, cuando se activa/consulta, entonces las fronteras entre regiones distintas (ej. cabeza vs. torso, frente vs. lateral) son visualmente claras.
+
+## Hecho
+Implementado por el agente `fullstack-dev` (PR [#23](https://github.com/64bitstudio/texture-studio-mc/pull/23)). CI de Jenkins en verde, sin hallazgos del gate de QA automático.
+
+- Catálogo de nombres definido y expuesto en `GET /api/base-assets/skeleton` (`faceLabels` por caja, cambio aditivo al contrato): Cabeza (Cara/Nuca/Parte superior/Parte inferior/Lateral izquierdo/derecho), Torso (Pecho/Espalda/Costado izquierdo/derecho), Brazo/Pierna ("Brazo — Frente/Atrás/...", sin lateralidad — ver nota abajo).
+- `frontend/src/regionLabels.ts`: módulo puro y reusable (`computeNamedRegions`/`findRegionAt`) — el ticket 012 lo consume directamente, sin redefinir el catálogo.
+- Etiqueta fija "Región: `<nombre>`" sobre el editor + overlay de fronteras (líneas de 2px) siempre visible, en un canvas separado.
+- **Decisión del agente, aceptada**: `armRight`/`armLeft`/`legRight`/`legLeft` no llevan lateralidad en su label (ej. "Brazo — Lateral", no "Brazo derecho — Lateral") porque ambas partes comparten literalmente la misma región UV (un pixel pintado ahí afecta a los dos lados) — decir "derecho" sería engañoso. Correcto, se mantiene así.
+- **Verificado en vivo contra el deploy real de DEV** (el orquestador repitió la verificación tras el merge, con eventos de puntero reales y lectura directa de `getImageData`): hover sobre distintas zonas de la cuadrícula devuelve el nombre correcto (Cara, Parte superior, Pecho, Costado izquierdo/derecho, Brazo/Pierna — Lateral, "—" fuera de toda región); pintar en la región "Cara" aparece exactamente en la cara del cráneo del modelo 3D; overlay de fronteras (líneas amarillas) claramente visible.
+- Pendiente, explícitamente fuera de este ticket: aislar partes (012), pegado con ajuste automático (013).
