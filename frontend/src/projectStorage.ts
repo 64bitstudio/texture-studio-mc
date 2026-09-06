@@ -10,11 +10,13 @@
 // JSON de `localStorage`, nunca toca un `TextureBuffer` ni un canvas.
 //
 // DECISION -- `globalThis.localStorage` en vez de `window.localStorage`:
-// `panelWidth.ts` (ticket 010) ya persiste en localStorage pero via
-// `window.localStorage`, y deliberadamente NO tiene tests unitarios de
-// esas funciones (el entorno de test de este proyecto es
-// `environment: 'node'`, sin `window`, ver `vitest.config.ts` -- ver
-// comentario de `panelWidth.ts`). Este ticket SI exige tests unitarios
+// `panelWidth.ts` (ticket 010, panel lateral redimensionable --
+// eliminado en el ticket 029 al reemplazar ese layout por el panel en
+// grid de ancho flexible, ver docs/ARQUITECTURA.md "Ticket 029") ya
+// persistia en localStorage pero via `window.localStorage`, y
+// deliberadamente NO tenia tests unitarios de esas funciones (el
+// entorno de test de este proyecto es `environment: 'node'`, sin
+// `window`, ver `vitest.config.ts`). Este ticket SI exige tests unitarios
 // de guardar/cargar/listar/eliminar con un mock de `localStorage` (ver
 // ticket, seccion "Verificacion") -- referenciar `window` a secas en
 // Node lanzaria `ReferenceError: window is not defined` incluso antes

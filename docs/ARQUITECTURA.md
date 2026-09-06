@@ -905,3 +905,25 @@ El hook local (`~/.claude/hooks/ui-accessibility-guard.sh`, PreToolUse:Write/Edi
 ### Verificación en vivo (Claude in Chrome, local)
 
 Se sembraron 3 proyectos de prueba directamente en `localStorage` (mismo formato que `saveProject` ya produce, para no repetir la verificación del flujo de guardado real -- ya cubierta en el ticket 019/027) con mobs distintos (Esqueleto+Zombie, Araña, Zombie) y fechas distintas. Confirmado: la lista se ordena por fecha descendente por default; buscar "nether" filtra en tiempo real a solo el proyecto que coincide por nombre; filtrar por "Araña" deja solo el proyecto que la contiene; cambiar el orden a "Nombre (A-Z)" reordena alfabéticamente. `npm run lint`, `npm test` (incluye `projectFilter.spec.ts` nuevo), `npm run build` en verde.
+
+## Ticket 029 -- Reorganización del panel del editor en grid + visor acotado a 400px (HU-3)
+
+### Visor 3D: `flex: 1` (ilimitado) → acotado a 400px máximo
+
+`Viewer3D` (sin cambios internos) ahora vive en un contenedor `flexBasis: 400, flexGrow: 0, flexShrink: 1, maxWidth: 400` -- NUNCA crece más allá de 400px sin importar cuánto espacio sobre (a diferencia del `flex: 1` anterior, que lo dejaba ocupar todo lo que el panel no usara), pero SÍ puede encogerse en ventanas angostas (evita desbordar en vez de simplemente truncarse).
+
+### Decisión real señalada explícitamente: se elimina el panel lateral redimensionable a mano (ticket 010)
+
+`PanelResizeHandle.tsx`, `panelWidth.ts` y `test/panelWidth.spec.ts` se eliminan por completo (no solo se dejan de usar). Razonamiento: el PROPÓSITO original del ticket 010 era darle al usuario más espacio para el formulario cuando lo necesitara, arrastrando el borde del panel -- con el visor ahora acotado a un máximo fijo de 400px, el panel automáticamente recibe TODO el resto del ancho disponible siempre, sin necesidad de que el usuario ajuste nada a mano; mantener el control de arrastre habría sido redimensionar un panel que ya es `flex: 1` (sin otro panel de ancho fijo del cual "quitarle" espacio), una interacción sin efecto claro. No estaba escrito explícitamente como decisión en el documento de definición (`docs/definiciones/rediseno-ux-ui-y-navegacion.md`) -- se documenta aquí como una decisión real tomada durante la implementación, consistente con el diseño técnico ya aprobado ("el panel de controles ocupa el resto"), y verificable/reversible si Marco prefiere conservar el control de arrastre.
+
+### Panel de controles: `<section>` apiladas verticalmente → grid `auto-fit` de `Section` (`ui/`)
+
+`grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))` -- mismo criterio "resiliente al ancho real de la ventana, sin media queries manuales" ya usado por el panel redimensionable del ticket 010 (ahora aplicado a las COLUMNAS del grid en vez de al ancho total del panel). Cada sección del panel (`Historial`, `Simetría`, `Color`, `Resolución`, `Vista`, `Aislar parte`, `Importar/pegar imagen`, `Exportar`) es ahora un `Section` (ticket 025) en vez de un `<section><h2>` ad-hoc. La sección "Textura" (el editor de píxeles en sí) usa `style={{ gridColumn: '1 / -1' }}` -- ocupa TODAS las columnas del grid, a diferencia del resto (controles compactos) -- se beneficia de todo el ancho disponible, sobre todo a resoluciones/zoom altos. `Section` (`ui/`) gana un prop `style` opcional para este caso puntual (no estaba en el alcance original del ticket 025).
+
+### Sin regresión: el mecanismo de scroll horizontal + medición real (ticket 010) sigue intacto
+
+`textureSectionWrapperRef`/`availableTextureWidth`/`textureOverflowsPanel` (que deciden si el wrapper del editor de píxeles debe scrollear en X quedaba fuera de alcance de este ticket -- ya eran independientes de `panelWidth` (medían el ancho REAL renderizado vía `ResizeObserver`, sin importar qué lo determinaba), así que siguen funcionando sin cambios con el panel ahora de ancho flexible por grid en vez de por estado fijo. El texto del aviso de overflow se actualizó (ya no menciona "arrastrando el borde izquierdo", que ya no existe).
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Confirmado por captura de pantalla: el visor 3D del Zombie se renderiza correctamente acotado a 400px; el panel muestra las secciones en grid de 2 columnas (a ~1186px de ancho de ventana); la sección "Textura" ocupa el ancho completo del grid; se pintó un pixel rojo y se confirmó por `getImageData` (mismo pipeline de pintado sin cambios); el visor permanece fijo mientras el panel scrollea verticalmente por separado (`overflowY: auto` en el `<aside>`, sin cambios de comportamiento). El colapso a una columna en ventanas angostas es comportamiento nativo garantizado de CSS Grid `auto-fit` (mecanismo del navegador, no lógica propia) -- no requirió verificación empírica adicional más allá de confirmar que el grid realmente usa `auto-fit` (no un número fijo de columnas), ya demostrado por el cambio de 2 columnas observado. `npm run lint`, `npm test`, `npm run build` en verde.
