@@ -590,13 +590,26 @@ Asset ya cacheado (`~/tools/minecraft-texture-pack/vanilla-cache/zombie.png`, co
 
 ### Cambios de codigo (confirman la prediccion del ticket 016: "agregar un mob es solo esto")
 
-- `backend/src/geometry/zombieGeometry.ts` (nuevo): mismo shape que `skeletonGeometry.ts`, con los valores ya verificados arriba. `faceLabels` reutiliza el mismo catalogo de nombres del Esqueleto (Cara/Nuca/Pecho/Brazo.../Pierna..., sin lateralidad en brazo/pierna) -- razonable sin ajustes porque la estructura de cajas (y el hecho de que `armRight`/`armLeft` y `legRight`/`legLeft` comparten exactamente la misma region UV) es identica a la del Esqueleto.
+- `backend/src/geometry/zombieGeometry.ts` (nuevo): con los valores ya verificados arriba. `faceLabels` reutiliza el mismo catalogo de nombres del Esqueleto (Cara/Nuca/Pecho/Brazo.../Pierna..., sin lateralidad en brazo/pierna) -- razonable sin ajustes porque la estructura de cajas (y el hecho de que `armRight`/`armLeft` y `legRight`/`legLeft` comparten exactamente la misma region UV) es identica a la del Esqueleto.
 - `backend/src/mobs/registry.ts`: `MobId` se amplia a `'skeleton' | 'zombie'`; se agrega la entrada `zombie` (`label: 'Zombie'`, `vanillaAssetFileName: 'zombie.png'`). Cero cambios a `routes/mobs.ts`, `routes/baseAssets.ts` o `services/mobTexture.ts` -- ya eran 100% genericos, confirmado.
 - `backend/vanilla-assets/zombie.png` (no versionado, gitignored): copiado desde `~/tools/minecraft-texture-pack/vanilla-cache/zombie.png` para desarrollo local -- mismo mecanismo ya usado para `skeleton.png` (ticket 007).
 
+### Refactor: `classicBipedGeometry.ts` -- eliminacion de duplicacion detectada por el Quality Gate
+
+La primera version de este ticket escribio `zombieGeometry.ts` como un archivo standalone con el mismo shape que `skeletonGeometry.ts` -- literalmente los mismos 4 objetos `*_FACE_LABELS` y las mismas cajas de cabeza/torso repetidas caracter por caracter, solo cambiando brazos/piernas. El Quality Gate de SonarQube en el PR (`new_duplicated_lines_density`) marco esto correctamente como codigo duplicado real (11.04% contra un maximo de 3%) -- no fue un falso positivo a silenciar, era duplicacion genuina.
+
+**Fix**: se extrajo `backend/src/geometry/classicBipedGeometry.ts` (nuevo) -- unica fuente de verdad de:
+- Los 4 objetos `*_FACE_LABELS` (exportados, ya no repetidos por archivo de mob).
+- `buildClassicBipedGeometry(textureHeight, { size, armOffsetX, legOffsetX })`: construye la `MobGeometry` completa -- cabeza/torso SIEMPRE `[8,8,8]`/`[8,12,4]` en las mismas posiciones/UV (identicas en Esqueleto y Zombie, verificado contra `bedrock-samples` para ambos), brazos/piernas parametrizados por lo unico que SI varia entre estos dos mobs.
+
+`skeletonGeometry.ts` y `zombieGeometry.ts` quedan como archivos delgados: cada uno conserva INTACTA su propia investigacion/verificacion (comentarios de ticket 009 y 017 respectivamente, sin recortar ningun hallazgo) pero delega la construccion del objeto a `buildClassicBipedGeometry(...)` con sus 3 valores propios (`textureHeight`, `size`, `armOffsetX`/`legOffsetX`). Cero cambio de comportamiento: los 9 tests originales (contrato exacto del Esqueleto) siguieron pasando sin tocar ni un assert.
+
+**Tests**: la misma duplicacion existia en `backend/test/baseAssets.spec.ts` (dos `it` casi identicos, uno por mob, con los mismos asserts y solo los literales distintos). Se reemplazaron por un `describe.each(CLASSIC_BIPED_FIXTURES)` -- una sola definicion del test de "6 cajas correctas" y otra de "faceLabels sin lateralidad", parametrizadas por mob -- en vez de un bloque de asserts por mob.
+
 ### Verificacion
 
-- `backend/test/baseAssets.spec.ts`: nuevos casos para `GET /api/base-assets/zombie` (dimensiones/posicion/UV/mirror de las 6 cajas, `texture.width/height=64/64`, `faceLabels` sin lateralidad en brazo/pierna).
+- `backend/test/baseAssets.spec.ts`: `describe.each` sobre `skeleton`/`zombie` (dimensiones/posicion/UV/mirror de las 6 cajas, `texture.width/height`, `faceLabels` sin lateralidad en brazo/pierna) + los 3 casos ya existentes (placeholder, nunca 5xx, 404 de mob inexistente).
 - `backend/test/mobs.spec.ts`: `GET /api/mobs` ahora exige tambien la entrada `{ id: 'zombie', label: 'Zombie' }`.
-- `npm run lint`, `npm test` (9 tests en verde), `npm run build` -- los tres en verde en `backend/`.
+- `npm run lint`, `npm test` (10 tests en verde), `npm run build` -- los tres en verde en `backend/`.
 - **Verificado en vivo (Claude in Chrome)**: cambio temporal de `frontend/src/api/baseAssets.ts` a pedir `/api/base-assets/zombie` (revertido antes del PR, cero diff en `frontend/` en el PR final) -- silueta del Zombie con brazos/piernas notablemente gruesos (proporcion tipo Steve, nada que ver con los huesos delgados del Esqueleto), textura real (no placeholder, ya con `vanilla-assets/zombie.png` copiado) aplicada correctamente en cabeza/torso/brazos/piernas, confirmado rotando el modelo (frente, semi-perfil y espalda) sin ninguna cara en blanco ni con el patron equivocado.
+- **Quality Gate de SonarQube**: el hallazgo de `new_duplicated_lines_density` (11.04% > 3%) que bloqueo el primer build de CI de este PR se resolvio con el refactor de arriba -- no se silencio ni se bajo el umbral, se elimino la duplicacion real.
