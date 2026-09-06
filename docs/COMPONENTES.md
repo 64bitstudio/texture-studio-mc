@@ -152,3 +152,9 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`ProjectControls.tsx`** — migrado a `FormField`+`Button` (`variant="danger"` en "Sí, sobrescribir"/"Sí, eliminar")+`InlineError`; se eliminan `buttonStyle`/`dangerButtonStyle`/`inputStyle` ad-hoc.
 - **`MobSelector.tsx`** — migrado a `Button` (`variant="primary"` para el mob activo, `"secondary"` para el resto).
 - **`ColorPicker.tsx`** — los swatches de la paleta se dejan como `<button>` nativo (necesitan color de fondo dinámico por instancia, no cubierto por las variantes de `Button`); el selector "Color libre" migra a `FormField` (nueva variante `.ui-field--inline` para su layout en fila).
+
+### Ticket 027 -- Pantalla de inicio + navegación Home/Editor
+
+- **`App.tsx`** — gana `view: 'home' | 'editor'` (sin router). `handleSelectMob` es el único punto de entrada para "activar mob + ver editor" (usado por `MobSelector` y `HomeScreen`); `handleProjectOpenedFromHome` (nuevo) navega a editor tras cargar un proyecto desde el inicio. Botón "← Volver al inicio" en el header de la vista de editor. Los bloques `mobsState.status === 'loading'/'error'` de la vista de editor se eliminaron por ser código inalcanzable tras el split de vistas.
+- **`components/HomeScreen.tsx`** (nuevo) — dos `Section`: "Selección de mob" (un `Button` por mob) y "Guardados" (lista clicable, reusa `loadProject`/`restoreProjectBuffers` del ticket 019 -- misma lógica que `ProjectControls.handleLoad`).
+- **`projectStorage.ts`** — `ProjectSummary` gana `mobIds: string[]` (`Object.keys(record.mobs)`, sin decodificar ningún PNG) -- usado por `HomeScreen` y, en el ticket 028, por el filtro por mob.

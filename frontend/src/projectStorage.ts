@@ -37,10 +37,20 @@ export interface ProjectRecord {
   mobs: Record<string, ProjectMobEntry>;
 }
 
-/** Fila minima para listar proyectos guardados (HU-4: "nombres y fecha de guardado"). */
+/**
+ * Fila minima para listar proyectos guardados (HU-4: "nombres y fecha de
+ * guardado"). `mobIds` (ticket 027, ensanchamiento aditivo -- ver
+ * `docs/ARQUITECTURA.md`, "Ticket 027"): las claves de `mobs` de ese
+ * proyecto YA estan disponibles en el registro crudo sin decodificar
+ * ningun PNG (`Object.keys(record.mobs)`, ver `listProjects`) -- se
+ * exponen aca para que la pantalla de inicio (`HomeScreen.tsx`) muestre
+ * que mobs contiene cada proyecto, y para que el filtro por mob del
+ * ticket 028 (HU-2) pueda filtrar sin cargar/decodificar cada proyecto.
+ */
 export interface ProjectSummary {
   name: string;
   updatedAt: string;
+  mobIds: string[];
 }
 
 /** Clave de `localStorage` -- exactamente la que fija el documento de definicion, namespaced por proyecto (mismo criterio que `PANEL_WIDTH_STORAGE_KEY`). */
@@ -125,7 +135,7 @@ export function projectExists(name: string): boolean {
 export function listProjects(): ProjectSummary[] {
   const all = readAllProjects();
   return Object.entries(all)
-    .map(([name, record]) => ({ name, updatedAt: record.updatedAt }))
+    .map(([name, record]) => ({ name, updatedAt: record.updatedAt, mobIds: Object.keys(record.mobs) }))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 

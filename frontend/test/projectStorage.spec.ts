@@ -133,6 +133,13 @@ describe('listProjects', () => {
     expect(listProjects()).toEqual([]);
   });
 
+  it('incluye mobIds -- claves de mobs del proyecto, sin decodificar ningun PNG (ticket 027)', () => {
+    saveProject('multimob', { skeleton: SAMPLE_MOBS.skeleton, zombie: { resolution: 2, pngDataUrl: 'data:image/png;base64,BBB' } });
+
+    const [summary] = listProjects();
+    expect(summary.mobIds.sort()).toEqual(['skeleton', 'zombie']);
+  });
+
   it('ordena por fecha de actualizacion mas reciente primero', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
