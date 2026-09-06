@@ -96,7 +96,7 @@ describe('GET /api/base-assets/:mobId', () => {
 
       const { head, body, armRight, armLeft, legRight, legLeft } = res.body.geometry.parts;
 
-      // Cabeza y torso son IDENTICOS en todo biped clasico (ver
+      // Cabeza y torso son IDENTICOS en cualquier biped clasico (ver
       // `classicBipedGeometry.ts`) -- no varian por mob.
       expect(head.size).toEqual([8, 8, 8]);
       expect(head.position).toEqual([0, 28, 0]);

@@ -87,7 +87,7 @@ export interface ClassicBipedLimbs {
 /**
  * Construye la `MobGeometry` de un biped clasico de 6 cajas: cabeza y
  * torso son SIEMPRE `[8,8,8]`/`[8,12,4]` en las mismas posiciones/UV
- * (identicas en todo mob de este tipo -- Esqueleto y Zombie, verificado
+ * (identicas en cualquier mob de este tipo -- Esqueleto y Zombie, verificado
  * contra `bedrock-samples` para ambos), brazos/piernas parametrizados
  * por `limbs` (unica diferencia real entre estos dos mobs).
  */
