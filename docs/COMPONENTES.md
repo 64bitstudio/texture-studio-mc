@@ -313,3 +313,8 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 ### Ticket 051 -- Visor 3D: solo piso, colores homologados, material sin tone mapping
 
 - **`components/Viewer3D.tsx`** — se retiran las 2 paredes del ticket 050 (`BOX_GRID_PROPS` renombrado a `FLOOR_GRID_PROPS`, sin `side: THREE.DoubleSide`); colores re-muestreados de la referencia (`#20392c`/`#2c4d3c`, antes `#274435`/`#3c6b4f`); `MeshBasicMaterial` del modelo gana `toneMapped: false` (el `<Canvas>` de r3f aplica `ACESFilmicToneMapping` por defecto, alterando los colores reales de la textura -- causa real de "se ve brilloso").
+
+### Ticket 052 -- Color space de la textura 3D + fondo neutro del visor
+
+- **`hooks/useCanvasTexture.ts`** — `colorSpace = THREE.SRGBColorSpace` explícito en la `CanvasTexture` (defaultea a `NoColorSpace` en three.js, causando un descalce sRGB de un solo sentido -- causa real del modelo "lavado", distinta del tone mapping ya corregido en el ticket 051). Componente compartido, aplica a toda la app.
+- **`components/Viewer3D.tsx`** — fondo revertido a `#0f171d` (el mismo `--bg` del resto de la app, antes `#122015` verde del ticket 049) -- muestreo de la nueva imagen de referencia confirmó que no es verde.

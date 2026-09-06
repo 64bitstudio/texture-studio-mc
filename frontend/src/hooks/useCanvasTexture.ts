@@ -2,12 +2,33 @@ import { useEffect, useMemo, useState } from 'react';
 import * as THREE from 'three';
 import type { TextureBuffer } from '../textureBuffer';
 
-/** Crea una `THREE.CanvasTexture` con los sampler settings fijos que usa todo el proyecto (pixel-art nitido, ver Viewer3D.tsx / docs/COMPONENTES.md). */
+/**
+ * Crea una `THREE.CanvasTexture` con los sampler settings fijos que usa
+ * todo el proyecto (pixel-art nitido, ver Viewer3D.tsx / docs/COMPONENTES.md).
+ *
+ * Ticket 052 (hallazgo real, corrección de Marco -- comparó una captura
+ * del visor contra la imagen de referencia lado a lado: "los colores no
+ * son identicos ni para el fondo ni para el modelo"): `THREE.Texture`
+ * (la clase base de `CanvasTexture`) trae `colorSpace = THREE.NoColorSpace`
+ * por default -- el renderer NO decodifica sRGB→lineal al muestrear esta
+ * textura en el shader, aunque el `<canvas>` 2D de donde sale (y el PNG
+ * que eventualmente la llena, ver `ImageData`/`putImageData`) SÍ tiene
+ * sus píxeles codificados en sRGB estándar (como cualquier imagen web).
+ * Ese descalce (decodificación de entrada faltante + `WebGLRenderer`
+ * codificando de todos modos a la salida, `SRGBColorSpace` por default
+ * desde three.js r152) es la causa real de la apariencia "lavada"/de
+ * bajo contraste reportada -- no el tone mapping (ya corregido en el
+ * ticket 051, seguía sin alcanzar por esto). Fix: `colorSpace =
+ * THREE.SRGBColorSpace` explícito, para que el pipeline haga el
+ * redondeo completo (sRGB→lineal al entrar, lineal→sRGB al salir) en
+ * vez de solo la mitad.
+ */
 function createCanvasTexture(canvas: HTMLCanvasElement): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(canvas);
   t.magFilter = THREE.NearestFilter;
   t.minFilter = THREE.NearestFilter;
   t.generateMipmaps = false;
+  t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 
