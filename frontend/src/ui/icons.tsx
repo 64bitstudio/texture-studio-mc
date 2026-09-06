@@ -319,6 +319,53 @@ export function IconTrash(props: IconProps) {
 }
 
 /**
+ * "Archivo" (info de una tarjeta de mob, ticket 059 -- Marco pidió
+ * íconos para la lista de info que hoy es solo texto) -- hoja con
+ * esquina doblada, trazo fino.
+ */
+export function IconDocument(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="M6.5 3.5h7l4 4v13a1 1 0 0 1-1 1h-10a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" />
+      <path d="M13.5 3.5v4h4" />
+      <path d="M8.5 13h7M8.5 16.5h7" />
+    </LineIcon>
+  );
+}
+
+/** "Dimensiones" (info de una tarjeta de mob, ticket 059) -- 4 corchetes de esquina apuntando hacia afuera, mismo concepto que un ícono de "maximizar". */
+export function IconMaximize(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="M4 9V5a1 1 0 0 1 1-1h4" />
+      <path d="M20 9V5a1 1 0 0 0-1-1h-4" />
+      <path d="M4 15v4a1 1 0 0 0 1 1h4" />
+      <path d="M20 15v4a1 1 0 0 1-1 1h-4" />
+    </LineIcon>
+  );
+}
+
+/** "Escala" (info de una tarjeta de mob, ticket 059) -- cuadrado chico + flecha hacia un cuadrado más grande, representa el multiplicador de resolución de trabajo (x1/x4/x6/etc.). */
+export function IconScale(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <rect x={3} y={12} width={8} height={8} rx={1} />
+      <path d="M13 11 20 4M20 4h-5.5M20 4v5.5" />
+    </LineIcon>
+  );
+}
+
+/** "Modelo" (info de una tarjeta de mob, ticket 059) -- cubo isométrico en trazo fino (wireframe, `currentColor`) -- a diferencia de `IconCube`, que es la versión rellena de colores fijos usada como ícono de marca en "Selecciona un mob". */
+export function IconModel(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="M12 3 20 7.5v9L12 21l-8-4.5v-9Z" />
+      <path d="M12 12v9M12 12 20 7.5M12 12 4 7.5" />
+    </LineIcon>
+  );
+}
+
+/**
  * Logo pixel-art de bloque de pasto -- REEMPLAZADO en la revisión 2 de
  * este ticket por el PNG real que mandó Marco (`assets/brand/logo.png`,
  * ver `Sidebar.tsx`) -- este componente queda sin uso, se elimina en el

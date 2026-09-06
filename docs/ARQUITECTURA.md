@@ -1657,3 +1657,21 @@ Nueva función que quita una entrada de `record.mobs` sin tocar el resto del pro
 Confirmado: menú "⋮" con confirmación inline quita el mob y actualiza el conteo/estado vacío correctamente; tras quitarlo, "Agregar mobs" vuelve a ofrecerlo (bug de sincronización corregido); preview 2D de una textura x6 con dithering se ve fiel, sin ruido; modal ampliado ya no se desborda de su caja. Sin errores de consola.
 
 `npm run lint`, `npx tsc --noEmit`, `npm test` (220 -- 4 tests nuevos de `removeMobFromProject`), `npm run build` en verde.
+
+## Ticket 059 -- Íconos en la info de la tarjeta de mob + layout imagen-izquierda/detalle-derecha
+
+Corrección puntual sobre el ticket 058. Marco: "te falta agregar iconos, y la card que contiene al mob debe estar de lado izquierdo la imagen del mob (2D render) y del lado derecho el detalle, nombre de la imagen, resolucion, escala, modelo".
+
+### Íconos nuevos (`ui/icons.tsx`)
+
+4 íconos hand-drawn, mismo criterio del ticket 046 (sin librería externa): `IconDocument` (hoja con esquina doblada, para el nombre de archivo), `IconMaximize` (4 corchetes de esquina, para dimensiones), `IconScale` (cuadrado chico + flecha hacia uno más grande, para el multiplicador de resolución de trabajo), `IconModel` (cubo isométrico en trazo fino/wireframe -- distinto de `IconCube`, que es la versión rellena de colores fijos usada como ícono de marca en "Selecciona un mob", no reutilizable aquí por seguir tema con `currentColor`).
+
+### `MobEntryCard.tsx`
+
+Cada línea de la lista de info ahora es `<Icon/> texto` en vez de texto plano. Layout de la tarjeta en modo GRID: se invierte de "nombre+menú arriba, miniatura grande centrada debajo" a una fila horizontal -- miniatura a la izquierda (baja de 140px a 96px, ya no necesita ocupar todo el ancho de la tarjeta), columna de nombre+menú+info a la derecha. El modo LISTA ya tenía este orden desde el ticket 057 (miniatura izquierda, info derecha) -- solo gana los íconos, sin cambio de estructura.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Confirmado en grid y lista, dark y light theme: los 4 íconos se ven claros y distinguibles junto a cada línea de info; en modo grid la miniatura queda a la izquierda y el detalle a la derecha, coincidiendo con la imagen de referencia. Sin errores de consola.
+
+`npm run lint`, `npx tsc --noEmit`, `npm test` (220, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde.

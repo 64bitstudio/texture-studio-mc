@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Menu } from '../ui';
-import { IconDots, IconEye, IconPencil, IconTrash, IconX } from '../ui/icons';
+import { IconDocument, IconDots, IconEye, IconMaximize, IconModel, IconPencil, IconScale, IconTrash, IconX } from '../ui/icons';
 import { fetchMobBaseAssets } from '../api/baseAssets';
 import { useMobFrontSprite2D } from '../hooks/useMobFrontSprite2D';
 import type { MobGeometry } from '../types/baseAssets';
@@ -129,7 +129,12 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
   }, [onRemoveMob]);
 
   const isList = layout === 'list';
-  const thumbSize = isList ? 40 : 140;
+  // Ticket 059 (corrección de Marco): en grid, la miniatura va al lado
+  // IZQUIERDO del detalle (antes: grande y centrada debajo del
+  // nombre) -- comparte la fila con el nombre/menú/info en vez de
+  // ocupar el ancho completo de la tarjeta, así que baja de tamaño
+  // (140 -> 96) para dejarle espacio real al texto.
+  const thumbSize = isList ? 40 : 96;
   const dimensions = geometry ? `${geometry.textureWidth * resolution}×${geometry.textureHeight * resolution} px` : '—';
 
   const menu = (
@@ -168,12 +173,24 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
   // Una sola línea -- ver `ProjectCard.tsx` (ticket 053) para el hallazgo real de por qué (bug de `ui-accessibility-guard.sh` con tags multilínea, reportado via `SendFeedback`).
   const thumb = <img src={spriteUrl ?? pngDataUrl} alt={`Miniatura de la textura guardada de ${label}`} style={{ width: thumbSize, height: thumbSize, objectFit: 'contain', imageRendering: 'pixelated', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', flexShrink: 0 }} />;
 
+  // Ticket 059 (corrección de Marco: "te falta agregar iconos") -- cada
+  // línea de info gana un ícono a la izquierda (`ui/icons.tsx`, mismo
+  // criterio hand-drawn del ticket 046, sin emoji).
+  const infoRows: Array<{ Icon: typeof IconDocument; text: string }> = [
+    { Icon: IconDocument, text: vanillaFileName(mobId) },
+    { Icon: IconMaximize, text: dimensions },
+    { Icon: IconScale, text: `Escala: x${resolution}` },
+    { Icon: IconModel, text: `Modelo: ${label}` },
+  ];
+
   const info = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 'var(--font-xs)', color: 'var(--text-dim)' }}>
-      <span>{vanillaFileName(mobId)}</span>
-      <span>{dimensions}</span>
-      <span>Escala: x{resolution}</span>
-      <span>Modelo: {label}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 'var(--font-xs)', color: 'var(--text-dim)' }}>
+      {infoRows.map(({ Icon, text }) => (
+        <span key={text} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Icon size={13} style={{ flexShrink: 0 }} />
+          {text}
+        </span>
+      ))}
     </div>
   );
 
@@ -208,12 +225,21 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
 
   return (
     <li style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 14, borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', background: 'var(--surface-raised)' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{ fontWeight: 600, fontSize: 'var(--font-sm)' }}>{label}</span>
-        {menu}
+      {/* Ticket 059 (corrección de Marco: "la card... debe estar de
+          lado izquierdo la imagen del mob y del lado derecho el
+          detalle") -- miniatura a la izquierda, nombre+menú+info a la
+          derecha, en vez de nombre arriba y la miniatura grande
+          centrada debajo. */}
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+        {thumb}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ fontWeight: 600, fontSize: 'var(--font-sm)' }}>{label}</span>
+            {menu}
+          </div>
+          {info}
+        </div>
       </div>
-      {info}
-      <div style={{ display: 'flex', justifyContent: 'center' }}>{thumb}</div>
       <div style={{ display: 'flex', gap: 8 }}>
         {eyeButton}
         {editButton}
