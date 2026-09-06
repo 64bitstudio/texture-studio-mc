@@ -339,3 +339,10 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`renderMobFrontSprite2D.ts`** (nuevo, DOM) — dibuja ese layout sobre un `<canvas>` real a partir de la textura guardada (`pngDataUrl` + `resolution`) y devuelve una `data:` URL.
 - **`hooks/useMobFrontSprite2D.ts`** (nuevo) — hook delgado que memoiza el resultado por `(geometry, pngDataUrl, resolution)`.
 - **`components/Proyecto.tsx`** — integración mínima de prueba: la miniatura de cada mob (antes la hoja de textura completa comprimida en un cuadro chico) ahora es el sprite 2D de arriba, con fallback a la textura cruda mientras la geometría/el render no terminan. El rediseño completo de esta tarjeta es el ticket 057.
+
+### Ticket 056 -- Rediseño de layout de "Proyecto"
+
+- **`projectStorage.ts`** — `ProjectRecord` gana `description?`/`coverImageDataUrl?` (opcionales, aditivos); nuevas `updateProjectDescription`/`updateProjectCover`.
+- **`hooks/useProjectActions.ts`** (nuevo) — lógica compartida de Renombrar/Duplicar/Exportar/Eliminar, consumida por `ProjectCard.tsx` (refactorizado, sin cambio de comportamiento) y `Proyecto.tsx`.
+- **`components/Proyecto.tsx`** — breadcrumb, portada subible, título/descripción editables inline, badge fijo "Minecraft Java Edition", botones de header, panel lateral "Información del proyecto" + "Acciones". Nuevo prop `onBackToList`.
+- **`components/App.tsx`** — pasa `onBackToList={() => setView('mis-proyectos')}` a `Proyecto`.

@@ -361,6 +361,7 @@ function App() {
             onAddMobs={handleAddMobs}
             onProjectRenamed={handleProjectRenamed}
             onProjectDeleted={handleProjectDeleted}
+            onBackToList={() => setView('mis-proyectos')}
           />
         )}
         {/* Ticket 042: "Agregar mobs" ya tiene contenido real. */}

@@ -20,6 +20,8 @@ import {
   projectExists,
   renameProject,
   saveProject,
+  updateProjectCover,
+  updateProjectDescription,
 } from '../src/projectStorage';
 
 class MockStorage implements Storage {
@@ -242,6 +244,57 @@ describe('renameProject (ticket 041)', () => {
     // Ninguno de los dos proyectos originales se toco.
     expect(projectExists('a')).toBe(true);
     expect(projectExists('b')).toBe(true);
+  });
+});
+
+describe('updateProjectDescription (ticket 056)', () => {
+  it('guarda la descripción sin tocar updatedAt (metadato, no trabajo hecho)', () => {
+    saveProject('a', SAMPLE_MOBS);
+    const before = loadProject('a')!.updatedAt;
+
+    updateProjectDescription('a', 'Set inspirado en el Nether.');
+
+    const record = loadProject('a')!;
+    expect(record.description).toBe('Set inspirado en el Nether.');
+    expect(record.updatedAt).toBe(before);
+  });
+
+  it('recorta espacios y guarda una descripción vacía/solo-espacios como undefined', () => {
+    saveProject('a', SAMPLE_MOBS);
+
+    updateProjectDescription('a', '   ');
+
+    expect(loadProject('a')!.description).toBeUndefined();
+  });
+
+  it('lanza si el proyecto no existe', () => {
+    expect(() => updateProjectDescription('no-existe', 'x')).toThrow(/ya no existe/);
+  });
+});
+
+describe('updateProjectCover (ticket 056)', () => {
+  it('guarda la portada sin tocar updatedAt', () => {
+    saveProject('a', SAMPLE_MOBS);
+    const before = loadProject('a')!.updatedAt;
+
+    updateProjectCover('a', 'data:image/png;base64,abc');
+
+    const record = loadProject('a')!;
+    expect(record.coverImageDataUrl).toBe('data:image/png;base64,abc');
+    expect(record.updatedAt).toBe(before);
+  });
+
+  it('quita la portada con undefined', () => {
+    saveProject('a', SAMPLE_MOBS);
+    updateProjectCover('a', 'data:image/png;base64,abc');
+
+    updateProjectCover('a', undefined);
+
+    expect(loadProject('a')!.coverImageDataUrl).toBeUndefined();
+  });
+
+  it('lanza si el proyecto no existe', () => {
+    expect(() => updateProjectCover('no-existe', 'data:image/png;base64,abc')).toThrow(/ya no existe/);
   });
 });
 
