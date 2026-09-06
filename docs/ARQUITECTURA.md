@@ -1305,3 +1305,46 @@ Subtítulos de sección ("Elige el mob que quieres editar.", "Así se verá el m
 Comparación directa contra la imagen de referencia en tema oscuro: paleta, tipografía, espaciado, íconos, tarjetas de mob con miniatura real + badge de check al seleccionar, header de sidebar, item de nav activo, tarjeta de marca con fondo decorativo, topbar con 3 controles cuadrados -- coincide en cada punto comparado. Se probó el flujo completo: escribir "Creeper_personalizado" en el campo de nombre (botón limpiar aparece), seleccionar Creeper (badge de check + borde de acento + tarjeta informativa "Creeper -- Explota al acercarse al jugador." + vista 3D), confirmar que "Configuración" sigue abriendo la pantalla de Configuración desde su botón propio. Se ajustó el ancho del sidebar (240px -> 272px) tras ver en vivo que "Texture Studio MC" se partía en dos líneas. Se verificó tema claro (paleta propia sin romperse) y que Mis proyectos/Proyecto/Editor (fuera de alcance) siguen legibles/funcionales con la paleta heredada. Sin errores de consola.
 
 `npm run lint`, `npm test` (197, sin tests nuevos -- cambio 100% visual/presentacional, verificado en vivo), `npm run build` en verde (636 módulos, +4 assets PNG de mob-icons).
+
+## Ticket 047 -- Correcciones de fidelidad visual (segunda pasada del ticket 046)
+
+Marco revisó el resultado del ticket 046 en vivo y pidió una segunda pasada: "todos los estilos son acercados pero no son idénticos". Esta vez, en vez de aproximar colores/proporciones a ojo, se **muestrearon píxeles reales** de la imagen de referencia original con Python/PIL (`Image.open(...).load()`, recortes ampliados con `.crop().resize()` para inspeccionar íconos/badges de cerca) -- la diferencia entre "se parece" y "es igual" resultó ser precisión de muestreo, no talento de diseño.
+
+### Assets reales de Marco reemplazan las aproximaciones hechas a mano
+
+Marco proveyó 2 imágenes: el fondo del sidebar (rectángulo con degradado de píxeles verdes, oscuro arriba/intenso abajo-izquierda) y el logo de la app (bloque de pasto con glow de neón dentro de una placa redondeada). Se recortaron con PIL (`crop`, con inset para descartar las esquinas redondeadas del recorte de Marco -- el sidebar es un rectángulo real, no una tarjeta con esquinas propias) y el logo se procesó para tener transparencia REAL (el archivo de Marco traía un patrón de cuadros gris/blanco "de mentira" para representar transparencia visualmente -- se detectaron esos píxeles por ser grisáceos Y claros, `abs(r-g)<8 and abs(g-b)<8 and r>185`, y se pusieron en alpha 0). Resultado: `assets/brand/sidebar-bg.png` (270x1202, aplicado como `background-image` del `<nav>` completo, `cover`, anclado abajo-izquierda) y `assets/brand/logo.png` (256x259, con canal alfa real). `IconGrassBlockLogo` (`ui/icons.tsx`, el SVG hecho a mano del ticket 046) queda sin uso -- se elimina en este mismo commit.
+
+### Bug real encontrado en vivo: el sidebar es una superficie SIEMPRE oscura, su texto no puede seguir el tema
+
+`sidebar-bg.png` es un asset fijo, sin variante clara -- pero el texto del sidebar usaba `var(--text)`/`var(--text-dim)` (que SÍ cambian con el tema). En tema claro, `--text` es casi negro -- texto negro sobre un fondo de sidebar que sigue siendo oscuro (la imagen no cambia) = ilegible. Encontrado al verificar el tema claro en vivo (paso del checklist de cierre, no algo que un test unitario hubiera detectado). Fix: `Sidebar.tsx` define `SIDEBAR_TEXT`/`SIDEBAR_TEXT_DIM` fijos (no ligados a ningún token de tema) para todo su texto -- el sidebar es, por diseño, una superficie permanentemente oscura, igual de fija que `sidebar-bg.png` en sí.
+
+### Tokens re-muestreados (`index.css`)
+
+- `--bg`/`--panel-bg`: `#0f171d` (antes `#0b0e13`/`#12161d`) -- muestreado del fondo de página y del fondo del sidebar de la referencia, que resultaron ser el MISMO valor. `--panel-bg` pasa a ser igual a `--bg` a propósito: en la referencia una tarjeta ("Selecciona un mob", "Vista previa") no tiene relleno más claro que el fondo, se distingue solo por su borde -- antes este proyecto usaba `--panel-bg` como un paso de elevación visible.
+- `--accent`: `#60ef9b` (antes `#34d399`) -- promedio muestreado de la caja de ícono activa del sidebar y el botón "Crear proyecto" de la referencia (`rgb(96,239,155)`), sensiblemente más brillante/saturado que la estimación a ojo del ticket 046.
+- `--chip-bg` (nuevo): `#212c37` -- relleno sólido de un chip informativo (ej. "Minecraft Java Edition"), muestreado directo.
+- `--surface-raised`: `#161e26` -- elevación más sutil que antes, acorde a que las cajas de ícono del topbar en la referencia son apenas un paso más claras que el fondo.
+- `.ui-button--primary`'s `color`: corregido a un oscuro FIJO (`#0f171d`, no una variable de tema) -- se había escrito por error como `var(--bg)` en un borrador intermedio de este mismo ticket, lo que hubiera vuelto el texto del botón primario CASI INVISIBLE en tema claro (`--bg` ahí es casi blanco) -- detectado y corregido antes de verificar en vivo, mismo patrón de bug que el del sidebar de arriba (una variable de TEMA usada donde hace falta un valor FIJO porque el fondo de referencia no cambia con el tema).
+
+### Set de íconos -- la referencia MEZCLA trazo fino y forma rellena
+
+El hallazgo central de "todos los íconos no tienen el estilo correcto": la revisión 1 de este ticket asumió (sin verificar con recortes ampliados) que todos los íconos de la referencia eran de trazo fino tipo Lucide/Feather. Recortes ampliados (`crop().resize()`) revelaron que la referencia mezcla dos estilos reales:
+- **Trazo fino** (`LineIcon`, sin cambios): carpeta, reloj, ojo, info, limpiar -- íconos "neutros"/informativos.
+- **Forma rellena/sólida** (`FilledIcon`, nuevo): sol, engranaje (con agujero central logrado con `fillRule="evenodd"`, sin depender del color de fondo detrás), más (`IconPlus`, ahora una cruz sólida en vez de trazo), cubo de "Selecciona un mob" (`IconCube`, 3 caras isométricas con sombreado propio, colores FIJOS -- no `currentColor`, igual criterio que el logo, siempre se muestra en el mismo verde de marca sin importar dónde se use).
+
+### `NuevoProyecto.tsx` -- layout y detalles corregidos
+
+- `maxWidth` retirado del contenedor -- ahora ocupa todo el ancho disponible (`gridTemplateColumns: minmax(0,1fr) minmax(340px,460px)`, sin límite superior).
+- "Crear proyecto" se movió a una SEGUNDA fila del mismo grid, bajo la columna de "Vista previa" (antes vivía al final de la columna izquierda, bajo "Selecciona un mob") -- se logra con un `<div aria-hidden />` vacío como relleno de la celda columna-izquierda-fila-2, dejando que el flujo natural del grid ubique el botón en columna-derecha-fila-2.
+- Ícono del botón: círculo oscuro fijo (`#0f171d`) con el `IconPlus` en `--accent` adentro -- antes el ícono iba suelto sin círculo.
+- Encabezados de sección ("Selecciona un mob"/"Vista previa"): el ícono ya NO va envuelto en una caja con fondo de acento (la revisión 1 sí lo hacía) -- va suelto, igual que la referencia.
+- Badge "Minecraft Java Edition": pasa de pastilla con borde (`border-radius: 999px`, sin relleno) a chip sólido (`--chip-bg`, `border-radius: 10px`).
+- Campo de nombre: fondo `var(--bg)` (antes `--surface-raised`, más claro que el fondo) + borde con tinte de acento (`--accent-soft-strong`, antes un borde gris genérico); botón "limpiar" ahora es un círculo con borde propio (antes un ícono suelto sin círculo).
+- Tarjetas de mob: imagen más grande (128px de alto, antes 88px), sin relleno propio salvo cuando está seleccionada (antes `--surface-raised` siempre) -- coincide con el criterio "las tarjetas se distinguen por su borde, no por su relleno" de arriba.
+- Detalle agregado (no pedido explícitamente, oportunidad aprovechada durante esta misma pasada de detalle): fondo cuadriculado sutil en el panel del visor 3D antes de que cargue el modelo (la referencia lo muestra) -- se pierde una vez el `<canvas>` de `Viewer3D` (componente compartido, fuera de alcance modificar) pinta su propio fondo opaco encima; limitación conocida, no perseguida más allá por ser un componente compartido con otras pantallas.
+
+### Verificación en vivo (Claude in Chrome, local, ambos temas)
+
+Comparación directa contra la imagen de referencia con recortes ampliados de: ícono de tema (relleno, con rayos), ícono de Configuración (relleno, con agujero central), input (borde con tinte de acento), tarjeta de marca del pie del sidebar (legible sobre el degradado de píxeles verdes tras subir la opacidad de su fondo de 0.55 a 0.88 -- otro hallazgo en vivo, se veía demasiado transparente contra la zona más intensa del degradado). Se confirmó tema claro sin el bug de contraste del sidebar (ya corregido) y sin errores de consola.
+
+`npm run lint`, `npm test` (197, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde (638 módulos, +2 assets PNG de marca).

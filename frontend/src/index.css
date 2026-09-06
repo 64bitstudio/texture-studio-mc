@@ -64,34 +64,47 @@
      porque el SO seguía en modo oscuro). Fijarlo por bloque de tema
      hace que los controles nativos sigan SIEMPRE el tema de la app. */
   color-scheme: dark;
-  /* Ticket 046: fondo/paneles bastante más oscuros que antes (mockup de
-     referencia nuevo, casi negro) -- reemplaza los valores del ticket
-     034. Como `--bg`/`--panel-bg`/`--accent` son compartidos por TODA
-     la app (no solo las 3 áreas que este ticket rediseña), el resto de
-     pantallas hereda la paleta refrescada "gratis"; su LAYOUT/tarjetas
-     siguen sin tocar hasta un ticket de seguimiento (ver
-     docs/ARQUITECTURA.md, "Ticket 046"). */
-  --bg: #0b0e13;
-  --panel-bg: #12161d;
+  /* Ticket 046, revisión 2 -- valores tomados con muestreo de píxeles
+     REAL sobre la imagen de referencia (Python/PIL, no a ojo) para que
+     "parecido" pase a ser "idéntico": ver `docs/ARQUITECTURA.md`,
+     "Ticket 046" para las coordenadas/valores muestreados. Como
+     `--bg`/`--panel-bg`/`--accent` son compartidos por TODA la app (no
+     solo las 3 áreas que este ticket rediseña), el resto de pantallas
+     hereda la paleta refrescada "gratis"; su LAYOUT/tarjetas siguen sin
+     tocar hasta un ticket de seguimiento. */
+  --bg: #0f171d;
+  /* En la referencia, una tarjeta ("Selecciona un mob", "Vista previa")
+     NO tiene un relleno más claro que el fondo -- se distingue casi
+     enteramente por su borde. `--panel-bg` queda igual a `--bg` a
+     propósito (antes era un paso más claro, ticket 034/037). */
+  --panel-bg: #0f171d;
   --text: #eef1f5;
   --text-dim: #8b93a1;
-  /* Ticket 035 introdujo el acento verde; ticket 046 lo afina hacia un
-     verde-esmeralda más saturado (mockup nuevo) -- sigue siendo un
-     único valor compartido entre ambos temas (mismo criterio del
-     ticket 035, usado como borde/fondo-con-texto-oscuro-fijo, nunca
-     como texto sobre el fondo del tema). `--accent-soft`/
-     `--accent-soft-strong` (nuevos) son ese mismo verde en baja
-     opacidad -- para el relleno de un item de navegación activo o una
-     tarjeta seleccionada, donde un fondo 100% opaco del acento se vería
+  /* Ticket 035 introdujo el acento verde; ticket 046 lo afina a un
+     verde-esmeralda más brillante (promedio muestreado de la caja de
+     ícono activa del sidebar y el botón "Crear proyecto" de la
+     referencia: rgb(96,239,155)) -- sigue siendo un único valor
+     compartido entre ambos temas (mismo criterio del ticket 035).
+     `--accent-soft`/`--accent-soft-strong` (nuevos) son ese mismo verde
+     en baja opacidad -- para el relleno de un item de navegación activo
+     o una tarjeta seleccionada, donde un fondo 100% opaco se vería
      demasiado fuerte (ver `Sidebar.tsx`/`NuevoProyecto.tsx`). */
-  --accent: #34d399;
-  --accent-soft: rgba(52, 211, 153, 0.14);
-  --accent-soft-strong: rgba(52, 211, 153, 0.32);
+  --accent: #60ef9b;
+  --accent-soft: rgba(96, 239, 155, 0.14);
+  --accent-soft-strong: rgba(96, 239, 155, 0.3);
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.18);
-  --surface-raised: #1a1f28;
+  /* Elevación sutil para controles (botones ícono-cuadrado, inputs) --
+     un paso apenas perceptible sobre `--bg`, mismo criterio "casi
+     invisible salvo el borde" que `--panel-bg` de arriba. */
+  --surface-raised: #161e26;
+  /* Ticket 046: relleno sólido de una insignia/chip informativo (ej.
+     "Minecraft Java Edition") -- gris-azulado sólido, distinto de
+     `--surface-raised` (that's the app-wide "control elevado", esto es
+     "etiqueta informativa"), muestreado directo de la referencia. */
+  --chip-bg: #212c37;
   --hover-overlay: rgba(255, 255, 255, 0.06);
-  --overlay-bg: rgba(11, 14, 19, 0.75);
+  --overlay-bg: rgba(15, 23, 29, 0.75);
   --danger: #f87171;
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
@@ -106,9 +119,10 @@
   /* Ticket 046: mismo acento esmeralda que el tema oscuro (ver ese
      bloque para el porqué) -- `--accent-soft`/`--accent-soft-strong`
      bajan la opacidad sobre blanco en vez de sobre negro. */
-  --accent: #34d399;
-  --accent-soft: rgba(16, 185, 129, 0.12);
-  --accent-soft-strong: rgba(16, 185, 129, 0.24);
+  --accent: #60ef9b;
+  --accent-soft: rgba(22, 163, 106, 0.12);
+  --accent-soft-strong: rgba(22, 163, 106, 0.24);
+  --chip-bg: #eef1f5;
   --border: rgba(0, 0, 0, 0.12);
   --border-strong: rgba(0, 0, 0, 0.22);
   --surface-raised: #ffffff;
@@ -211,7 +225,13 @@ body {
 .ui-button--primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #1b1c22;
+  /* Fijo, NUNCA `var(--bg)`/`var(--text)` -- `--accent` es claro en
+     AMBOS temas (fondo del botón), así que el texto necesita un
+     oscuro fijo que no siga el tema activo (en tema claro `--bg` es
+     casi blanco, ilegible aquí). Ticket 046: valor actualizado a
+     `--bg` del tema oscuro (antes un fijo distinto, previo al
+     rediseño). */
+  color: #0f171d;
   font-weight: 600;
 }
 
