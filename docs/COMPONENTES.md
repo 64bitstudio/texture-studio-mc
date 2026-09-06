@@ -304,3 +304,8 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 
 - **`components/Viewer3D.tsx`** — fondo de la escena a verde oscuro (`#122015`, antes gris); `<Grid>` con `args` mucho más grande (`[300,300]`, antes `[10,10]` — el plano físico era demasiado chico para la escala real de la escena) y `fadeDistance` mayor (220, antes 110); colores de la cuadrícula ajustados a verde.
 - **`ui/icons.tsx`** — `IconSettings` reconstruido con geometría radial exacta (círculo + 8 dientes rotados 45° c/u, agujero vía `<mask>` con `useId()`) en vez del `<path>` a mano de la revisión anterior (causa real del ícono "apachurrado").
+
+### Ticket 050 -- Visor 3D como caja cuadriculada + ícono de Configuración correcto
+
+- **`ui/icons.tsx`** — `IconSettings` reconstruido (tercera vez) con la geometría correcta verificada contra referencia real: contorno de 6 pétalos vía curva paramétrica `r(θ)=R_prom+R_amp·cos(6θ)`, trazo fino (no relleno), aro central suelto.
+- **`components/Viewer3D.tsx`** — 2 `<Grid>` adicionales rotados 90° simulando paredes izquierda/derecha (mismos colores que el piso, extraídos a `BOX_GRID_PROPS`); `side: THREE.DoubleSide` (drei usa `BackSide` por defecto, culleaba las paredes); colores del piso/paredes más sutiles (`#274435`/`#3c6b4f`, antes `#3a6b4d`/`#5b9e77`).
