@@ -89,7 +89,14 @@ export function computeUVBoxRects(geometry: SkeletonGeometry, scale: number = 1)
   return rects;
 }
 
-function findContainingBox(point: PixelPoint, boxes: UVBoxRect[]): UVBoxRect | null {
+/**
+ * Devuelve la caja UV que contiene `point`, o `null` si cae en una zona
+ * de relleno del layout clasico 64x32 ajena a las cajas conocidas.
+ * Exportada desde el ticket 015 (limpieza de zonas no editables al
+ * exportar, ver `uvBoxCleanup.ts`) para no duplicar este mismo chequeo
+ * de pertenencia -- ya se usaba internamente aca para `mirrorPointHorizontal`.
+ */
+export function findContainingBox(point: PixelPoint, boxes: UVBoxRect[]): UVBoxRect | null {
   for (const box of boxes) {
     if (point.x >= box.x0 && point.x < box.x1 && point.y >= box.y0 && point.y < box.y1) {
       return box;
