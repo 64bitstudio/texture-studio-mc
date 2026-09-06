@@ -11,6 +11,7 @@ import { PasteImageControls } from './PasteImageControls';
 import { PasteImageOverlay } from './PasteImageOverlay';
 import { ExportControls } from './ExportControls';
 import { ResolutionControls } from './ResolutionControls';
+import { PanelResizeHandle } from './PanelResizeHandle';
 import { decodeImageFileToImageData, decodePngDataUrlToImageData } from '../decodeTexture';
 import { useCanvasTexture } from '../hooks/useCanvasTexture';
 import { bresenhamLine, TextureBuffer, type PixelPoint, type PixelSource, type RGBA } from '../textureBuffer';
@@ -18,6 +19,8 @@ import { PaintHistory, type Stroke } from '../history';
 import { computeUVBoxRects, mirrorPointHorizontal } from '../symmetry';
 import { ZOOM_DEFAULT } from '../zoom';
 import { RESOLUTION_DEFAULT, clampResolutionMultiplier, resamplePixelSource } from '../resolution';
+import { canvasOverflowsAvailableWidth, computeCanvasDisplaySize } from '../canvasSize';
+import { loadStoredPanelWidth, savePanelWidth } from '../panelWidth';
 import {
   computeBurnPixels,
   computeFullReplaceDiff,
@@ -107,26 +110,20 @@ export function Editor({ data }: EditorProps) {
   const [zoom, setZoom] = useState(ZOOM_DEFAULT);
   const [showGrid, setShowGrid] = useState(true);
 
-  // Hallazgo real de este ticket (005): el overlay de "pegar imagen"
-  // (HU-9) necesita saber cuantos pixeles CSS REALES ocupa cada texel
-  // en pantalla para alinearse con el canvas de `TextureEditor` -- pero
-  // eso NO siempre es igual a `zoom`. `TextureEditor` renderiza su
-  // `<canvas>` con `maxWidth: '100%'` (ver `TextureEditor.tsx`) dentro
-  // de este `<aside>` de ancho FIJO (280px, ver mas abajo) -- al zoom
-  // por defecto (1000% => 640px logicos de ancho) el navegador comprime
-  // el ancho renderizado del canvas para que quepa (~230px en la
-  // practica) SIN comprimir su alto (320px, sin restriccion), asi que
-  // el canvas termina renderizando texeles NO cuadrados (`scaleX !=
-  // scaleY`) -- una distorsion visual preexistente desde que el ticket
-  // 002 fijo el factor de escala en X10 (agravada por el ticket 004 al
-  // subir el rango de zoom), nunca antes evidenciada porque ningun
-  // ticket anterior necesito medir el tamaño RENDERIZADO del canvas
-  // (alcance de arreglar esa distorsion en si -- fuera de este ticket,
-  // ver docs/ARQUITECTURA.md "Ticket 005"). Si el overlay asumiera
-  // `zoom` como escala real, quedaria desalineado del area que el
-  // usuario ve de verdad. Se mide el `<canvas>` real con
-  // `ResizeObserver` (en vez de asumir un valor) para que el overlay
-  // siga alineado sin depender de arreglar esa distorsion.
+  // Escala real renderizada del canvas: el overlay de "pegar imagen" (HU-9, ticket 005) necesita
+  // saber cuantos pixeles CSS REALES ocupa cada texel en pantalla para
+  // alinearse con el canvas de `TextureEditor` -- antes del ticket 010
+  // eso NO siempre era igual a `zoom`, porque `TextureEditor` renderizaba
+  // su `<canvas>` con `maxWidth: '100%'` dentro de un `<aside>` de ancho
+  // FIJO (280px), y el navegador comprimia solo el ancho sin ajustar el
+  // alto (texeles no cuadrados, ver docs/ARQUITECTURA.md "Ticket 005").
+  // **Ticket 010 elimina esa distorsion en la fuente** (`TextureEditor`
+  // ya no usa `maxWidth`, ver `canvasSize.ts`) -- `scaleX` y `scaleY`
+  // medidos aca deberian ser SIEMPRE iguales entre si ahora, sin
+  // importar el ancho del panel (verificado en vivo, ver checklist de
+  // cierre). Se mantiene la medicion real via `ResizeObserver` (en vez
+  // de asumir `zoom` directo) por el mismo criterio defensivo de
+  // siempre: medir lo renderizado de verdad, no asumirlo.
   const textureCanvasWrapperRef = useRef<HTMLDivElement | null>(null);
   const [canvasDisplayScale, setCanvasDisplayScale] = useState({ scaleX: zoom, scaleY: zoom });
 
@@ -146,6 +143,53 @@ export function Editor({ data }: EditorProps) {
     observer.observe(canvasEl);
     return () => observer.disconnect();
   }, [buffer, zoom, showGrid]);
+
+  // Panel lateral redimensionable (ticket 010). El ancho se persiste en
+  // `localStorage` (conveniencia por navegador, no un dato de usuario
+  // que deba sincronizarse -- ver `pending/010-panel-lateral-...md`) y
+  // se lee de forma perezosa en el `useState` inicial para no aplicar
+  // el ancho por defecto (con su parpadeo) y luego saltar al valor
+  // guardado en un segundo render.
+  const [panelWidth, setPanelWidth] = useState(() => loadStoredPanelWidth());
+
+  const handlePanelWidthChange = useCallback((width: number) => {
+    setPanelWidth(width);
+  }, []);
+
+  // Se persiste solo al terminar el gesto de arrastre (o tras cada
+  // ajuste discreto por teclado) -- ver `PanelResizeHandle.tsx` para el
+  // razonamiento completo (evita escrituras a `localStorage` en cada
+  // `pointermove`).
+  const handlePanelWidthCommit = useCallback((width: number) => {
+    savePanelWidth(width);
+  }, []);
+
+  // Ancho REAL disponible para el editor de textura dentro del panel
+  // (ticket 010, mismo patron de medicion con `ResizeObserver` que ya
+  // usa el efecto de arriba) -- se usa exclusivamente para decidir si
+  // el contenedor debe scrollear horizontalmente cuando el canvas (a
+  // la resolucion/zoom actuales) no cabe, NUNCA para encoger el canvas
+  // en si (ver `canvasSize.ts`, `computeCanvasDisplaySize` es
+  // independiente de este valor por diseño).
+  const textureSectionWrapperRef = useRef<HTMLDivElement | null>(null);
+  const [availableTextureWidth, setAvailableTextureWidth] = useState<number | null>(null);
+
+  useEffect(() => {
+    const el = textureSectionWrapperRef.current;
+    if (!el) return;
+
+    function measure() {
+      setAvailableTextureWidth(el!.clientWidth);
+    }
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const canvasDisplaySize = computeCanvasDisplaySize(buffer.width, buffer.height, zoom);
+  const textureOverflowsPanel = canvasOverflowsAvailableWidth(canvasDisplaySize.width, availableTextureWidth);
 
   // Importar textura completa + pegar/insertar imagen sobre una region
   // UV (ticket 005, HU-8/HU-9). `importError`/`pasteError` son mensajes
@@ -561,14 +605,19 @@ export function Editor({ data }: EditorProps) {
         )}
       </div>
 
+      <PanelResizeHandle
+        panelWidth={panelWidth}
+        onPanelWidthChange={handlePanelWidthChange}
+        onPanelWidthCommit={handlePanelWidthCommit}
+      />
+
       <aside
         style={{
-          width: 280,
+          width: panelWidth,
           flexShrink: 0,
           overflowY: 'auto',
           padding: 16,
           background: 'var(--panel-bg)',
-          borderLeft: '1px solid rgba(255,255,255,0.08)',
           display: 'flex',
           flexDirection: 'column',
           gap: 20,
@@ -611,34 +660,48 @@ export function Editor({ data }: EditorProps) {
           <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>
             Textura ({buffer.width}×{buffer.height})
           </h2>
-          {/* Wrapper HERMANO de TextureEditor (no anidado dentro): asi el
-              overlay de "pegar imagen" no queda recortado por el
-              `overflow: hidden` propio de TextureEditor mientras se
-              arrastra/redimensiona mas alla de su borde -- ver
-              `PasteImageOverlay.tsx`. */}
-          <div ref={textureCanvasWrapperRef} style={{ position: 'relative', display: 'inline-block' }}>
-            <TextureEditor
-              buffer={buffer}
-              version={version}
-              color={color}
-              zoom={zoom}
-              onZoomChange={setZoom}
-              showGrid={showGrid}
-              onSetPixel={setPixel}
-              onPaintLine={paintLine}
-              onStrokeStart={onStrokeStart}
-              onStrokeEnd={onStrokeEnd}
-            />
-            {pendingPaste && (
-              <PasteImageOverlay
-                rect={pendingPaste.rect}
-                scaleX={canvasDisplayScale.scaleX}
-                scaleY={canvasDisplayScale.scaleY}
-                previewUrl={pendingPaste.previewUrl}
-                onRectChange={handlePendingRectChange}
+          {/* Contenedor con scroll horizontal (ticket 010): si el canvas
+              (textureWidth*zoom, ver `canvasSize.ts`) no cabe en el
+              ancho disponible del panel, este `<div>` scrollea en X en
+              vez de dejar que el canvas se comprima/deforme -- nunca se
+              usa `max-width`/`width: 100%` sobre el canvas en si (ver
+              `TextureEditor.tsx`). */}
+          <div ref={textureSectionWrapperRef} style={{ maxWidth: '100%', overflowX: 'auto' }}>
+            {/* Wrapper HERMANO de TextureEditor (no anidado dentro): asi el
+                overlay de "pegar imagen" no queda recortado por el
+                `overflow: hidden` propio de TextureEditor mientras se
+                arrastra/redimensiona mas alla de su borde -- ver
+                `PasteImageOverlay.tsx`. */}
+            <div ref={textureCanvasWrapperRef} style={{ position: 'relative', display: 'inline-block' }}>
+              <TextureEditor
+                buffer={buffer}
+                version={version}
+                color={color}
+                zoom={zoom}
+                onZoomChange={setZoom}
+                showGrid={showGrid}
+                onSetPixel={setPixel}
+                onPaintLine={paintLine}
+                onStrokeStart={onStrokeStart}
+                onStrokeEnd={onStrokeEnd}
               />
-            )}
+              {pendingPaste && (
+                <PasteImageOverlay
+                  rect={pendingPaste.rect}
+                  scaleX={canvasDisplayScale.scaleX}
+                  scaleY={canvasDisplayScale.scaleY}
+                  previewUrl={pendingPaste.previewUrl}
+                  onRectChange={handlePendingRectChange}
+                />
+              )}
+            </div>
           </div>
+          {textureOverflowsPanel && (
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-dim)' }}>
+              El editor no cabe en el ancho actual del panel -- desplázate horizontalmente para ver el resto, o ensancha el
+              panel arrastrando el borde izquierdo.
+            </p>
+          )}
         </section>
 
         <section>
