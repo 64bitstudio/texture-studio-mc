@@ -163,3 +163,9 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 
 - **`projectFilter.ts`** (nuevo, puro) — `filterAndSortProjects(projects, options)` (busca por nombre + filtra por mob + ordena, 100% client-side) y `collectMobIdsInProjects(projects)` (catálogo de mobs presentes en al menos un proyecto guardado, para poblar el `<select>` de filtro). Ver `projectFilter.spec.ts`.
 - **`components/HomeScreen.tsx`** — gana los controles "Buscar"/"Mob"/"Orden" sobre la lista de "Guardados"; el `<select>` de mob solo se muestra si hay más de un mob distinto entre los proyectos guardados.
+
+### Ticket 029 -- Reorganización del panel en grid + visor acotado a 400px
+
+- **`components/Editor.tsx`** — el visor 3D pasa a `flexBasis: 400, flexGrow: 0` (nunca crece más de 400px). El panel de controles se reorganiza en un grid `auto-fit` de `Section` (`ui/`, ticket 025) en vez de `<section><h2>` ad-hoc; la sección "Textura" ocupa todas las columnas (`gridColumn: '1 / -1'`).
+- **`ui/Section.tsx`** — gana un prop `style` opcional (necesario para el `gridColumn: '1 / -1'` de la sección "Textura").
+- **Eliminados** (ticket 010, panel lateral redimensionable a mano, superado por el layout en grid -- ver `docs/ARQUITECTURA.md`, "Ticket 029"): `components/PanelResizeHandle.tsx`, `panelWidth.ts`, `test/panelWidth.spec.ts`.

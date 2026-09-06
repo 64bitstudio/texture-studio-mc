@@ -11,8 +11,8 @@ import { PasteImageControls } from './PasteImageControls';
 import { PasteImageOverlay } from './PasteImageOverlay';
 import { ExportControls } from './ExportControls';
 import { ResolutionControls } from './ResolutionControls';
-import { PanelResizeHandle } from './PanelResizeHandle';
 import { PartIsolationControls } from './PartIsolationControls';
+import { Section } from '../ui';
 import { decodeImageFileToImageData, decodePngDataUrlToImageData } from '../decodeTexture';
 import { useCanvasTexture } from '../hooks/useCanvasTexture';
 import { bresenhamLine, TextureBuffer, type PixelPoint, type PixelSource, type RGBA } from '../textureBuffer';
@@ -23,7 +23,6 @@ import { isPixelInActiveRegion } from '../partIsolation';
 import { ZOOM_DEFAULT } from '../zoom';
 import { RESOLUTION_DEFAULT, clampResolutionMultiplier, resamplePixelSource } from '../resolution';
 import { canvasOverflowsAvailableWidth, computeCanvasDisplaySize } from '../canvasSize';
-import { loadStoredPanelWidth, savePanelWidth } from '../panelWidth';
 import {
   computeBurnPixels,
   computeFullReplaceDiff,
@@ -270,33 +269,16 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
     return () => observer.disconnect();
   }, [buffer, zoom, showGrid]);
 
-  // Panel lateral redimensionable (ticket 010). El ancho se persiste en
-  // `localStorage` (conveniencia por navegador, no un dato de usuario
-  // que deba sincronizarse -- ver `pending/010-panel-lateral-...md`) y
-  // se lee de forma perezosa en el `useState` inicial para no aplicar
-  // el ancho por defecto (con su parpadeo) y luego saltar al valor
-  // guardado en un segundo render.
-  const [panelWidth, setPanelWidth] = useState(() => loadStoredPanelWidth());
-
-  const handlePanelWidthChange = useCallback((width: number) => {
-    setPanelWidth(width);
-  }, []);
-
-  // Se persiste solo al terminar el gesto de arrastre (o tras cada
-  // ajuste discreto por teclado) -- ver `PanelResizeHandle.tsx` para el
-  // razonamiento completo (evita escrituras a `localStorage` en cada
-  // `pointermove`).
-  const handlePanelWidthCommit = useCallback((width: number) => {
-    savePanelWidth(width);
-  }, []);
-
   // Ancho REAL disponible para el editor de textura dentro del panel
   // (ticket 010, mismo patron de medicion con `ResizeObserver` que ya
   // usa el efecto de arriba) -- se usa exclusivamente para decidir si
   // el contenedor debe scrollear horizontalmente cuando el canvas (a
   // la resolucion/zoom actuales) no cabe, NUNCA para encoger el canvas
   // en si (ver `canvasSize.ts`, `computeCanvasDisplaySize` es
-  // independiente de este valor por diseño).
+  // independiente de este valor por diseño). Sigue siendo necesario
+  // tras el ticket 029 (panel de ancho flexible, ya no redimensionable
+  // a mano): el panel puede seguir siendo mas angosto que el canvas a
+  // resoluciones/zoom altos, sobre todo en ventanas chicas.
   const textureSectionWrapperRef = useRef<HTMLDivElement | null>(null);
   const [availableTextureWidth, setAvailableTextureWidth] = useState<number | null>(null);
 
@@ -769,7 +751,15 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
 
   return (
     <div style={{ display: 'flex', width: '100%', height: '100%', minHeight: 0 }}>
-      <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
+      {/* Ticket 029 (HU-3): visor acotado a 400px maximo -- `flexBasis:
+          400` + `flexGrow: 0` (nunca crece mas alla, sin importar cuanto
+          espacio sobre) + `flexShrink: 1` (SI puede encogerse en
+          ventanas angostas, en vez de desbordar). Antes de este ticket
+          el visor era `flex: 1` (ilimitado) y el panel tenia ancho FIJO
+          redimensionable a mano (`PanelResizeHandle`, ticket 010) -- ver
+          docs/ARQUITECTURA.md, "Ticket 029", para por que ese control ya
+          no hace falta con este layout. */}
+      <div style={{ flexBasis: 400, flexGrow: 0, flexShrink: 1, minWidth: 0, maxWidth: 400, position: 'relative' }}>
         <Viewer3D texture={texture} geometry={geometry} mobLabel={mobLabel} />
         {initError && (
           <p
@@ -791,179 +781,163 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
         )}
       </div>
 
-      <PanelResizeHandle
-        panelWidth={panelWidth}
-        onPanelWidthChange={handlePanelWidthChange}
-        onPanelWidthCommit={handlePanelWidthCommit}
-      />
+      {/* Panel de ancho flexible (ticket 029) -- ocupa TODO el resto del
+          ancho disponible (ya no un valor fijo/redimensionable a mano).
+          Las secciones (`Section` de `ui/`, ticket 025) se acomodan en
+          un grid `auto-fit` -- el numero real de columnas depende del
+          ancho disponible, sin media queries manuales por breakpoint
+          (mismo criterio de "resiliente al ancho real de la ventana"
+          que ya aplicaba el panel redimensionable del ticket 010). */}
+      <aside style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: 16, background: 'var(--panel-bg)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
+          <Section title="Historial">
+            <HistoryControls canUndo={history.canUndo} canRedo={history.canRedo} onUndo={handleUndo} onRedo={handleRedo} />
+          </Section>
 
-      <aside
-        style={{
-          width: panelWidth,
-          flexShrink: 0,
-          overflowY: 'auto',
-          padding: 16,
-          background: 'var(--panel-bg)',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 20,
-        }}
-      >
-        <section>
-          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Historial</h2>
-          <HistoryControls canUndo={history.canUndo} canRedo={history.canRedo} onUndo={handleUndo} onRedo={handleRedo} />
-        </section>
+          <Section title="Simetria">
+            <SymmetryControls enabled={symmetryEnabled} onToggle={setSymmetryEnabled} />
+          </Section>
 
-        <section>
-          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Simetria</h2>
-          <SymmetryControls enabled={symmetryEnabled} onToggle={setSymmetryEnabled} />
-        </section>
+          <Section title="Color">
+            <ColorPicker color={color} onChange={setColor} />
+          </Section>
 
-        <section>
-          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Color</h2>
-          <ColorPicker color={color} onChange={setColor} />
-        </section>
+          <Section title="Resolucion">
+            <ResolutionControls
+              resolution={resolution}
+              nativeWidth={baseTexture.width}
+              nativeHeight={baseTexture.height}
+              onChange={handleResolutionChange}
+            />
+          </Section>
 
-        <section>
-          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Resolucion</h2>
-          <ResolutionControls
-            resolution={resolution}
-            nativeWidth={baseTexture.width}
-            nativeHeight={baseTexture.height}
-            onChange={handleResolutionChange}
-          />
-        </section>
+          <Section title="Vista">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <ZoomControls zoom={zoom} onChange={setZoom} />
+              <GridToggle visible={showGrid} onToggle={setShowGrid} />
+            </div>
+          </Section>
 
-        <section>
-          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Vista</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <ZoomControls zoom={zoom} onChange={setZoom} />
-            <GridToggle visible={showGrid} onToggle={setShowGrid} />
-          </div>
-        </section>
+          <Section title="Aislar parte">
+            {/* Selector de partes (ticket 012) -- reusa `namedRegions`
+                (catalogo del ticket 011) tal cual, sin redefinirlo. Ver
+                `PartIsolationControls.tsx`/`partIsolation.ts` para la
+                decision de granularidad (una region = una cara, no la caja
+                completa) y docs/ARQUITECTURA.md, "Ticket 012". */}
+            <PartIsolationControls regions={namedRegions} activeRegionId={isolatedRegionId} onSelect={handleSelectIsolatedPart} />
+          </Section>
 
-        <section>
-          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Aislar parte</h2>
-          {/* Selector de partes (ticket 012) -- reusa `namedRegions`
-              (catalogo del ticket 011) tal cual, sin redefinirlo. Ver
-              `PartIsolationControls.tsx`/`partIsolation.ts` para la
-              decision de granularidad (una region = una cara, no la caja
-              completa) y docs/ARQUITECTURA.md, "Ticket 012". */}
-          <PartIsolationControls regions={namedRegions} activeRegionId={isolatedRegionId} onSelect={handleSelectIsolatedPart} />
-        </section>
+          <Section title="Importar / pegar imagen">
+            <ImportTextureControl
+              expectedWidth={buffer.width}
+              expectedHeight={buffer.height}
+              error={importError}
+              onFileSelected={(file) => void handleImportFile(file)}
+            />
+            <PasteImageControls
+              hasPending={!!pendingPaste}
+              error={pasteError}
+              onFileSelected={(file) => void startPendingPaste(file)}
+              onConfirm={handleConfirmPaste}
+              onCancel={handleCancelPaste}
+            />
+          </Section>
 
-        <section>
-          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>
-            Textura ({buffer.width}×{buffer.height})
-          </h2>
-          {/* Etiqueta fija de region (ticket 011, alternativa elegida sobre
-              un tooltip flotante -- ver docs/ARQUITECTURA.md): se actualiza
-              en vivo con cada `pointermove` sobre el canvas de textura
-              (`onHoverPixel`, `TextureEditor.tsx`) y vuelve a "--" al salir
-              del canvas o cuando el pixel cae en una zona de relleno sin
-              region UV conocida (ver `regionLabels.ts`). */}
-          <p
-            aria-live="polite"
-            style={{
-              margin: '0 0 8px',
-              fontSize: 12,
-              color: 'var(--text-dim)',
-              minHeight: 16,
-            }}
-          >
-            Región: <strong style={{ color: 'var(--text)' }}>{hoveredRegion?.label ?? '—'}</strong>
-          </p>
-          {/* Aviso de bloqueo de pintado (ticket 012, criterio "nunca
-              fallo silencioso"): aparece cuando el ultimo intento de
-              pintado (click/brocha) toco al menos un pixel fuera de la
-              parte aislada activa -- ver `applyPixelsWithSymmetry`. Se
-              suma a la señal visual continua (atenuado + cursor
-              `not-allowed`, `TextureEditor.tsx`), no la reemplaza. */}
-          {isolatedRegion && paintBlockedByIsolation && (
+          <Section title="Exportar">
+            <ExportControls buffer={buffer} uvBoxes={uvBoxes} />
+          </Section>
+
+          {/* Ocupa TODAS las columnas del grid (`gridColumn: '1 / -1'`) --
+              a diferencia del resto de secciones (controles compactos),
+              el editor de pixeles se beneficia de todo el ancho
+              disponible, sobre todo a resoluciones/zoom altos. */}
+          <Section title={`Textura (${buffer.width}×${buffer.height})`} style={{ gridColumn: '1 / -1' }}>
+            {/* Etiqueta fija de region (ticket 011, alternativa elegida sobre
+                un tooltip flotante -- ver docs/ARQUITECTURA.md): se actualiza
+                en vivo con cada `pointermove` sobre el canvas de textura
+                (`onHoverPixel`, `TextureEditor.tsx`) y vuelve a "--" al salir
+                del canvas o cuando el pixel cae en una zona de relleno sin
+                region UV conocida (ver `regionLabels.ts`). */}
             <p
-              role="status"
               aria-live="polite"
               style={{
                 margin: '0 0 8px',
                 fontSize: 12,
-                color: 'var(--text)',
-                background: 'rgba(255, 214, 89, 0.15)',
-                border: '1px solid rgba(255, 214, 89, 0.5)',
-                borderRadius: 4,
-                padding: '4px 8px',
+                color: 'var(--text-dim)',
+                minHeight: 16,
               }}
             >
-              Pintura bloqueada: ese pixel esta fuera de la parte aislada ({isolatedRegion.label}).
+              Región: <strong style={{ color: 'var(--text)' }}>{hoveredRegion?.label ?? '—'}</strong>
             </p>
-          )}
-          {/* Contenedor con scroll horizontal (ticket 010): si el canvas
-              (textureWidth*zoom, ver `canvasSize.ts`) no cabe en el
-              ancho disponible del panel, este `<div>` scrollea en X en
-              vez de dejar que el canvas se comprima/deforme -- nunca se
-              usa `max-width`/`width: 100%` sobre el canvas en si (ver
-              `TextureEditor.tsx`). */}
-          <div ref={textureSectionWrapperRef} style={{ maxWidth: '100%', overflowX: 'auto' }}>
-            {/* Wrapper HERMANO de TextureEditor (no anidado dentro): asi el
-                overlay de "pegar imagen" no queda recortado por el
-                `overflow: hidden` propio de TextureEditor mientras se
-                arrastra/redimensiona mas alla de su borde -- ver
-                `PasteImageOverlay.tsx`. */}
-            <div ref={textureCanvasWrapperRef} style={{ position: 'relative', display: 'inline-block' }}>
-              <TextureEditor
-                buffer={buffer}
-                version={version}
-                color={color}
-                zoom={zoom}
-                onZoomChange={setZoom}
-                showGrid={showGrid}
-                onSetPixel={setPixel}
-                onPaintLine={paintLine}
-                onStrokeStart={onStrokeStart}
-                onStrokeEnd={onStrokeEnd}
-                namedRegions={namedRegions}
-                onHoverPixel={handleHoverPixel}
-                isolatedRegion={isolatedRegion}
-              />
-              {pendingPaste && (
-                <PasteImageOverlay
-                  rect={pendingPaste.rect}
-                  scaleX={canvasDisplayScale.scaleX}
-                  scaleY={canvasDisplayScale.scaleY}
-                  previewUrl={pendingPaste.previewUrl}
-                  onRectChange={handlePendingRectChange}
+            {/* Aviso de bloqueo de pintado (ticket 012, criterio "nunca
+                fallo silencioso"): aparece cuando el ultimo intento de
+                pintado (click/brocha) toco al menos un pixel fuera de la
+                parte aislada activa -- ver `applyPixelsWithSymmetry`. Se
+                suma a la señal visual continua (atenuado + cursor
+                `not-allowed`, `TextureEditor.tsx`), no la reemplaza. */}
+            {isolatedRegion && paintBlockedByIsolation && (
+              <p
+                role="status"
+                aria-live="polite"
+                style={{
+                  margin: '0 0 8px',
+                  fontSize: 12,
+                  color: 'var(--text)',
+                  background: 'rgba(255, 214, 89, 0.15)',
+                  border: '1px solid rgba(255, 214, 89, 0.5)',
+                  borderRadius: 4,
+                  padding: '4px 8px',
+                }}
+              >
+                Pintura bloqueada: ese pixel esta fuera de la parte aislada ({isolatedRegion.label}).
+              </p>
+            )}
+            {/* Contenedor con scroll horizontal (ticket 010): si el canvas
+                (textureWidth*zoom, ver `canvasSize.ts`) no cabe en el
+                ancho disponible del panel, este `<div>` scrollea en X en
+                vez de dejar que el canvas se comprima/deforme -- nunca se
+                usa `max-width`/`width: 100%` sobre el canvas en si (ver
+                `TextureEditor.tsx`). */}
+            <div ref={textureSectionWrapperRef} style={{ maxWidth: '100%', overflowX: 'auto' }}>
+              {/* Wrapper HERMANO de TextureEditor (no anidado dentro): asi el
+                  overlay de "pegar imagen" no queda recortado por el
+                  `overflow: hidden` propio de TextureEditor mientras se
+                  arrastra/redimensiona mas alla de su borde -- ver
+                  `PasteImageOverlay.tsx`. */}
+              <div ref={textureCanvasWrapperRef} style={{ position: 'relative', display: 'inline-block' }}>
+                <TextureEditor
+                  buffer={buffer}
+                  version={version}
+                  color={color}
+                  zoom={zoom}
+                  onZoomChange={setZoom}
+                  showGrid={showGrid}
+                  onSetPixel={setPixel}
+                  onPaintLine={paintLine}
+                  onStrokeStart={onStrokeStart}
+                  onStrokeEnd={onStrokeEnd}
+                  namedRegions={namedRegions}
+                  onHoverPixel={handleHoverPixel}
+                  isolatedRegion={isolatedRegion}
                 />
-              )}
+                {pendingPaste && (
+                  <PasteImageOverlay
+                    rect={pendingPaste.rect}
+                    scaleX={canvasDisplayScale.scaleX}
+                    scaleY={canvasDisplayScale.scaleY}
+                    previewUrl={pendingPaste.previewUrl}
+                    onRectChange={handlePendingRectChange}
+                  />
+                )}
+              </div>
             </div>
-          </div>
-          {textureOverflowsPanel && (
-            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-dim)' }}>
-              El editor no cabe en el ancho actual del panel -- desplázate horizontalmente para ver el resto, o ensancha el
-              panel arrastrando el borde izquierdo.
-            </p>
-          )}
-        </section>
-
-        <section>
-          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Importar / pegar imagen</h2>
-          <ImportTextureControl
-            expectedWidth={buffer.width}
-            expectedHeight={buffer.height}
-            error={importError}
-            onFileSelected={(file) => void handleImportFile(file)}
-          />
-          <PasteImageControls
-            hasPending={!!pendingPaste}
-            error={pasteError}
-            onFileSelected={(file) => void startPendingPaste(file)}
-            onConfirm={handleConfirmPaste}
-            onCancel={handleCancelPaste}
-          />
-        </section>
-
-        <section>
-          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Exportar</h2>
-          <ExportControls buffer={buffer} uvBoxes={uvBoxes} />
-        </section>
+            {textureOverflowsPanel && (
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-dim)' }}>
+                El editor no cabe en el ancho actual del panel -- desplázate horizontalmente para ver el resto.
+              </p>
+            )}
+          </Section>
+        </div>
       </aside>
     </div>
   );

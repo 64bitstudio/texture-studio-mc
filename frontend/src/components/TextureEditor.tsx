@@ -115,9 +115,11 @@ const REGION_BORDER_COLOR = 'rgba(255, 214, 89, 0.85)';
  * FIJO, cuando el ancho logico (`displayWidth`) excedia el ancho
  * disponible, el navegador comprimia SOLO el ancho renderizado (sin
  * `height: auto`), produciendo texeles no cuadrados (hallazgo
- * documentado en `docs/ARQUITECTURA.md`, tickets 005/008). Ahora el
- * ancho del `<aside>` es ajustable por el usuario (ver `Editor.tsx`,
- * `PanelResizeHandle`) y el canvas SIEMPRE se renderiza a
+ * documentado en `docs/ARQUITECTURA.md`, tickets 005/008). El `<aside>`
+ * era ajustable por el usuario en ese momento (`PanelResizeHandle`,
+ * eliminado en el ticket 029 -- el panel ahora es de ancho flexible por
+ * el layout en grid, ver `docs/ARQUITECTURA.md` "Ticket 029") -- sin
+ * importar el ancho real del panel, el canvas SIEMPRE se renderiza a
  * `computeCanvasDisplaySize(buffer.width, buffer.height, zoom)` --
  * mismo factor de escala en ambos ejes, sin importar el ancho
  * disponible. Si no cabe, el CONTENEDOR (el wrapper en `Editor.tsx`)
