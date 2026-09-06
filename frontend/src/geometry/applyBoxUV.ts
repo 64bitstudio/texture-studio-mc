@@ -38,22 +38,56 @@ export interface ApplyBoxUVOptions {
   textureHeight: number;
 }
 
-interface PixelRect {
+export interface PixelRect {
   x0: number;
   y0: number;
   x1: number;
   y1: number;
 }
 
+/** Las 6 caras de un "cross" UV, en pixeles de textura -- sin aplicar `mirrorX`. */
+export interface BoxFaceRects {
+  front: PixelRect;
+  back: PixelRect;
+  top: PixelRect;
+  bottom: PixelRect;
+  left: PixelRect;
+  right: PixelRect;
+}
+
+/**
+ * Calcula los 6 rectangulos de pixeles del "cross" UV clasico de una
+ * caja, a partir de su origen (`u`,`v`) y tamaño (`w`,`h`,`d`) -- misma
+ * formula que ya usaba `applyBoxUV` internamente, extraida a una
+ * funcion pura (ticket 011) para que `frontend/src/regionLabels.ts`
+ * (catalogo de regiones nombradas, reusado por el ticket 012) derive
+ * las MISMAS coordenadas sin duplicar el calculo -- unica fuente de
+ * verdad para "que pixeles pertenecen a que cara de que caja".
+ *
+ * Deliberadamente NO toma `mirrorX`: el flag solo decide a que grupo de
+ * caras 3D (`px`/`nx`/etc.) se asigna cada rectangulo -- nunca mueve el
+ * rectangulo en si dentro del espacio de pixeles de la textura (por eso
+ * `armRight`/`armLeft`, que difieren solo en `mirrorX`, producen
+ * exactamente los mismos 6 rectangulos -- ver docs/ARQUITECTURA.md,
+ * "Ticket 011").
+ */
+export function computeBoxFaceRects(u: number, v: number, w: number, h: number, d: number): BoxFaceRects {
+  return {
+    right: { x0: u, y0: v + d, x1: u + d, y1: v + d + h },
+    left: { x0: u + d + w, y0: v + d, x1: u + 2 * d + w, y1: v + d + h },
+    top: { x0: u + d, y0: v, x1: u + d + w, y1: v + d },
+    bottom: { x0: u + d + w, y0: v, x1: u + d + 2 * w, y1: v + d },
+    front: { x0: u + d, y0: v + d, x1: u + d + w, y1: v + d + h },
+    back: { x0: u + 2 * d + w, y0: v + d, x1: u + 2 * d + 2 * w, y1: v + d + h },
+  };
+}
+
 export function applyBoxUV(geometry: THREE.BoxGeometry, opts: ApplyBoxUVOptions): void {
   const { u, v, w, h, d, mirrorX = false, textureWidth, textureHeight } = opts;
 
-  let right: PixelRect = { x0: u, y0: v + d, x1: u + d, y1: v + d + h };
-  let left: PixelRect = { x0: u + d + w, y0: v + d, x1: u + 2 * d + w, y1: v + d + h };
-  const top: PixelRect = { x0: u + d, y0: v, x1: u + d + w, y1: v + d };
-  const bottom: PixelRect = { x0: u + d + w, y0: v, x1: u + d + 2 * w, y1: v + d };
-  const front: PixelRect = { x0: u + d, y0: v + d, x1: u + d + w, y1: v + d + h };
-  const back: PixelRect = { x0: u + 2 * d + w, y0: v + d, x1: u + 2 * d + 2 * w, y1: v + d + h };
+  const rects = computeBoxFaceRects(u, v, w, h, d);
+  let { right, left } = rects;
+  const { top, bottom, front, back } = rects;
 
   if (mirrorX) {
     // El lado izquierdo reutiliza la textura del lado derecho: las

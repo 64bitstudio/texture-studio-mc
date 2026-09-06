@@ -9,11 +9,22 @@ export interface BoxUvOrigin {
   y: number;
 }
 
+/** Nombres legibles de cada cara del "cross" UV (ticket 011) -- ver `backend/src/types/baseAssets.ts` para la convencion completa. */
+export interface FaceLabels {
+  front: string;
+  back: string;
+  top: string;
+  bottom: string;
+  left: string;
+  right: string;
+}
+
 export interface SkeletonBoxPart {
   size: [number, number, number];
   position: [number, number, number];
   uv: BoxUvOrigin;
   mirrorX?: boolean;
+  faceLabels: FaceLabels;
 }
 
 export interface SkeletonGeometry {

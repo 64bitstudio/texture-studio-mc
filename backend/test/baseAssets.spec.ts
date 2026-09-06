@@ -54,6 +54,31 @@ describe('GET /api/base-assets/skeleton', () => {
     expect(legLeft.mirrorX).toBe(true);
   });
 
+  it('incluye faceLabels legibles por cada caja (ticket 011)', async () => {
+    const app = createApp();
+    const res = await request(app).get('/api/base-assets/skeleton');
+    const { head, body, armRight, armLeft, legRight, legLeft } = res.body.geometry.parts;
+
+    expect(head.faceLabels).toEqual({
+      front: 'Cara',
+      back: 'Nuca',
+      top: 'Parte superior',
+      bottom: 'Parte inferior',
+      left: 'Lateral derecho',
+      right: 'Lateral izquierdo',
+    });
+    expect(body.faceLabels).toMatchObject({ front: 'Pecho', back: 'Espalda' });
+
+    // armRight/armLeft (y legRight/legLeft) comparten la misma region UV
+    // (mismo `uv`, mismo tamaño) -- sus labels deben ser identicos y sin
+    // lateralidad, para no sugerir que solo un lado se pinta (ver
+    // docs/ARQUITECTURA.md, "Ticket 011").
+    expect(armRight.faceLabels).toEqual(armLeft.faceLabels);
+    expect(armRight.faceLabels.front).not.toMatch(/derech|izquierd/i);
+    expect(legRight.faceLabels).toEqual(legLeft.faceLabels);
+    expect(legRight.faceLabels.front).not.toMatch(/derech|izquierd/i);
+  });
+
   it('nunca responde con error aunque falte el asset vanilla real', async () => {
     const app = createApp();
     const res = await request(app).get('/api/base-assets/skeleton');

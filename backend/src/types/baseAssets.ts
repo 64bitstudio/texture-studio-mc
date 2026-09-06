@@ -16,6 +16,35 @@ export interface BoxUvOrigin {
 }
 
 /**
+ * Nombres legibles (es-MX) de cada una de las 6 caras del "cross" UV de
+ * una caja (ticket 011, HU sin numero previo -- feedback directo de
+ * Marco, ver `pending/011-regiones-uv-nombradas.md`). Las claves
+ * coinciden EXACTAMENTE con los nombres de region ya usados por
+ * `frontend/src/geometry/applyBoxUV.ts` (`front`/`back`/`top`/`bottom`/
+ * `left`/`right`) -- no se inventa una segunda nomenclatura de caras.
+ *
+ * Convencion `left`/`right`: son las mismas caras +x/-x del sistema de
+ * coordenadas de la caja (ver "Convencion de ejes" en
+ * `skeletonGeometry.ts`), NO relativas a la camara/pantalla. Como el
+ * personaje esta de frente a la camara (+z = frente), su lado
+ * anatomico DERECHO cae del lado -x (pantalla-izquierda) y su
+ * IZQUIERDO del lado +x (pantalla-derecha) -- exactamente la misma
+ * convencion ya usada por `armRight`/`armLeft` (`armRight.position.x =
+ * -5`, pantalla-izquierda). Por eso `right` (cara +x) se etiqueta con
+ * el lado IZQUIERDO del personaje y `left` (cara -x) con su DERECHO --
+ * ver docs/ARQUITECTURA.md, "Ticket 011", para la verificacion en vivo
+ * de este mapeo.
+ */
+export interface FaceLabels {
+  front: string;
+  back: string;
+  top: string;
+  bottom: string;
+  left: string;
+  right: string;
+}
+
+/**
  * Definición de una caja del modelo (formato de caja de Minecraft:
  * tamaño width/height/depth en unidades de pixel de textura, más el
  * origen de su "cross" UV clásico).
@@ -27,12 +56,19 @@ export interface BoxUvOrigin {
  * completa, verificada contra `~/tools/minecraft-texture-pack/
  * mc_render_preview.py` (ya calibrado, mismo criterio que el documento
  * de definición).
+ *
+ * `faceLabels` (ticket 011): nombre legible de cada una de las 6 caras
+ * de esta caja, para el editor de textura (tooltip/etiqueta + overlay
+ * de fronteras). Ver docs/ARQUITECTURA.md, "Ticket 011", para el
+ * catalogo completo y las decisiones no cubiertas literalmente por el
+ * ticket (labels de brazo/pierna sin lateralidad, top/bottom de body).
  */
 export interface SkeletonBoxPart {
   size: [number, number, number];
   position: [number, number, number];
   uv: BoxUvOrigin;
   mirrorX?: boolean;
+  faceLabels: FaceLabels;
 }
 
 export interface SkeletonGeometry {
