@@ -27,3 +27,12 @@ Este es el criterio de aceptación central, no un detalle menor:
 - Dado cualquier ancho de panel (dentro de los límites min/max), cuando se mide el tamaño renderizado de un texel individual en pantalla, entonces su ancho y alto son iguales (margen de redondeo de 1px).
 - Dado que el usuario arrastra el handle para cambiar el ancho del panel, cuando termina de arrastrar, entonces los pixeles de la cuadrícula siguen viéndose cuadrados (no alargados) en todo momento durante y después del arrastre.
 - Dado un ancho de panel muy angosto donde el editor completo no cabe a un zoom dado, cuando esto ocurre, entonces aparece scroll horizontal en vez de deformación.
+
+## Hecho
+Implementado por el agente `fullstack-dev` (PR [#21](https://github.com/64bitstudio/texture-studio-mc/pull/21)). CI de Jenkins en verde, sin hallazgos del gate de QA automático.
+
+- Handle arrastrable (mouse + teclado: flechas, Home/End) entre visor 3D y panel, límites 220-640px, ancho persistido en `localStorage`.
+- El canvas del editor ya NO usa `max-width: 100%` — su tamaño de presentación se deriva únicamente de `textureWidth/Height × zoom` (mismo factor en ambos ejes), corrigiendo en la fuente el bug original del ticket 008.
+- `overflow-x: auto` + aviso visible cuando el contenido no cabe, en vez de deformar.
+- **Verificado en vivo contra el deploy real de DEV** (el orquestador repitió la verificación tras el merge, midiendo con JavaScript en la página real, no solo visualmente): al ensanchar el panel de 280px a 568px el canvas del editor mantuvo el mismo tamaño cuadrado (640×320 sobre un backing de 64×32, 10×10 por texel); al angostarlo por debajo de lo que el editor necesita, apareció el aviso de scroll horizontal ("El editor no cabe en el ancho actual del panel...") y los pixeles visibles siguieron perfectamente cuadrados; pintar un pixel en ese estado angosto aterrizó exactamente en la celda correcta.
+- Pendiente, explícitamente fuera de este ticket: regiones UV nombradas (011), aislar partes (012), pegado con ajuste automático (013).
