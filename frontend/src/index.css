@@ -49,6 +49,33 @@
   box-sizing: border-box;
 }
 
+/* Ticket 032 (HU-7): utilidad de fundido para elementos que aparecen
+   de golpe por MONTAJE (no por un cambio de propiedad mientras ya
+   estan en pantalla, que es lo que `transition` anima) -- el editor
+   completo al cambiar de mob (remonta por `key`, ticket 018) y el
+   overlay de "aislar parte" (canvas condicional, ticket 012). Reusa
+   `--transition-fast` (150ms, 0ms con `prefers-reduced-motion`) en vez
+   de un segundo mecanismo aparte para el mismo caso -- con duracion
+   0ms la animacion completa instantaneamente, que es exactamente el
+   comportamiento reducido que se busca. */
+@keyframes ts-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.ts-fade-in {
+  /* `--transition-fast` ya incluye la funcion de easing (`150ms ease`,
+     ticket 025) -- NO agregar un segundo `ease` aqui: el shorthand de
+     `animation` solo acepta una funcion de easing, y un segundo valor
+     invalida toda la declaracion completa (bug real encontrado en vivo:
+     `getComputedStyle` reportaba `animation: none`). */
+  animation: ts-fade-in var(--transition-fast);
+}
+
 html,
 body,
 #root {

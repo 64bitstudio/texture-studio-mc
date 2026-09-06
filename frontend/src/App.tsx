@@ -257,8 +257,12 @@ function App() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Button variant="icon" aria-label="Volver al inicio" title="Volver al inicio" onClick={() => setView('home')}>
-            ←
+          {/* Ticket 032 (HU-7): texto visible junto al icono -- ya no
+              solo icono (`aria-label` se elimina, el texto real es
+              ahora el nombre accesible; `title` se conserva como
+              tooltip adicional). */}
+          <Button variant="icon" title="Volver al inicio" onClick={() => setView('home')}>
+            <span aria-hidden="true">←</span> Volver al inicio
           </Button>
           <h1 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>
             Texture Studio MC{selectedMobLabel ? ` — ${selectedMobLabel}` : ''}
@@ -307,7 +311,14 @@ function App() {
             borderBottom: '1px solid rgba(255,255,255,0.08)',
           }}
         >
-          <Menu label="Proyecto" items={[]}>
+          <Menu
+            label={
+              <>
+                <span aria-hidden="true">💾</span> Proyecto
+              </>
+            }
+            items={[]}
+          >
             <div style={{ padding: 8, minWidth: 260 }}>
               <ProjectControls bufferCache={bufferCache} geometryCache={geometryCache} onProjectLoaded={handleProjectLoaded} />
             </div>

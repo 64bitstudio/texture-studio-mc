@@ -774,7 +774,12 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
   const texture = useCanvasTexture(buffer, version);
 
   return (
-    <div style={{ display: 'flex', width: '100%', height: '100%', minHeight: 0 }}>
+    // `ts-fade-in` (ticket 032, HU-7): transicion corta al cambiar de
+    // mob -- `Editor` remonta por completo (`key`, ticket 018) cada vez
+    // que cambia el mob activo, asi que un fundido de entrada por
+    // MONTAJE (no una `transition` sobre una propiedad que cambia con
+    // el componente ya en pantalla) es lo que corresponde aqui.
+    <div className="ts-fade-in" style={{ display: 'flex', width: '100%', height: '100%', minHeight: 0 }}>
       {/* Ticket 029 (HU-3): visor acotado a 400px maximo -- `flexBasis:
           400` + `flexGrow: 0` (nunca crece mas alla, sin importar cuanto
           espacio sobre) + `flexShrink: 1` (SI puede encogerse en
@@ -874,7 +879,11 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
                 de "pegar") que no encaja en el patron ARIA "menu" de
                 items planos -- ver docs/ARQUITECTURA.md, "Ticket 031". */}
             <Menu
-              label="Archivo"
+              label={
+                <>
+                  <span aria-hidden="true">📁</span> Archivo
+                </>
+              }
               items={[]}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 8, minWidth: 220 }}>

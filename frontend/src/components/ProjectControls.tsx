@@ -31,6 +31,8 @@ export interface ProjectControlsProps {
  * `danger`)+`InlineError` (`ui/`) -- mismo comportamiento exacto,
  * `dangerButtonStyle`/`buttonStyle`/`inputStyle` ad-hoc de este archivo
  * se eliminan (reemplazados por `Button` variant="danger"/`FormField`).
+ *
+ * Ticket 032 (HU-7): "Guardar" gana ícono 💾 junto al texto.
  */
 export function ProjectControls({ bufferCache, geometryCache, onProjectLoaded }: ProjectControlsProps) {
   const [name, setName] = useState('');
@@ -143,6 +145,7 @@ export function ProjectControls({ bufferCache, geometryCache, onProjectLoaded }:
           <input type="text" value={name} placeholder="ej. Set Nether" aria-label="Nombre del proyecto" onChange={handleNameChange} style={{ fontSize: 12, padding: '4px 6px', minWidth: 140 }} />
         </FormField>
         <Button disabled={pending !== null} onClick={handleSaveClick}>
+          <span aria-hidden="true">💾</span>
           {pending === 'save' ? 'Guardando…' : 'Guardar'}
         </Button>
 
