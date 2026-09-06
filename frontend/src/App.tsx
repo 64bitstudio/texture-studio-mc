@@ -8,7 +8,7 @@ import { fetchMobs } from './api/mobs';
 import type { MobBaseAssetsResponse, MobGeometry } from './types/baseAssets';
 import type { MobSummary } from './types/mobs';
 import { TextureBuffer } from './textureBuffer';
-import { Button } from './ui';
+import { Button, Menu } from './ui';
 
 /** Ticket 027, HU-1: pantalla de inicio en vez de cargar directo al editor. Estado interno, sin router (ver docs/definiciones/rediseno-ux-ui-y-navegacion.md, "Diseño técnico"). */
 type View = 'home' | 'editor';
@@ -287,7 +287,18 @@ function App() {
       {/* Ticket 019 (HU-3/HU-4/HU-5): fila propia, hermana del header --
           un proyecto agrupa VARIOS mobs a la vez (no es un control por
           mob), y debe seguir visible sin importar cual mob este activo
-          en cada momento (ver `ProjectControls.tsx`). */}
+          en cada momento (ver `ProjectControls.tsx`).
+
+          Ticket 031 (HU-6): `ProjectControls` deja de mostrarse siempre
+          expandida -- vive detras de un menu "Proyecto" (`Menu` de
+          `ui/`), sin cambios de logica (mismos props/handlers). Se
+          queda en `App.tsx` (NO se mueve al `Menu` "Archivo" de
+          `Editor.tsx`) por la misma razon original de este comentario:
+          si viviera dentro de `Editor` se remontaria por completo cada
+          vez que `Editor` se remonta al cambiar de mob (`key`, ticket
+          018), perdiendo su estado -- ver docs/ARQUITECTURA.md,
+          "Ticket 031", para el detalle completo de por que son DOS
+          menus (Archivo/Proyecto) y no uno solo. */}
       {mobsState.status === 'ready' && (
         <div
           style={{
@@ -296,7 +307,11 @@ function App() {
             borderBottom: '1px solid rgba(255,255,255,0.08)',
           }}
         >
-          <ProjectControls bufferCache={bufferCache} geometryCache={geometryCache} onProjectLoaded={handleProjectLoaded} />
+          <Menu label="Proyecto" items={[]}>
+            <div style={{ padding: 8, minWidth: 260 }}>
+              <ProjectControls bufferCache={bufferCache} geometryCache={geometryCache} onProjectLoaded={handleProjectLoaded} />
+            </div>
+          </Menu>
         </div>
       )}
 

@@ -14,7 +14,21 @@ export interface MenuItem {
 export interface MenuProps {
   /** Texto del botón que abre el menú (ticket 032: siempre texto, nunca solo ícono). */
   label: ReactNode;
-  items: MenuItem[];
+  /** Acciones planas tipo "menuitem" (patrón ARIA "menu" -- navegables con flechas/Home/End). Opcional: un menú puede llevar solo `children`. */
+  items?: MenuItem[];
+  /**
+   * Contenido libre (ticket 031) para acciones que ya traen su propia UI
+   * rica -- campos de archivo, listas, confirmaciones inline -- y que
+   * por eso NO encajan en el patrón ARIA "menu" (pensado solo para
+   * items de accion planos, no para campos de formulario ni listas). Se
+   * renderiza en un contenedor aparte dentro del mismo desplegable,
+   * después de `items` si los hay. A diferencia de un item (que cierra
+   * el menú al elegirse), el contenido de `children` NO cierra el menú
+   * por sí solo -- sigue abierto mientras se interactúa con un campo de
+   * archivo o una confirmación, y se cierra igual que siempre con
+   * Escape o click afuera.
+   */
+  children?: ReactNode;
 }
 
 /**
@@ -26,10 +40,11 @@ export interface MenuProps {
  * mismo criterio de "sin dependencias nuevas si no hace falta" del
  * resto del proyecto.
  */
-export function Menu({ label, items }: MenuProps) {
+export function Menu({ label, items = [], children }: MenuProps) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const rootRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   // `close`/`toggleOpen` resetean `activeIndex` en el mismo evento que
@@ -41,10 +56,35 @@ export function Menu({ label, items }: MenuProps) {
     setActiveIndex(-1);
   }
 
+  // Ticket 031: el panel se mide y se "voltea" a anclaje derecho de
+  // forma imperativa (manipulando `panelRef.current.style` directo, sin
+  // pasar por estado de React) justo antes de abrirse -- un boton
+  // disparador cerca del borde IZQUIERDO de la ventana (ej. "Proyecto")
+  // necesita anclar el panel a la izquierda (default), pero uno cerca
+  // del borde DERECHO (ej. "Archivo", dentro de una columna angosta del
+  // grid del panel) lo saca de la pantalla si se ancla igual -- se
+  // decide en runtime, no con un valor fijo, porque la posicion real
+  // depende de donde termine cada boton en el layout (grid `auto-fit`,
+  // ancho real de ventana), no de cual menu es. El panel SIEMPRE esta
+  // montado (oculto con opacidad, no `display: none`), asi que ya tiene
+  // geometria real para medir en cualquier momento -- no hace falta un
+  // efecto aparte que reaccione a `open`.
   function toggleOpen() {
     setOpen((wasOpen) => {
       const willOpen = !wasOpen;
-      if (!willOpen) setActiveIndex(-1);
+      if (willOpen) {
+        const panel = panelRef.current;
+        if (panel) {
+          panel.style.left = '0';
+          panel.style.right = 'auto';
+          if (panel.getBoundingClientRect().right > window.innerWidth) {
+            panel.style.left = 'auto';
+            panel.style.right = '0';
+          }
+        }
+      } else {
+        setActiveIndex(-1);
+      }
       return willOpen;
     });
   }
@@ -87,26 +127,33 @@ export function Menu({ label, items }: MenuProps) {
       <Button aria-haspopup="menu" aria-expanded={open} onClick={toggleOpen}>
         {label}
       </Button>
-      <div className={`ui-menu__list${open ? ' ui-menu__list--open' : ''}`} role="menu" aria-hidden={!open}>
-        {items.map((item, index) => (
-          <button
-            key={item.key}
-            type="button"
-            role="menuitem"
-            className="ui-menu__item"
-            disabled={item.disabled}
-            tabIndex={open ? 0 : -1}
-            ref={(el) => {
-              itemRefs.current[index] = el;
-            }}
-            onClick={() => {
-              item.onSelect();
-              close();
-            }}
-          >
-            {item.label}
-          </button>
-        ))}
+      <div className={`ui-menu__panel${open ? ' ui-menu__panel--open' : ''}`} aria-hidden={!open} ref={panelRef}>
+        {items.length > 0 && (
+          <div className="ui-menu__list" role="menu">
+            {items.map((item, index) => (
+              <button
+                key={item.key}
+                type="button"
+                role="menuitem"
+                className="ui-menu__item"
+                disabled={item.disabled}
+                tabIndex={open ? 0 : -1}
+                ref={(el) => {
+                  itemRefs.current[index] = el;
+                }}
+                onClick={() => {
+                  item.onSelect();
+                  close();
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        )}
+        {/* Contenido libre (ticket 031) -- NO usa role="menuitem": ver
+            doc de `MenuProps.children` arriba. */}
+        {children && <div className="ui-menu__content">{children}</div>}
       </div>
     </div>
   );

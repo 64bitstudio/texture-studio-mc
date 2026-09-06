@@ -176,3 +176,9 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`components/EraseControls.tsx`** (nuevo) — botón "Borrar"/"Borrar (activo)" (`Button`, `aria-pressed`) + `Select` de tamaño de pincel (solo visible con el modo activo).
 - **`components/TextureEditor.tsx`** — gana un prop opcional `forcedRgba?: RGBA` que, si está presente, reemplaza el color de paleta en los 3 puntos de pintado internos (el componente no sabe que existe un "modo borrado").
 - **`components/Editor.tsx`** — gana `paintMode: 'paint' | 'erase'` y `eraseBrushSize` (estado independiente de `color`); `setPixel`/`paintLine` expanden a footprint de pincel en modo `erase` antes de pasar por `applyPixelsWithSymmetry` (sin lógica paralela: misma función que ya respeta simetría y aislar-parte). Nueva `Section title="Borrar"` en el grid del panel, justo después de "Color".
+
+### Ticket 031 -- Menú unificado de Archivo (primer consumidor real de `Menu`)
+
+- **`ui/Menu.tsx`** — gana `children?: ReactNode` (contenido libre, para acciones con UI rica que no encajan como `items` planos de ARIA "menu") e `items` pasa a ser opcional. Anclaje del panel (`left`/`right`) ahora se decide en runtime (`toggleOpen`, mide `getBoundingClientRect()` antes de abrir) en vez de fijo por CSS -- ver `docs/ARQUITECTURA.md`, "Ticket 031", para el bug real que esto corrige.
+- **`components/Editor.tsx`** — las secciones "Importar / pegar imagen" y "Exportar" se reemplazan por una única `Section title="Archivo"` con un `Menu` cuyo `children` renderiza `ImportTextureControl`/`PasteImageControls`/`ExportControls` tal cual (sin cambios de lógica).
+- **`App.tsx`** — la fila donde vivía `ProjectControls` siempre expandida ahora envuelve ese mismo componente (sin cambios de lógica) en un `Menu` label="Proyecto".

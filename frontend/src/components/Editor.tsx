@@ -13,7 +13,7 @@ import { ExportControls } from './ExportControls';
 import { ResolutionControls } from './ResolutionControls';
 import { PartIsolationControls } from './PartIsolationControls';
 import { EraseControls } from './EraseControls';
-import { Section } from '../ui';
+import { Menu, Section } from '../ui';
 import { computeBrushFootprint, computeBrushFootprintForLine } from '../brush';
 import { decodeImageFileToImageData, decodePngDataUrlToImageData } from '../decodeTexture';
 import { useCanvasTexture } from '../hooks/useCanvasTexture';
@@ -860,24 +860,40 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
             <PartIsolationControls regions={namedRegions} activeRegionId={isolatedRegionId} onSelect={handleSelectIsolatedPart} />
           </Section>
 
-          <Section title="Importar / pegar imagen">
-            <ImportTextureControl
-              expectedWidth={buffer.width}
-              expectedHeight={buffer.height}
-              error={importError}
-              onFileSelected={(file) => void handleImportFile(file)}
-            />
-            <PasteImageControls
-              hasPending={!!pendingPaste}
-              error={pasteError}
-              onFileSelected={(file) => void startPendingPaste(file)}
-              onConfirm={handleConfirmPaste}
-              onCancel={handleCancelPaste}
-            />
-          </Section>
-
-          <Section title="Exportar">
-            <ExportControls buffer={buffer} uvBoxes={uvBoxes} />
+          <Section title="Archivo">
+            {/* Ticket 031 (HU-6): "Importar / pegar imagen" y "Exportar"
+                dejan de ser secciones fijas del panel -- se agrupan bajo
+                un unico menu "Archivo" (`Menu` de `ui/`, ticket 025,
+                primer consumidor real). Los 3 componentes de abajo NO
+                cambian de logica (mismos props, mismos handlers,
+                mismo estado interno de error/pendiente) -- solo cambia
+                DONDE se montan: dentro del desplegable en vez de en
+                `Section` propias. Van como `children` del `Menu` (no
+                como `items`) porque cada uno ya tiene su propia UI rica
+                (campo de archivo, mensajes de error, confirmar/cancelar
+                de "pegar") que no encaja en el patron ARIA "menu" de
+                items planos -- ver docs/ARQUITECTURA.md, "Ticket 031". */}
+            <Menu
+              label="Archivo"
+              items={[]}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 8, minWidth: 220 }}>
+                <ImportTextureControl
+                  expectedWidth={buffer.width}
+                  expectedHeight={buffer.height}
+                  error={importError}
+                  onFileSelected={(file) => void handleImportFile(file)}
+                />
+                <PasteImageControls
+                  hasPending={!!pendingPaste}
+                  error={pasteError}
+                  onFileSelected={(file) => void startPendingPaste(file)}
+                  onConfirm={handleConfirmPaste}
+                  onCancel={handleCancelPaste}
+                />
+                <ExportControls buffer={buffer} uvBoxes={uvBoxes} />
+              </div>
+            </Menu>
           </Section>
 
           {/* Ocupa TODAS las columnas del grid (`gridColumn: '1 / -1'`) --

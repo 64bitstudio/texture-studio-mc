@@ -193,10 +193,23 @@ body {
   display: inline-block;
 }
 
-.ui-menu__list {
+/* Contenedor del desplegable en si (ticket 025) -- controla
+   posicion/apertura. Ticket 031: renombrado de `.ui-menu__list` a
+   `.ui-menu__panel` al separar "lista de items ARIA" (abajo) de
+   "contenido libre" (`.ui-menu__content`), que ahora pueden coexistir
+   dentro del mismo panel. */
+.ui-menu__panel {
   position: absolute;
   top: calc(100% + var(--space-1));
-  right: 0;
+  /* Ticket 031: alineado a la izquierda del boton (no a la derecha) --
+     con `right: 0`, un boton disparador cerca del borde izquierdo de la
+     ventana (ej. el menu "Proyecto" de `App.tsx`) empujaba TODO el
+     panel fuera de la pantalla hacia la izquierda, dejandolo ilegible
+     (confirmado en vivo). `left: 0` es el default mas seguro dado que
+     los disparadores de este proyecto viven casi siempre cerca del
+     borde izquierdo de su contenedor, nunca del derecho. */
+  left: 0;
+  max-width: min(320px, calc(100vw - 32px));
   min-width: 200px;
   background: var(--surface-raised);
   border: 1px solid var(--border-strong);
@@ -213,10 +226,21 @@ body {
   transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
 
-.ui-menu__list--open {
+.ui-menu__panel--open {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
+}
+
+.ui-menu__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ui-menu__content {
+  display: flex;
+  flex-direction: column;
 }
 
 .ui-menu__item {
