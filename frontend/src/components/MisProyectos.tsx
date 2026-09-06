@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, type ChangeEvent } from 'react';
 import type { MobSummary } from '../types/mobs';
 import type { TextureBuffer } from '../textureBuffer';
 import { listProjects, loadProject } from '../projectStorage';
@@ -6,13 +6,12 @@ import { restoreProjectBuffers } from '../projectSnapshot';
 import { collectMobIdsInProjects, filterAndSortProjects, type ProjectSortBy } from '../projectFilter';
 import { Button, InlineError, Section } from '../ui';
 
-export interface HomeScreenProps {
+export interface MisProyectosProps {
   mobs: MobSummary[];
-  onSelectMob: (mobId: string) => void;
-  /** Cache compartida de buffers por mob (ticket 018) -- mismo `Map` que usa `ProjectControls`, se puebla aca al cargar un proyecto desde el inicio. */
+  /** Cache compartida de buffers por mob (ticket 018) -- mismo `Map` que usa `ProjectControls`, se puebla aca al abrir un proyecto. */
   bufferCache: Map<string, TextureBuffer>;
-  /** Se llama tras cargar un proyecto con éxito, con los ids de mob que quedaron restaurados en `bufferCache`. */
-  onProjectOpened: (loadedMobIds: string[]) => void;
+  /** Se llama tras abrir un proyecto con éxito, con su nombre y los ids de mob que quedaron restaurados en `bufferCache`. */
+  onProjectSelected: (projectName: string, loadedMobIds: string[]) => void;
 }
 
 /** Nombre legible de un mob a partir de su id -- usa el catalogo YA resuelto (`mobs`), sin volver a pedirlo. Cae al propio id si el mob ya no esta en el catalogo (ej. proyecto viejo de un mob renombrado). */
@@ -24,22 +23,26 @@ const inlineFieldStyle = { display: 'flex', alignItems: 'center', gap: 6, fontSi
 const inputStyle = { fontSize: 12, padding: '4px 6px' } as const;
 
 /**
- * Pantalla de inicio (ticket 027, HU-1) -- reemplaza la carga directa al
- * editor. Dos secciones: "Selección de mob" (catálogo ya resuelto por
- * `App.tsx`, un botón por mob) y "Guardados" (ticket 028, HU-2: búsqueda
- * por nombre + filtro por mob + orden, sobre `filterAndSortProjects`,
- * puro y testeado -- este componente solo conecta esa lógica con los
- * inputs). Cada control de filtro va envuelto en un `<label>` con texto
- * visible, con `aria-label`/`placeholder` explícitos -- mismo patrón
- * accesible que el resto del proyecto.
+ * Vista "Mis proyectos" (ticket 039, HU-5) -- reubica la sección
+ * "Guardados" que antes vivía en `HomeScreen.tsx` (tickets 027/028) a
+ * su propio destino de navegación, SIN cambios de lógica: misma
+ * búsqueda por nombre + filtro por mob + orden sobre
+ * `filterAndSortProjects`/`collectMobIdsInProjects` (puras, ticket 028,
+ * sin tocar). Único cambio real de comportamiento: elegir un proyecto
+ * navega a su vista de detalle (`'proyecto'`, ticket 041) en vez de ir
+ * directo al editor del primer mob -- los buffers se siguen
+ * restaurando aquí mismo (misma lógica de `loadProject`/
+ * `restoreProjectBuffers`, ticket 019), solo cambia a dónde navega
+ * `App.tsx` después.
  *
- * La carga de un proyecto guardado reusa `loadProject`/
- * `restoreProjectBuffers` (ticket 019) -- MISMA lógica que
- * `ProjectControls.handleLoad`, pero aquí el resultado hace transicionar
- * a la vista de editor (`onProjectOpened`, manejado por `App.tsx`) en
- * vez de quedarse en el mismo lugar.
+ * `HomeScreen.tsx` (su origen) se eliminó en este mismo ticket -- una
+ * vez que "Nuevo proyecto" (038) y "Mis proyectos" (039) tienen su
+ * propio contenido real, ningún camino de la app vuelve a montarlo
+ * (confirmado con grep antes de borrarlo) -- se retira ahora en vez de
+ * dejarlo como código muerto hasta el ticket 045, mismo criterio ya
+ * aplicado en el ticket 029 (`PanelResizeHandle.tsx`).
  */
-export function HomeScreen({ mobs, onSelectMob, bufferCache, onProjectOpened }: HomeScreenProps) {
+export function MisProyectos({ mobs, bufferCache, onProjectSelected }: MisProyectosProps) {
   const [pendingProject, setPendingProject] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
@@ -54,15 +57,15 @@ export function HomeScreen({ mobs, onSelectMob, bufferCache, onProjectOpened }: 
     sortBy,
   });
 
-  function handleSearchTextChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleSearchTextChange(e: ChangeEvent<HTMLInputElement>) {
     setSearchText(e.target.value);
   }
 
-  function handleMobFilterChange(e: React.ChangeEvent<HTMLSelectElement>) {
+  function handleMobFilterChange(e: ChangeEvent<HTMLSelectElement>) {
     setMobFilter(e.target.value);
   }
 
-  function handleSortByChange(e: React.ChangeEvent<HTMLSelectElement>) {
+  function handleSortByChange(e: ChangeEvent<HTMLSelectElement>) {
     setSortBy(e.target.value as ProjectSortBy);
   }
 
@@ -80,36 +83,20 @@ export function HomeScreen({ mobs, onSelectMob, bufferCache, onProjectOpened }: 
         for (const [mobId, buffer] of restored.entries()) {
           bufferCache.set(mobId, buffer);
         }
-        onProjectOpened(Array.from(restored.keys()));
+        onProjectSelected(projectName, Array.from(restored.keys()));
       } catch (err) {
         setError(err instanceof Error ? err.message : `No se pudo cargar el proyecto "${projectName}".`);
       } finally {
         setPendingProject(null);
       }
     },
-    [bufferCache, onProjectOpened],
+    [bufferCache, onProjectSelected],
   );
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-        gap: 16,
-        padding: 24,
-        maxWidth: 900,
-        margin: '0 auto',
-      }}
-    >
-      <Section title="Selección de mob">
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-          {mobs.map((mob) => (
-            <Button key={mob.id} onClick={() => onSelectMob(mob.id)}>
-              {mob.label}
-            </Button>
-          ))}
-        </div>
-      </Section>
+    <div style={{ padding: 24, maxWidth: 900 }}>
+      <h2 style={{ margin: '0 0 4px' }}>Mis proyectos</h2>
+      <p style={{ margin: '0 0 16px', color: 'var(--text-dim)', fontSize: 13 }}>Busca, filtra y abre cualquiera de tus proyectos guardados.</p>
 
       <Section title="Guardados">
         {allProjects.length === 0 ? (

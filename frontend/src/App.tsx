@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Editor } from './components/Editor';
 import { MobSelector } from './components/MobSelector';
 import { ProjectControls } from './components/ProjectControls';
-import { HomeScreen } from './components/HomeScreen';
+import { MisProyectos } from './components/MisProyectos';
 import { AppShell } from './components/AppShell';
 import type { NavView } from './components/Sidebar';
 import { ThemeToggle } from './components/ThemeToggle';
@@ -202,13 +202,11 @@ function App() {
   }
 
   // Ticket 027: unico punto de entrada para "activar este mob y mostrar
-  // el editor" -- lo usan tanto `MobSelector` del header (mob ya en
-  // vista de editor) como `HomeScreen` (primera eleccion desde el
-  // inicio). `setView('editor')` es incondicional (barato si ya estaba
+  // el editor" -- lo usa `MobSelector` del header (mob ya en vista de
+  // editor). `setView('editor')` es incondicional (barato si ya estaba
   // en 'editor') porque, a diferencia del cambio de mob en si, SIEMPRE
   // debe pasar -- incluso si `mobId` ya era el `selectedMobId` por
-  // default (ej. el usuario vuelve al inicio y hace click en el MISMO
-  // mob que ya tenia activo).
+  // default.
   function handleSelectMob(mobId: string) {
     if (mobId !== selectedMobId) {
       setAssetState({ status: 'loading' });
@@ -217,33 +215,19 @@ function App() {
     setView('editor');
   }
 
-  // Ticket 027: `HomeScreen` ya dejo los buffers restaurados en
-  // `bufferCache` (mismo mecanismo que `handleProjectLoaded` de abajo,
-  // ver `HomeScreen.tsx`) -- este callback solo decide a que mob
-  // navegar (el primero del proyecto cargado) y cambia la vista a
-  // 'editor'. NO necesita bump de `loadGeneration`: `Editor` esta
-  // desmontado mientras `view` no es `'editor'` (ver el render de
-  // abajo), asi que el proximo montaje ya lee `bufferCache` desde cero
-  // via su inicializador perezoso -- sin una instancia vieja que
-  // forzar a remontar.
-  // Ticket 038: `NuevoProyecto.tsx` ya llamo a `saveProject` con exito
-  // ANTES de este callback (mismo orden que `handleProjectOpenedFromHome`
-  // de abajo: guardar/restaurar primero, navegar despues) -- esto solo
-  // registra cual proyecto quedo activo y navega a su vista de detalle
-  // (`'proyecto'`, ticket 041 construye el contenido real sobre
-  // `activeProject`).
-  function handleProjectCreated(projectName: string, mobId: string) {
-    setActiveProject({ name: projectName, mobIds: [mobId] });
+  // Ticket 038/039: fuente unica para "un proyecto quedo activo,
+  // navegar a su vista de detalle" -- la usan tanto `NuevoProyecto.tsx`
+  // (crear, `mobIds` siempre de un solo elemento) como `MisProyectos.tsx`
+  // (abrir uno existente, `mobIds` los que efectivamente se restauraron
+  // en `bufferCache`). El ticket 041 construye el contenido real de
+  // `'proyecto'` sobre este mismo estado, sin cambiar su forma.
+  function handleProjectActivated(projectName: string, mobIds: string[]) {
+    setActiveProject({ name: projectName, mobIds });
     setView('proyecto');
   }
 
-  function handleProjectOpenedFromHome(loadedMobIds: string[]) {
-    const targetMobId = loadedMobIds[0] ?? selectedMobId;
-    if (targetMobId && targetMobId !== selectedMobId) {
-      setAssetState({ status: 'loading' });
-      setSelectedMobIdOverride(targetMobId);
-    }
-    setView('editor');
+  function handleProjectCreated(projectName: string, mobId: string) {
+    handleProjectActivated(projectName, [mobId]);
   }
 
   // Ticket 019 (HU-4, "el mob actualmente activo se actualiza de
@@ -311,11 +295,10 @@ function App() {
           </>
         )}
 
-        {/* Ticket 037, decisión real (documentada -- ver
-            docs/ARQUITECTURA.md, "Ticket 037"): "Mis proyectos" sigue
-            mostrando TEMPORALMENTE el mismo `HomeScreen` ya existente
-            (selección de mob + Guardados, tickets 027/028) hasta que el
-            ticket 039 construya su contenido real y diferenciado. */}
+        {/* Ticket 039: "Mis proyectos" ya tiene contenido real (antes
+            mostraba temporalmente el mismo `HomeScreen`, ver
+            `docs/ARQUITECTURA.md`, "Ticket 037"/"Ticket 039" -- ese
+            componente se eliminó en este ticket, ya sin consumidores). */}
         {view === 'mis-proyectos' && (
           <>
             {mobsState.status === 'loading' && <LoadingOverlay message="Cargando catálogo de mobs…" />}
@@ -328,12 +311,7 @@ function App() {
             )}
 
             {mobsState.status === 'ready' && (
-              <HomeScreen
-                mobs={mobsState.mobs}
-                onSelectMob={handleSelectMob}
-                bufferCache={bufferCache}
-                onProjectOpened={handleProjectOpenedFromHome}
-              />
+              <MisProyectos mobs={mobsState.mobs} bufferCache={bufferCache} onProjectSelected={handleProjectActivated} />
             )}
           </>
         )}
@@ -441,7 +419,7 @@ function App() {
 
       {/* `mobsState.status === 'loading'/'error'` no se manejan aca --
           ya no son alcanzables en la vista de editor (ticket 027): solo
-          se llega a `view === 'editor'` desde `HomeScreen`/`MobSelector`,
+          se llega a `view === 'editor'` desde `NuevoProyecto`/`MisProyectos`/`MobSelector`,
           y ambos solo renderizan con `mobsState.status === 'ready'`. Esos
           dos estados se manejan en 'nuevo-proyecto'/'mis-proyectos' de arriba. */}
       {/* `position: relative` (ticket 033, HU-8): ancla `LoadingOverlay`
