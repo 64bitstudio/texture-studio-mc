@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach, afterEach } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../src/app.js';
 
-describe('GET /api/base-assets/skeleton', () => {
+describe('GET /api/base-assets/:mobId', () => {
   const ORIGINAL_ENV = process.env.VANILLA_ASSETS_DIR;
 
   beforeEach(() => {
@@ -83,5 +83,14 @@ describe('GET /api/base-assets/skeleton', () => {
     const app = createApp();
     const res = await request(app).get('/api/base-assets/skeleton');
     expect(res.status).not.toBe(500);
+  });
+
+  it('responde 404 con mensaje claro para un mob que no existe en el registro (ticket 016)', async () => {
+    const app = createApp();
+    const res = await request(app).get('/api/base-assets/mob-inexistente');
+
+    expect(res.status).toBe(404);
+    expect(typeof res.body.error).toBe('string');
+    expect(res.body.error.length).toBeGreaterThan(0);
   });
 });
