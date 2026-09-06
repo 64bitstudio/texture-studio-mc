@@ -12,12 +12,14 @@ import { PasteImageOverlay } from './PasteImageOverlay';
 import { ExportControls } from './ExportControls';
 import { ResolutionControls } from './ResolutionControls';
 import { PanelResizeHandle } from './PanelResizeHandle';
+import { PartIsolationControls } from './PartIsolationControls';
 import { decodeImageFileToImageData, decodePngDataUrlToImageData } from '../decodeTexture';
 import { useCanvasTexture } from '../hooks/useCanvasTexture';
 import { bresenhamLine, TextureBuffer, type PixelPoint, type PixelSource, type RGBA } from '../textureBuffer';
 import { PaintHistory, type Stroke } from '../history';
 import { computeUVBoxRects, mirrorPointHorizontal } from '../symmetry';
 import { computeNamedRegions, findRegionAt, type NamedUVRegion } from '../regionLabels';
+import { isPixelInActiveRegion } from '../partIsolation';
 import { ZOOM_DEFAULT } from '../zoom';
 import { RESOLUTION_DEFAULT, clampResolutionMultiplier, resamplePixelSource } from '../resolution';
 import { canvasOverflowsAvailableWidth, computeCanvasDisplaySize } from '../canvasSize';
@@ -116,6 +118,41 @@ export function Editor({ data }: EditorProps) {
     },
     [namedRegions],
   );
+
+  // Aislar una parte para pintar (ticket 012). Solo se guarda el `id`
+  // (estable entre cambios de resolucion/escala, ver `regionLabels.ts`)
+  // -- el rectangulo real (`isolatedRegion` de abajo) se re-deriva de
+  // `namedRegions`, que ya se recalcula solo con la escala vigente, asi
+  // que un cambio de resolucion NO desalinea la parte aislada (a
+  // diferencia de `hoveredRegion`, que si se limpia explicitamente mas
+  // abajo porque depende de la POSICION del cursor, no de un id
+  // estable).
+  //
+  // Estado deliberadamente expuesto tal cual (no envuelto en un hook
+  // propio) para que el ticket 013 (pegado de imagen con ajuste
+  // automatico a la parte aislada, que depende de este ticket) pueda
+  // leer `isolatedRegion` (en particular su `.rect`) directamente sin
+  // tener que rehacer este trabajo -- ver docs/ARQUITECTURA.md, "Ticket
+  // 012".
+  const [isolatedRegionId, setIsolatedRegionId] = useState<string | null>(null);
+  const isolatedRegion = useMemo(
+    () => (isolatedRegionId ? (namedRegions.find((r) => r.id === isolatedRegionId) ?? null) : null),
+    [namedRegions, isolatedRegionId],
+  );
+
+  // Mensaje de bloqueo de pintado fuera de la parte aislada (ticket
+  // 012, criterio "nunca fallo silencioso"). Se activa cuando el punto
+  // PRIMARIO (el pixel que el usuario intento pintar de verdad, no una
+  // contraparte de simetria) cae fuera de `isolatedRegion` -- ver
+  // `applyPixelsWithSymmetry` mas abajo. Se limpia apenas el usuario
+  // pinta con exito dentro de la region, o al desactivar/cambiar el
+  // aislamiento.
+  const [paintBlockedByIsolation, setPaintBlockedByIsolation] = useState(false);
+
+  const handleSelectIsolatedPart = useCallback((regionId: string | null) => {
+    setIsolatedRegionId(regionId);
+    setPaintBlockedByIsolation(false);
+  }, []);
 
   // Zoom y cuadricula del editor de textura (ticket 004, HU-7). Estado
   // subido aca (no local a `TextureEditor`) porque los controles
@@ -296,6 +333,10 @@ export function Editor({ data }: EditorProps) {
       // nombre de region potencialmente desalineado hasta el proximo
       // `pointermove` (ticket 011).
       setHoveredRegion(null);
+      // `isolatedRegionId` NO se limpia (ver comentario en su
+      // declaracion) -- solo el mensaje de bloqueo, que si depende de
+      // intentos de pintado a la escala ANTERIOR.
+      setPaintBlockedByIsolation(false);
 
       setBuffer(newBuffer);
       setResolutionState(clamped);
@@ -356,7 +397,28 @@ export function Editor({ data }: EditorProps) {
         }
       }
 
-      const points = Array.from(uniquePoints.values());
+      // Aislar una parte para pintar (ticket 012): con `isolatedRegion`
+      // activo, SOLO los puntos que caen dentro de esa region se
+      // escriben -- tanto el/los punto(s) primario(s) (click/brocha)
+      // como cualquier contraparte de simetria que haya caido fuera se
+      // descartan aca, ANTES de leer/escribir nada, para que ni
+      // `history` ni `version` se enteren de un intento bloqueado (no es
+      // una nueva unidad de historial, es un filtro de que puntos
+      // llegan a escribirse siquiera -- ver alcance del ticket).
+      //
+      // El aviso de "bloqueado" (`paintBlockedByIsolation`) se basa
+      // SOLO en los puntos PRIMARIOS (el pixel que el usuario realmente
+      // intento pintar), no en las contrapartes de simetria descartadas
+      // -- una contraparte de simetria fuera de la parte aislada se
+      // descarta en silencio, mismo criterio ya establecido por
+      // `mirrorPointHorizontal` al no encontrar contraparte valida (ver
+      // `partIsolation.ts`).
+      if (isolatedRegion) {
+        const anyPrimaryBlocked = primaryInBounds.some((p) => !isPixelInActiveRegion(p, isolatedRegion));
+        setPaintBlockedByIsolation(anyPrimaryBlocked);
+      }
+
+      const points = Array.from(uniquePoints.values()).filter((p) => isPixelInActiveRegion(p, isolatedRegion));
       if (points.length === 0) return;
 
       const befores = points.map((p) => buffer.getPixel(p.x, p.y));
@@ -369,7 +431,7 @@ export function Editor({ data }: EditorProps) {
       });
       if (changed) setVersion((v) => v + 1);
     },
-    [buffer, history, symmetryEnabled, uvBoxes],
+    [buffer, history, symmetryEnabled, uvBoxes, isolatedRegion],
   );
 
   const setPixel = useCallback(
@@ -678,6 +740,16 @@ export function Editor({ data }: EditorProps) {
         </section>
 
         <section>
+          <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>Aislar parte</h2>
+          {/* Selector de partes (ticket 012) -- reusa `namedRegions`
+              (catalogo del ticket 011) tal cual, sin redefinirlo. Ver
+              `PartIsolationControls.tsx`/`partIsolation.ts` para la
+              decision de granularidad (una region = una cara, no la caja
+              completa) y docs/ARQUITECTURA.md, "Ticket 012". */}
+          <PartIsolationControls regions={namedRegions} activeRegionId={isolatedRegionId} onSelect={handleSelectIsolatedPart} />
+        </section>
+
+        <section>
           <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>
             Textura ({buffer.width}×{buffer.height})
           </h2>
@@ -698,6 +770,29 @@ export function Editor({ data }: EditorProps) {
           >
             Región: <strong style={{ color: 'var(--text)' }}>{hoveredRegion?.label ?? '—'}</strong>
           </p>
+          {/* Aviso de bloqueo de pintado (ticket 012, criterio "nunca
+              fallo silencioso"): aparece cuando el ultimo intento de
+              pintado (click/brocha) toco al menos un pixel fuera de la
+              parte aislada activa -- ver `applyPixelsWithSymmetry`. Se
+              suma a la señal visual continua (atenuado + cursor
+              `not-allowed`, `TextureEditor.tsx`), no la reemplaza. */}
+          {isolatedRegion && paintBlockedByIsolation && (
+            <p
+              role="status"
+              aria-live="polite"
+              style={{
+                margin: '0 0 8px',
+                fontSize: 12,
+                color: 'var(--text)',
+                background: 'rgba(255, 214, 89, 0.15)',
+                border: '1px solid rgba(255, 214, 89, 0.5)',
+                borderRadius: 4,
+                padding: '4px 8px',
+              }}
+            >
+              Pintura bloqueada: ese pixel esta fuera de la parte aislada ({isolatedRegion.label}).
+            </p>
+          )}
           {/* Contenedor con scroll horizontal (ticket 010): si el canvas
               (textureWidth*zoom, ver `canvasSize.ts`) no cabe en el
               ancho disponible del panel, este `<div>` scrollea en X en
@@ -724,6 +819,7 @@ export function Editor({ data }: EditorProps) {
                 onStrokeEnd={onStrokeEnd}
                 namedRegions={namedRegions}
                 onHoverPixel={handleHoverPixel}
+                isolatedRegion={isolatedRegion}
               />
               {pendingPaste && (
                 <PasteImageOverlay
