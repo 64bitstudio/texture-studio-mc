@@ -23,3 +23,14 @@ Reportado por Marco: al pegar una imagen con resolución de trabajo en ×4 (256�
 ## Verificación esperada
 - En vivo (Claude in Chrome) contra la app en local, en AL MENOS 3 resoluciones (×2, ×4, ×10): pintar un pixel/trazo se refleja de inmediato en el modelo 3D, igual que ya sucede en ×1. Repetir la prueba de pegar imagen (ticket 013) en ×4 y confirmar que también se refleja.
 - Confirmar que el fix no rompe nada de lo ya construido en ×1 (regresión inversa) ni el cambio de resolución en sí (ticket 009, preservar contenido pintado al cambiar de resolución).
+
+## Hecho
+Corregido por el agente `fullstack-dev` (PR [#30](https://github.com/64bitstudio/texture-studio-mc/pull/30)). CI de Jenkins en verde, sin hallazgos del gate de QA automático.
+
+**Causa raíz real confirmada** (leyendo `node_modules/three/build/three.module.js`, no solo la hipótesis inicial): three.js solo reserva memoria de GPU (`gl.texStorage2D`, la que fija el tamaño) la primera vez que sube una `Texture`, o cuando cambia su "cache key" — que nunca incluye ancho/alto. Redimensionar el `<canvas>` offscreen y solo marcar `needsUpdate = true` (lo que hacía el hook desde el ticket 009) reutilizaba la asignación GPU vieja (del tamaño nativo) y escribía los pixeles nuevos sobre ella — de ahí el modelo congelado en cualquier resolución ≠ ×1.
+
+**Fix**: `useCanvasTexture.ts` ahora deriva la `THREE.CanvasTexture` con `useMemo` sobre `[canvas, buffer.width, buffer.height]` — mientras el tamaño no cambia, reutiliza la misma instancia (camino barato de siempre); cuando cambia, crea una `Texture` nueva (fuerza a three.js a reservar memoria GPU fresca), disponiendo la vieja automáticamente.
+
+**Verificado en vivo contra el deploy real de DEV** (el orquestador repitió la verificación tras el merge, reproduciendo exactamente el escenario original de Marco): en ×4, subir/confirmar una imagen ahora sí se refleja de inmediato en el modelo 3D (la cabeza del esqueleto se pintó completamente del color de la imagen pegada). El agente además verificó en ×2 y ×10 (pintado a mano), confirmó que ×1 sigue sin regresión, y que el contenido se preserva al cambiar de resolución.
+
+Sin test unitario nuevo — documentado explícitamente por qué (la lógica del fix está acoplada a `WebGLRenderer`, no es extraíble como función pura sin mockear WebGL sin señal real; consistente con la convención ya establecida del proyecto de validar canvas/three.js con revisión visual en vivo).
