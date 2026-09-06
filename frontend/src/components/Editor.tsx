@@ -32,7 +32,7 @@ import {
   type OverlayRect,
 } from '../importImage';
 import { maskPixelsOutsideUVBoxes } from '../uvBoxCleanup';
-import type { SkeletonBaseAssetsResponse } from '../types/baseAssets';
+import type { MobBaseAssetsResponse } from '../types/baseAssets';
 
 /** Imagen pegada/subida en espera de confirmar o descartar (ticket 005, HU-9) -- una a la vez (ver alcance del ticket). */
 interface PendingPasteImage {
@@ -45,7 +45,22 @@ interface PendingPasteImage {
 const DEFAULT_COLOR = '#e3dcc5';
 
 export interface EditorProps {
-  data: SkeletonBaseAssetsResponse;
+  data: MobBaseAssetsResponse;
+  /** Id del mob activo (ticket 018) -- clave del buffer en `bufferCache` y del `mobId` de la API. */
+  mobId: string;
+  /** Nombre legible del mob activo (ticket 018) -- solo para el `aria-label` de `Viewer3D`. */
+  mobLabel: string;
+  /**
+   * Cache de buffers en memoria, UNA instancia compartida y estable
+   * entre renders de `App.tsx` (ver `docs/ARQUITECTURA.md`, "Ticket
+   * 018") -- vive por fuera de este componente porque `Editor` se
+   * remonta completo (`key={mobId}` en `App.tsx`) cada vez que el
+   * usuario cambia de mob (la geometria/resolucion/historial/etc. de un
+   * mob no tienen por que aplicar al otro), pero el PIXEL BUFFER si debe
+   * sobrevivir ese remount -- es la unica pieza de estado que el ticket
+   * exige mantener "por mob visitado en la sesion".
+   */
+  bufferCache: Map<string, TextureBuffer>;
 }
 
 /**
@@ -63,8 +78,25 @@ export interface EditorProps {
  * `setPixel`/`loadFromImageData`, no hay logica de pintado acoplada al
  * manejo de eventos de mouse.
  */
-export function Editor({ data }: EditorProps) {
+export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
   const { texture: baseTexture, geometry } = data;
+
+  // Ticket 018 (buffer por mob visitado en la sesion): si ya existe un
+  // buffer cacheado para ESTE mob (de una visita anterior en la misma
+  // sesion), lo reusamos tal cual -- conserva exactamente los pixeles
+  // pintados y la resolucion de trabajo con la que se dejo, sin volver
+  // a decodificar la textura base de la red. Si es la primera visita,
+  // arranca en blanco (mismo comportamiento que antes de este ticket) y
+  // el efecto de carga inicial de mas abajo lo puebla con la textura
+  // base ya decodificada.
+  //
+  // `hadCachedBuffer` se lee UNA sola vez (lazy initial state, mismo
+  // patron ya usado por `loadStoredPanelWidth` en `panelWidth.ts`) --
+  // este componente se remonta completo por cada mob (`key={mobId}` en
+  // `App.tsx`), asi que "una vez" aca significa "una vez por visita a
+  // este mob", que es exactamente lo que se necesita saber para decidir
+  // si hay que decodificar la textura base o no.
+  const [hadCachedBuffer] = useState(() => bufferCache.has(mobId));
 
   // `buffer` es reemplazable (no un unico `useState` sin setter) desde
   // el ticket 009: cambiar la resolucion de trabajo (`handleResolutionChange`
@@ -74,7 +106,22 @@ export function Editor({ data }: EditorProps) {
   // original del ticket 002: las dimensiones de una instancia nunca
   // cambian a mitad de vida), asi que un cambio de tamaño real siempre
   // implica una instancia nueva, nunca mutar la existente.
-  const [buffer, setBuffer] = useState(() => new TextureBuffer(baseTexture.width, baseTexture.height));
+  const [buffer, setBuffer] = useState(
+    () => bufferCache.get(mobId) ?? new TextureBuffer(baseTexture.width, baseTexture.height),
+  );
+
+  // Registra (o actualiza) la instancia VIGENTE de `buffer` en la cache
+  // compartida -- corre en el montaje inicial (primera visita: registra
+  // el buffer recien creado; visita repetida: re-registra el mismo
+  // objeto que ya estaba, no-op observable) y de nuevo cada vez que
+  // `handleResolutionChange` reemplaza `buffer` por una instancia nueva
+  // (cambio de resolucion de trabajo) -- sin este segundo caso, volver a
+  // este mob despues de cambiar su resolucion perderia justo el cambio
+  // de tamaño (aunque no el contenido, gracias al re-muestreo) porque la
+  // cache seguiria apuntando a la instancia vieja.
+  useEffect(() => {
+    bufferCache.set(mobId, buffer);
+  }, [bufferCache, mobId, buffer]);
   const [resolution, setResolutionState] = useState(RESOLUTION_DEFAULT);
   const [version, setVersion] = useState(0);
   const [color, setColor] = useState(DEFAULT_COLOR);
@@ -255,10 +302,18 @@ export function Editor({ data }: EditorProps) {
   const [pasteError, setPasteError] = useState<string | null>(null);
 
   // Carga inicial: decodifica el PNG (real o placeholder) que ya vino
-  // en la respuesta de `GET /api/base-assets/skeleton` (ver App.tsx) y
-  // lo vuelca al buffer compartido. A partir de aca el buffer vive solo
-  // en memoria del navegador (sin persistencia server-side, decision
+  // en la respuesta de `GET /api/base-assets/:mobId` (ver App.tsx) y lo
+  // vuelca al buffer compartido. A partir de aca el buffer vive solo en
+  // memoria del navegador (sin persistencia server-side, decision
   // confirmada en la definicion).
+  //
+  // Ticket 018 -- se SALTA por completo si `hadCachedBuffer` es true: el
+  // usuario ya visito este mob antes en la sesion y su buffer (con lo
+  // que haya pintado) ya esta cargado desde el `useState` de arriba --
+  // sobreescribirlo con la textura base recien fetcheada perderia
+  // exactamente el trabajo que este ticket exige preservar. Sin este
+  // guard, volver a un mob ya visitado repintaria su buffer con la
+  // textura vanilla original en cada cambio de mob.
   //
   // Ticket 009 -- NO depende de `buffer` (a diferencia de antes de este
   // ticket): un cambio de resolucion reemplaza `buffer` por una
@@ -281,6 +336,7 @@ export function Editor({ data }: EditorProps) {
   // de ocurrir no hay nada razonable que cargar sobre un buffer de otro
   // tamaño).
   useEffect(() => {
+    if (hadCachedBuffer) return;
     let cancelled = false;
 
     decodePngDataUrlToImageData(baseTexture.dataUrl, baseTexture.width, baseTexture.height)
@@ -302,7 +358,7 @@ export function Editor({ data }: EditorProps) {
     return () => {
       cancelled = true;
     };
-  }, [baseTexture.dataUrl, baseTexture.width, baseTexture.height]);
+  }, [baseTexture.dataUrl, baseTexture.width, baseTexture.height, hadCachedBuffer]);
 
   // Cambio de resolucion de trabajo (ticket 009, x1-x10): re-muestrea el
   // contenido ACTUAL del buffer (nearest-neighbor, ver `resolution.ts`
@@ -688,7 +744,7 @@ export function Editor({ data }: EditorProps) {
   return (
     <div style={{ display: 'flex', width: '100%', height: '100%', minHeight: 0 }}>
       <div style={{ flex: 1, position: 'relative', minWidth: 0 }}>
-        <Viewer3D texture={texture} geometry={geometry} />
+        <Viewer3D texture={texture} geometry={geometry} mobLabel={mobLabel} />
         {initError && (
           <p
             role="alert"
