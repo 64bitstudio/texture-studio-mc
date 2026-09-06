@@ -598,5 +598,5 @@ Asset ya cacheado (`~/tools/minecraft-texture-pack/vanilla-cache/zombie.png`, co
 
 - `backend/test/baseAssets.spec.ts`: nuevos casos para `GET /api/base-assets/zombie` (dimensiones/posicion/UV/mirror de las 6 cajas, `texture.width/height=64/64`, `faceLabels` sin lateralidad en brazo/pierna).
 - `backend/test/mobs.spec.ts`: `GET /api/mobs` ahora exige tambien la entrada `{ id: 'zombie', label: 'Zombie' }`.
-- `npm run lint`, `npm test` (11 tests en verde), `npm run build` -- los tres en verde en `backend/`.
+- `npm run lint`, `npm test` (9 tests en verde), `npm run build` -- los tres en verde en `backend/`.
 - **Verificado en vivo (Claude in Chrome)**: cambio temporal de `frontend/src/api/baseAssets.ts` a pedir `/api/base-assets/zombie` (revertido antes del PR, cero diff en `frontend/` en el PR final) -- silueta del Zombie con brazos/piernas notablemente gruesos (proporcion tipo Steve, nada que ver con los huesos delgados del Esqueleto), textura real (no placeholder, ya con `vanilla-assets/zombie.png` copiado) aplicada correctamente en cabeza/torso/brazos/piernas, confirmado rotando el modelo (frente, semi-perfil y espalda) sin ninguna cara en blanco ni con el patron equivocado.
