@@ -557,3 +557,46 @@ El ticket permitía dejar temporalmente `/api/base-assets/skeleton` funcionando 
 - `backend/test`: 7 tests en verde (`health.spec.ts` sin cambios; `baseAssets.spec.ts` con el contrato del Esqueleto intacto + el caso 404 nuevo; `mobs.spec.ts` nuevo para `GET /api/mobs`).
 - `npm run lint`, `npm test`, `npm run build` -- los tres en verde en `backend/`.
 - Frontend intacto (no se tocó ningún archivo de `frontend/`) -- verificado en vivo (Claude in Chrome, `npm run dev` en frontend+backend) que la app sigue funcionando exactamente igual que antes del ticket: sin regresión visual ni de consola.
+
+## Ticket 017 -- Geometria e integracion del Zombie
+
+Sale de `docs/definiciones/multi-mob-y-proyectos-guardados.md` ("Diseño técnico", con VoBo de Marco), que ya adelantaba la geometria del Zombie como "investigada y verificada en esa misma sesion". Este ticket exigia explicitamente NO repetir esa investigacion de memoria sino volver a verificarla -- se hizo, y se encontraron dos correcciones reales respecto a lo que el documento de definicion daba por sentado (ver abajo).
+
+### Verificacion contra la fuente oficial (bedrock-samples) -- fetch real en esta sesion
+
+Se descargo (no de memoria) `Mojang/bedrock-samples/resource_pack/models/entity/zombie.geo.json` (rama `main`). Extracto relevante ya convertido de `origin` (esquina inferior de la caja) a `position` (centro, mismo criterio que `skeletonGeometry.ts`):
+
+| Caja | `size` | `position` (derivado) | `uv` | `mirror` |
+|---|---|---|---|---|
+| head | [8,8,8] | [0,28,0] | (0,0) | -- |
+| body | [8,12,4] | [0,18,0] | (16,16) | -- |
+| rightArm | [4,12,4] | [-6,18,0] | (40,16) | -- |
+| leftArm | [4,12,4] | [6,18,0] | (40,16) | true |
+| rightLeg | [4,12,4] | [-1.9,6,0] | (0,16) | -- |
+| leftLeg | [4,12,4] | [1.9,6,0] | (0,16) | true |
+
+**Correccion real #1 -- la posicion de brazos/piernas NO es la misma del Esqueleto**: el documento de definicion decia "la unica diferencia real es el grosor... `zombieGeometry.ts` es una copia casi directa de `skeletonGeometry.ts` con ese unico cambio" -- verificado que eso es INCOMPLETO. Al ser mas gruesos, brazos/piernas mantienen su cara interna pegada al mismo borde del torso que el Esqueleto (x=∓4), pero su CENTRO se recorre hacia afuera: brazo en `x=∓6` (no `∓5`, el valor ya corregido del Esqueleto para su caja de 2 de ancho), pierna en `x=∓1.9` (no `∓2` -- el .geo.json oficial usa un offset asimetrico de 0.1 entre `rightLeg`/`leftLeg`, tecnica conocida de Mojang para evitar z-fighting entre las dos piernas; se preservo el valor exacto de la fuente, mismo criterio de "verificar, no redondear a lo que se ve mas prolijo"). Cabeza y torso no cambian. El bone `hat` (overlay, `uv (32,0)`, `neverRender: true`) existe igual que en el Esqueleto y, como alla, no se modela como caja pintable propia (mismo tratamiento, no una omision nueva).
+
+### Verificacion empirica pixel a pixel contra el `zombie.png` real -- mismo metodo del ticket 009
+
+Asset ya cacheado (`~/tools/minecraft-texture-pack/vanilla-cache/zombie.png`, confirmado **64×64** con `file`). Mapa de alpha por fila/columna generado programaticamente (`pngjs`, mismo approach que el ticket 009 para el Esqueleto):
+
+- Filas 0-15, columnas 0-31: cross de cabeza (uv 0,0, 8×8×8) -- identico al Esqueleto.
+- Filas 16-19 (banda `d=4` de piernas/torso/brazos): el bloque opaco de piernas mide **8 columnas** (`2×w` con `w=4`), no 4 (`2×w` con `w=2` seria el caso Esqueleto) -- confirma `size.x=size.z=4`.
+- Filas 20-31 (banda `h=12`): opaco continuo de la columna 0 a la 55 sin huecos -- exactamente `16 (piernas) + 24 (torso) + 16 (brazos)` = 56, los anchos de cross esperados para brazos/piernas de grosor 4.
+- **Filas 32-63 (la mitad inferior extra que el Esqueleto ni siquiera tiene): 100% transparente en las 64 columnas, sin excepcion.**
+
+**Correccion real #2 -- que hay en la mitad inferior de la textura 64×64 (pregunta explicita del ticket)**: NADA -- no hay overlay de "sleeve"/"pants" del formato nuevo (esas capas son del formato de skins de JUGADOR, no de este mob) ni ninguna otra region UV activa; es espacio reservado/no usado en el PNG real. Consistente con que el propio `.geo.json` oficial declara `textureheight: 32` (la mitad de la altura real del archivo). Decision tomada: `ZOMBIE_GEOMETRY.textureHeight = 64` (el tamaño REAL del archivo servido por `loadMobTexture`, no el declarado en el .geo.json) -- mismo criterio ya usado para el Esqueleto (su `textureHeight: 32` coincide con su PNG real de 64×32): la API debe reportar las dimensiones reales del archivo que sirve, porque el frontend dimensiona su buffer de edicion con `texture.width/height` de la respuesta (`routes/baseAssets.ts` los toma de `mob.geometry.textureWidth/Height`, no decodifica el PNG). Si se hubiera dejado `textureHeight=32` (el valor del .geo.json), el editor habria recortado la mitad inferior del PNG real servido -- inconsistente con el archivo de 64×64 real, aunque esa mitad este vacia.
+
+### Cambios de codigo (confirman la prediccion del ticket 016: "agregar un mob es solo esto")
+
+- `backend/src/geometry/zombieGeometry.ts` (nuevo): mismo shape que `skeletonGeometry.ts`, con los valores ya verificados arriba. `faceLabels` reutiliza el mismo catalogo de nombres del Esqueleto (Cara/Nuca/Pecho/Brazo.../Pierna..., sin lateralidad en brazo/pierna) -- razonable sin ajustes porque la estructura de cajas (y el hecho de que `armRight`/`armLeft` y `legRight`/`legLeft` comparten exactamente la misma region UV) es identica a la del Esqueleto.
+- `backend/src/mobs/registry.ts`: `MobId` se amplia a `'skeleton' | 'zombie'`; se agrega la entrada `zombie` (`label: 'Zombie'`, `vanillaAssetFileName: 'zombie.png'`). Cero cambios a `routes/mobs.ts`, `routes/baseAssets.ts` o `services/mobTexture.ts` -- ya eran 100% genericos, confirmado.
+- `backend/vanilla-assets/zombie.png` (no versionado, gitignored): copiado desde `~/tools/minecraft-texture-pack/vanilla-cache/zombie.png` para desarrollo local -- mismo mecanismo ya usado para `skeleton.png` (ticket 007).
+
+### Verificacion
+
+- `backend/test/baseAssets.spec.ts`: nuevos casos para `GET /api/base-assets/zombie` (dimensiones/posicion/UV/mirror de las 6 cajas, `texture.width/height=64/64`, `faceLabels` sin lateralidad en brazo/pierna).
+- `backend/test/mobs.spec.ts`: `GET /api/mobs` ahora exige tambien la entrada `{ id: 'zombie', label: 'Zombie' }`.
+- `npm run lint`, `npm test` (11 tests en verde), `npm run build` -- los tres en verde en `backend/`.
+- **Verificado en vivo (Claude in Chrome)**: cambio temporal de `frontend/src/api/baseAssets.ts` a pedir `/api/base-assets/zombie` (revertido antes del PR, cero diff en `frontend/` en el PR final) -- silueta del Zombie con brazos/piernas notablemente gruesos (proporcion tipo Steve, nada que ver con los huesos delgados del Esqueleto), textura real (no placeholder, ya con `vanilla-assets/zombie.png` copiado) aplicada correctamente en cabeza/torso/brazos/piernas, confirmado rotando el modelo (frente, semi-perfil y espalda) sin ninguna cara en blanco ni con el patron equivocado.

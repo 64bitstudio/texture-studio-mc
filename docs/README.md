@@ -22,7 +22,7 @@ npm install
 npm run dev      # tsx watch, recarga en caliente -- escucha en :3000
 ```
 
-Endpoints disponibles de inmediato: `GET /health`, `GET /api/mobs` (catálogo de mobs soportados, ticket 016) y `GET /api/base-assets/:mobId` (ej. `/api/base-assets/skeleton` -- sirve un placeholder procedural mientras no exista `backend/vanilla-assets/skeleton.png` -- ver `docs/ARQUITECTURA.md`).
+Endpoints disponibles de inmediato: `GET /health`, `GET /api/mobs` (catálogo de mobs soportados -- `skeleton` y `zombie`, ver ticket 016/017) y `GET /api/base-assets/:mobId` (ej. `/api/base-assets/skeleton` o `/api/base-assets/zombie` -- sirve un placeholder procedural mientras no exista `backend/vanilla-assets/<mobId>.png` -- ver `docs/ARQUITECTURA.md`). El selector de mob en el frontend todavía no existe (ticket 018) -- la UI de hoy sigue mostrando solo el Esqueleto.
 
 ### Frontend
 
