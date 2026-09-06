@@ -158,3 +158,8 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`App.tsx`** — gana `view: 'home' | 'editor'` (sin router). `handleSelectMob` es el único punto de entrada para "activar mob + ver editor" (usado por `MobSelector` y `HomeScreen`); `handleProjectOpenedFromHome` (nuevo) navega a editor tras cargar un proyecto desde el inicio. Botón "← Volver al inicio" en el header de la vista de editor. Los bloques `mobsState.status === 'loading'/'error'` de la vista de editor se eliminaron por ser código inalcanzable tras el split de vistas.
 - **`components/HomeScreen.tsx`** (nuevo) — dos `Section`: "Selección de mob" (un `Button` por mob) y "Guardados" (lista clicable, reusa `loadProject`/`restoreProjectBuffers` del ticket 019 -- misma lógica que `ProjectControls.handleLoad`).
 - **`projectStorage.ts`** — `ProjectSummary` gana `mobIds: string[]` (`Object.keys(record.mobs)`, sin decodificar ningún PNG) -- usado por `HomeScreen` y, en el ticket 028, por el filtro por mob.
+
+### Ticket 028 -- Búsqueda/filtro/orden en "Guardados"
+
+- **`projectFilter.ts`** (nuevo, puro) — `filterAndSortProjects(projects, options)` (busca por nombre + filtra por mob + ordena, 100% client-side) y `collectMobIdsInProjects(projects)` (catálogo de mobs presentes en al menos un proyecto guardado, para poblar el `<select>` de filtro). Ver `projectFilter.spec.ts`.
+- **`components/HomeScreen.tsx`** — gana los controles "Buscar"/"Mob"/"Orden" sobre la lista de "Guardados"; el `<select>` de mob solo se muestra si hay más de un mob distinto entre los proyectos guardados.
