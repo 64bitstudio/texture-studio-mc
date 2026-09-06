@@ -279,6 +279,21 @@ function App() {
   const selectedMobLabel =
     (mobsState.status === 'ready' && mobsState.mobs.find((m) => m.id === selectedMobId)?.label) || null;
 
+  // Ticket 043 (HU-2): el selector de mob DENTRO del editor muestra
+  // solo los mobs del proyecto activo -- `MobSelector.tsx` sigue sin
+  // saber nada de "proyecto" (sigue siendo generico, ticket 018), es
+  // aca donde se filtra ANTES de pasarselo. `activeProject` deberia
+  // estar SIEMPRE poblado al llegar a `'editor'` en este punto del
+  // epic (toda navegacion a editor pasa por `Proyecto.tsx`, tickets
+  // 038-042) -- el fallback al catalogo completo es puramente
+  // defensivo, no un camino real alcanzable desde la UI.
+  const editorMobs =
+    mobsState.status === 'ready' && activeProject
+      ? mobsState.mobs.filter((mob) => activeProject.mobIds.includes(mob.id))
+      : mobsState.status === 'ready'
+        ? mobsState.mobs
+        : [];
+
   // Ticket 037: todas las vistas EXCEPTO 'editor' se envuelven en
   // `<AppShell>` (sidebar + header persistentes) -- el editor conserva
   // su layout dedicado propio, sin sidebar, para maximizar el espacio
@@ -413,7 +428,7 @@ function App() {
         </div>
 
         {mobsState.status === 'ready' && selectedMobId && (
-          <MobSelector mobs={mobsState.mobs} selectedMobId={selectedMobId} onSelect={handleSelectMob} />
+          <MobSelector mobs={editorMobs} selectedMobId={selectedMobId} onSelect={handleSelectMob} onAddMob={handleAddMobs} />
         )}
 
         {assetState.status === 'ready' && assetState.data.texture.isPlaceholder && (

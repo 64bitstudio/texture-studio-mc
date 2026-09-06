@@ -252,3 +252,8 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`components/AgregarMobs.tsx`** (nuevo) — mismo layout de `NuevoProyecto.tsx` (038) con selección MÚLTIPLE (`Set<string>`, toggle por tarjeta); excluye del grid los mobs que el proyecto ya tiene; agrega los seleccionados mezclando con el registro existente vía `saveProject(..., {overwrite: true})`.
 - **`components/PlaceholderScreen.tsx`** — **eliminado** (`git rm`) -- sin consumidores tras este ticket (040/041 ya habían reemplazado "Recientes"/"Proyecto").
 - **`App.tsx`** — "Agregar mobs" usa `AgregarMobs`; nuevos handlers `handleMobsAdded`/`handleCancelAddMobs`.
+
+### Ticket 043 -- Selector de mob del editor restringido al proyecto activo
+
+- **`components/MobSelector.tsx`** — gana prop opcional `onAddMob` (botón "+ Agregar mob" al final, solo si se pasa); sigue sin saber nada de "proyecto" (genérico).
+- **`App.tsx`** — nuevo `editorMobs` (filtra `mobsState.mobs` contra `activeProject.mobIds` antes de pasarlo a `MobSelector`); `onAddMob={handleAddMobs}` reusa el mismo handler del ticket 041.
