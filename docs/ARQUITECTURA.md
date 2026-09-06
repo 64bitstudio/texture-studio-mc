@@ -1627,3 +1627,33 @@ Confirmado con un proyecto real de 4 mobs, dark y light theme: buscador filtra p
 `npm run lint`, `npx tsc --noEmit`, `npm test` (216 -- 4 tests nuevos de `filterAndSortProjectMobs`), `npm run build` en verde.
 
 Con este ticket se completa el rediseño de "Proyecto" de 3 partes definido en `docs/definiciones/preview-2d-y-rediseno-proyecto.md` (tickets 055/056/057).
+
+## Ticket 058 -- Bug de preview 2D en alta resolución + fidelidad visual de tarjetas de mob
+
+Marco comparó su proyecto real ("Galgoth_v1", con una textura de Zombie en resolución x6) contra la imagen de referencia y señaló dos cosas: la miniatura del Zombie se veía con ruido de colores mezclados (bug real, no un tema de diseño), y la tarjeta de mob todavía difería del mockup en varios detalles. Ronda de preguntas resuelta con Marco (`AskUserQuestion`): el menú "⋮" por mob solo necesita "Eliminar mob del proyecto"; la pestaña "Configuración del proyecto" se mantiene omitida (decisión del ticket 056 sin cambios).
+
+### Bug real #1: ruido de color en preview 2D de alta resolución (`renderMobFrontSprite2D.ts`)
+
+Diagnosticado en vivo contra el proyecto real de Marco (confirmado con `img.naturalWidth/naturalHeight` vía consola -- el sprite de un Zombie x6 medía 18x34px reales, el tamaño "x1"). Causa raíz: la función armaba el canvas de salida en tamaño "x1" y usaba `ctx.drawImage` para ENCOGER cada región de origen (ya a resolución real, ej. x6) hasta ese tamaño chico. Con `imageSmoothingEnabled = false`, encoger así hace que el navegador muestree vecino-más-cercano -- cada píxel de destino "elige" un solo píxel de un bloque de `resolution × resolution`, sin promediar. Para una textura detallada esto produce ruido visible; con las texturas planas de prueba del ticket 055 no se notaba.
+
+**Fix**: el canvas de salida se arma a la resolución REAL (`layout.width*resolution x layout.height*resolution`), y cada `drawImage` copia 1:1 (mismo tamaño de origen y destino). Verificado inyectando directamente en `localStorage` una textura x6 con dithering fino generada por script (`canvas` + patrón de variación píxel a píxel) -- el resultado en la tarjeta muestra el patrón fielmente, sin ruido (recorte ampliado confirmado).
+
+### Bug real #2: el modal de vista previa no escalaba la imagen hacia arriba (`MobEntryCard.tsx`)
+
+`maxWidth`/`maxHeight` en el `<img>` del modal solo LIMITAN el tamaño -- nunca fuerzan a agrandar un sprite nativo chico. Fix inicial: `width`/`height`. **Hallazgo real adicional** verificando ESE fix (`getBoundingClientRect` + `getComputedStyle`): `width`/`height` en PORCENTAJE (`'90%'`) dentro de un padre `display: grid` con `placeItems: 'center'` no resuelven de forma confiable -- el ancho computado sí daba el 90% esperado, pero el alto terminaba derivado de la proporción intrínseca de la imagen en vez del 90% del contenedor, y el sprite se salía de la caja visualmente. Fix final: valores fijos en píxeles (`230`, no `'90%'`) -- sin porcentaje que resolver.
+
+### Fidelidad visual de `MobEntryCard.tsx`
+
+Preview 2D más grande (140px en grid, ocupa la mayor parte de la tarjeta); campo "Modelo: <nombre>" reincorporado en la lista de info (se había omitido en el ticket 057 por parecer redundante, pero la referencia lo mantiene siempre); ícono de "ojo" como botón cuadrado compacto (antes tenía el texto "Vista previa"); tarjeta "Agregar mob" (borde punteado) al final de la cuadrícula/lista, además del botón del header.
+
+### Menú "⋮" por mob + `removeMobFromProject` (`projectStorage.ts`)
+
+Nueva función que quita una entrada de `record.mobs` sin tocar el resto del proyecto (permite dejarlo con 0 mobs -- mismo estado ya soportado por "Agregar mobs"). El menú de cada tarjeta usa el mismo componente `Menu` que "Mis proyectos", con confirmación inline (sin diálogo nativo).
+
+**Hallazgo real durante la implementación** (bug encontrado en vivo, no reportado por Marco): tras quitar un mob, `AgregarMobs.tsx` lo seguía mostrando como "ya parte del proyecto" (no ofrecía volver a agregarlo) -- `activeProject.mobIds` en `App.tsx` es una copia local que solo se actualiza en puntos explícitos (`handleProjectRenamed`, `handleMobsAdded`, etc.), y `Proyecto.tsx` solo escribía a `localStorage` sin avisarle a `App.tsx`. Fix: nuevo callback `onMobRemoved` (mismo patrón que los demás) que sincroniza `activeProject.mobIds` filtrando el mob quitado.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Confirmado: menú "⋮" con confirmación inline quita el mob y actualiza el conteo/estado vacío correctamente; tras quitarlo, "Agregar mobs" vuelve a ofrecerlo (bug de sincronización corregido); preview 2D de una textura x6 con dithering se ve fiel, sin ruido; modal ampliado ya no se desborda de su caja. Sin errores de consola.
+
+`npm run lint`, `npx tsc --noEmit`, `npm test` (220 -- 4 tests nuevos de `removeMobFromProject`), `npm run build` en verde.

@@ -19,6 +19,7 @@ import {
   loadProject,
   projectExists,
   renameProject,
+  removeMobFromProject,
   saveProject,
   updateProjectCover,
   updateProjectDescription,
@@ -244,6 +245,43 @@ describe('renameProject (ticket 041)', () => {
     // Ninguno de los dos proyectos originales se toco.
     expect(projectExists('a')).toBe(true);
     expect(projectExists('b')).toBe(true);
+  });
+});
+
+describe('removeMobFromProject (ticket 058)', () => {
+  const TWO_MOBS = {
+    skeleton: { resolution: 1, pngDataUrl: 'data:image/png;base64,AAA' },
+    zombie: { resolution: 6, pngDataUrl: 'data:image/png;base64,BBB' },
+  };
+
+  it('quita solo el mob indicado, sin tocar el resto del proyecto', () => {
+    saveProject('a', TWO_MOBS);
+
+    removeMobFromProject('a', 'skeleton');
+
+    expect(loadProject('a')!.mobs).toEqual({ zombie: TWO_MOBS.zombie });
+  });
+
+  it('permite dejar el proyecto sin ningún mob (no fuerza eliminar el proyecto completo)', () => {
+    saveProject('a', { skeleton: SAMPLE_MOBS.skeleton });
+
+    removeMobFromProject('a', 'skeleton');
+
+    const record = loadProject('a')!;
+    expect(record).not.toBeNull();
+    expect(record.mobs).toEqual({});
+    expect(projectExists('a')).toBe(true);
+  });
+
+  it('no-op seguro si el mob no existe en el proyecto', () => {
+    saveProject('a', TWO_MOBS);
+
+    expect(() => removeMobFromProject('a', 'creeper')).not.toThrow();
+    expect(loadProject('a')!.mobs).toEqual(TWO_MOBS);
+  });
+
+  it('no-op seguro si el proyecto no existe', () => {
+    expect(() => removeMobFromProject('no-existe', 'skeleton')).not.toThrow();
   });
 });
 

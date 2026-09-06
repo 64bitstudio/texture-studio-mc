@@ -272,6 +272,28 @@ export function updateProjectCover(name: string, coverImageDataUrl: string | und
 }
 
 /**
+ * Quita UN mob de un proyecto guardado (ticket 058, menú "⋮" de cada
+ * tarjeta de mob en "Proyecto") -- a diferencia de `deleteProject`
+ * (borra el proyecto entero), esto solo elimina esa entrada de
+ * `record.mobs`, dejando el resto del proyecto intacto. No-op seguro si
+ * el mob no existe en ese proyecto (mismo criterio que `deleteProject`
+ * con un proyecto inexistente -- eliminar algo que ya no está no es un
+ * error). Se permite dejar el proyecto con CERO mobs -- mismo estado ya
+ * soportado por "Agregar mobs" al mostrar un proyecto recién creado; no
+ * se fuerza borrar el proyecto completo, esa es una decisión aparte con
+ * su propio botón ("Eliminar proyecto").
+ */
+export function removeMobFromProject(name: string, mobId: string): void {
+  const all = readAllProjects();
+  const record = all[name];
+  if (!record || !(mobId in record.mobs)) return;
+  const mobs = { ...record.mobs };
+  delete mobs[mobId];
+  all[name] = { ...record, mobs };
+  writeAllProjects(all);
+}
+
+/**
  * Duplica un proyecto guardado (ticket 053, menú "⋮" de "Mis proyectos") --
  * copia COMPLETA de `mobs` (mismos PNGs/resolución, sin volver a
  * codificar nada) bajo un nombre nuevo autogenerado, con `updatedAt`

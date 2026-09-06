@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, type ChangeEvent } from 'react';
 import { Button, FormField, InlineError, Section, SearchSortToggleBar, type ToggleLayout } from '../ui';
-import { IconDuplicate, IconExport, IconFolder, IconPencil, IconTrash } from '../ui/icons';
-import { loadProject, updateProjectCover, updateProjectDescription } from '../projectStorage';
+import { IconDuplicate, IconExport, IconFolder, IconPencil, IconPlus, IconTrash } from '../ui/icons';
+import { loadProject, removeMobFromProject, updateProjectCover, updateProjectDescription } from '../projectStorage';
 import { useProjectActions } from '../hooks/useProjectActions';
 import { filterAndSortProjectMobs } from '../projectMobFilter';
 import { MobEntryCard } from './MobEntryCard';
@@ -19,6 +19,14 @@ export interface ProyectoProps {
   onProjectRenamed: (newName: string) => void;
   /** El proyecto activo se eliminó -- `App.tsx` navega de vuelta a "Mis proyectos" y limpia `activeProject`. */
   onProjectDeleted: () => void;
+  /**
+   * Se quitó UN mob del proyecto activo (ticket 058, menú "⋮" de una
+   * tarjeta) -- `App.tsx` actualiza `activeProject.mobIds` para que
+   * `AgregarMobs.tsx`/el selector de mob del editor dejen de considerar
+   * a ese mob parte del proyecto (bug real encontrado en vivo: sin este
+   * callback, `activeProject.mobIds` quedaba desactualizado).
+   */
+  onMobRemoved: (mobId: string) => void;
   /** Click en "Mis proyectos" del breadcrumb (ticket 056, nuevo) -- navega afuera sin eliminar ni cambiar nada del proyecto. */
   onBackToList: () => void;
 }
@@ -52,7 +60,7 @@ function mobLabelFor(mobId: string, mobs: MobSummary[]): string {
  * texturas (`Editor.tsx`, con su visor 3D en vivo) -- `onSelectMob`
  * navega exactamente igual que siempre.
  */
-export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectRenamed, onProjectDeleted, onBackToList }: ProyectoProps) {
+export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectRenamed, onProjectDeleted, onMobRemoved, onBackToList }: ProyectoProps) {
   const [geometryCache] = useState(() => new Map<string, MobGeometry>());
   const { actionError, exporting, rename, duplicate, exportZip, remove, clearError } = useProjectActions(projectName);
 
@@ -175,6 +183,19 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
     const result = remove();
     if (result.ok) onProjectDeleted();
   }, [remove, onProjectDeleted]);
+
+  // Ticket 058: menú "⋮" de cada tarjeta de mob -- "Eliminar mob del
+  // proyecto". Mismo criterio de `refreshTick` que la descripción/
+  // portada de arriba: `record` se deriva fresco en cada render, así
+  // que solo hace falta forzar el re-render tras escribir.
+  const handleRemoveMob = useCallback(
+    (mobId: string) => {
+      removeMobFromProject(projectName, mobId);
+      setRefreshTick((t) => t + 1);
+      onMobRemoved(mobId);
+    },
+    [projectName, onMobRemoved],
+  );
 
   if (!record) {
     return (
@@ -319,8 +340,24 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
                       layout={mobLayout}
                       geometryCache={geometryCache}
                       onEditTexture={() => onSelectMob(mobId)}
+                      onRemoveMob={() => handleRemoveMob(mobId)}
                     />
                   ))}
+                  {/* Tarjeta "Agregar mob" (ticket 058, imagen de referencia) -- mismo destino que el botón del header, solo un segundo punto de entrada más visible dentro de la cuadrícula/lista. */}
+                  <li>
+                    <button
+                      type="button"
+                      onClick={onAddMobs}
+                      style={
+                        mobLayout === 'grid'
+                          ? { width: '100%', height: '100%', minHeight: 160, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-strong)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer' }
+                          : { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 14px', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-strong)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer' }
+                      }
+                    >
+                      <IconPlus size={mobLayout === 'grid' ? 24 : 16} />
+                      <span>{mobLayout === 'grid' ? 'Agregar mob' : 'Agregar mob a este proyecto'}</span>
+                    </button>
+                  </li>
                 </ul>
               )}
             </div>
