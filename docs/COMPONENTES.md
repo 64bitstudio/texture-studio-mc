@@ -332,3 +332,10 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 
 - **`ui/icons.tsx`** — nuevos íconos: `IconDuplicate`, `IconExport`, `IconTrash` (reemplazan emoji en el menú "⋮" de `ProjectCard.tsx`).
 - **`components/ProjectCard.tsx`** — menú "⋮" usa los íconos SVG de arriba (más `IconPencil` para "Renombrar") en vez de emoji; botón "Editar" con `border-radius: var(--radius-md)` (antes `--radius-lg`).
+
+### Ticket 055 -- Motor de preview 2D "de frente" de un mob
+
+- **`geometry/mobFrontSprite.ts`** (nuevo, puro) — `computeMobFrontSpriteLayout(geometry)`: calcula qué rect de la cara `front` de cada parte (via `computeBoxFaceRects`, ya existente) va a qué posición del sprite 2D, proyectando `position`/`size` ortográficamente y ordenando el dibujado por profundidad (`position[2]`).
+- **`renderMobFrontSprite2D.ts`** (nuevo, DOM) — dibuja ese layout sobre un `<canvas>` real a partir de la textura guardada (`pngDataUrl` + `resolution`) y devuelve una `data:` URL.
+- **`hooks/useMobFrontSprite2D.ts`** (nuevo) — hook delgado que memoiza el resultado por `(geometry, pngDataUrl, resolution)`.
+- **`components/Proyecto.tsx`** — integración mínima de prueba: la miniatura de cada mob (antes la hoja de textura completa comprimida en un cuadro chico) ahora es el sprite 2D de arriba, con fallback a la textura cruda mientras la geometría/el render no terminan. El rediseño completo de esta tarjeta es el ticket 057.
