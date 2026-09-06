@@ -10,8 +10,16 @@ export interface TextureEditorProps {
   buffer: TextureBuffer;
   /** Se incrementa en cada escritura al buffer -- dispara el redibujado del canvas. */
   version: number;
-  /** Color actualmente seleccionado, como `#rrggbb` (ver `ColorPicker`). */
+  /** Color actualmente seleccionado, como `#rrggbb` (ver `ColorPicker`). Ignorado cuando `forcedRgba` esta presente. */
   color: string;
+  /**
+   * Ticket 030 (herramienta de borrado): cuando esta presente, se
+   * escribe este RGBA en vez de `hexToRgba(color)` -- `Editor.tsx` lo
+   * pasa como `{r:0,g:0,b:0,a:0}` en modo "Borrar". El resto del
+   * comportamiento (simetria, aislar-parte, agrupacion de historial) no
+   * cambia -- sigue siendo el mismo `onSetPixel`/`onPaintLine`.
+   */
+  forcedRgba?: RGBA;
   /** Pixeles CSS por texel (ticket 004, HU-7). Ver `ZoomControls`/`frontend/src/zoom.ts`. */
   zoom: number;
   onZoomChange: (zoom: number) => void;
@@ -130,6 +138,7 @@ export function TextureEditor({
   buffer,
   version,
   color,
+  forcedRgba,
   zoom,
   onZoomChange,
   showGrid,
@@ -265,7 +274,7 @@ export function TextureEditor({
     isPaintingRef.current = true;
     lastCellRef.current = cell;
     onStrokeStart();
-    onSetPixel(cell.x, cell.y, hexToRgba(color));
+    onSetPixel(cell.x, cell.y, forcedRgba ?? hexToRgba(color));
   }
 
   function handlePointerMove(e: ReactPointerEvent<HTMLCanvasElement>) {
@@ -286,10 +295,11 @@ export function TextureEditor({
     const last = lastCellRef.current;
     if (last && last.x === cell.x && last.y === cell.y) return;
 
+    const activeRgba = forcedRgba ?? hexToRgba(color);
     if (last) {
-      onPaintLine(last, cell, hexToRgba(color));
+      onPaintLine(last, cell, activeRgba);
     } else {
-      onSetPixel(cell.x, cell.y, hexToRgba(color));
+      onSetPixel(cell.x, cell.y, activeRgba);
     }
     lastCellRef.current = cell;
   }

@@ -169,3 +169,10 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`components/Editor.tsx`** — el visor 3D pasa a `flexBasis: 400, flexGrow: 0` (nunca crece más de 400px). El panel de controles se reorganiza en un grid `auto-fit` de `Section` (`ui/`, ticket 025) en vez de `<section><h2>` ad-hoc; la sección "Textura" ocupa todas las columnas (`gridColumn: '1 / -1'`).
 - **`ui/Section.tsx`** — gana un prop `style` opcional (necesario para el `gridColumn: '1 / -1'` de la sección "Textura").
 - **Eliminados** (ticket 010, panel lateral redimensionable a mano, superado por el layout en grid -- ver `docs/ARQUITECTURA.md`, "Ticket 029"): `components/PanelResizeHandle.tsx`, `panelWidth.ts`, `test/panelWidth.spec.ts`.
+
+### Ticket 030 -- Herramienta de borrado con pincel de tamaño ajustable
+
+- **`brush.ts`** (nuevo, puro) — `computeBrushFootprint(center, size)`/`computeBrushFootprintForLine(linePoints, size)`: expanden un punto (o una línea de puntos) a un bloque `size×size` centrado, para `size` de 1 a 5. Ver `brush.spec.ts`.
+- **`components/EraseControls.tsx`** (nuevo) — botón "Borrar"/"Borrar (activo)" (`Button`, `aria-pressed`) + `Select` de tamaño de pincel (solo visible con el modo activo).
+- **`components/TextureEditor.tsx`** — gana un prop opcional `forcedRgba?: RGBA` que, si está presente, reemplaza el color de paleta en los 3 puntos de pintado internos (el componente no sabe que existe un "modo borrado").
+- **`components/Editor.tsx`** — gana `paintMode: 'paint' | 'erase'` y `eraseBrushSize` (estado independiente de `color`); `setPixel`/`paintLine` expanden a footprint de pincel en modo `erase` antes de pasar por `applyPixelsWithSymmetry` (sin lógica paralela: misma función que ya respeta simetría y aislar-parte). Nueva `Section title="Borrar"` en el grid del panel, justo después de "Color".

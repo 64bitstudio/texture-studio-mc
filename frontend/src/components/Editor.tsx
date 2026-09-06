@@ -12,7 +12,9 @@ import { PasteImageOverlay } from './PasteImageOverlay';
 import { ExportControls } from './ExportControls';
 import { ResolutionControls } from './ResolutionControls';
 import { PartIsolationControls } from './PartIsolationControls';
+import { EraseControls } from './EraseControls';
 import { Section } from '../ui';
+import { computeBrushFootprint, computeBrushFootprintForLine } from '../brush';
 import { decodeImageFileToImageData, decodePngDataUrlToImageData } from '../decodeTexture';
 import { useCanvasTexture } from '../hooks/useCanvasTexture';
 import { bresenhamLine, TextureBuffer, type PixelPoint, type PixelSource, type RGBA } from '../textureBuffer';
@@ -151,6 +153,17 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
   const [version, setVersion] = useState(0);
   const [color, setColor] = useState(DEFAULT_COLOR);
   const [initError, setInitError] = useState<string | null>(null);
+
+  // Herramienta de borrado (ticket 030, HU-5). `paintMode` NO vive junto
+  // a `color` porque son ejes independientes -- el color seleccionado
+  // se conserva mientras se borra, para que al desactivar "Borrar" el
+  // usuario siga pintando con el mismo color de antes. `eraseBrushSize`
+  // (1-5, ver `EraseControls.tsx`) solo aplica en modo borrado -- el
+  // pincel de pintar normal sigue siendo de un pixel, sin cambios (ver
+  // docs/definiciones/rediseno-ux-ui-y-navegacion.md, "No incluye").
+  const [paintMode, setPaintMode] = useState<'paint' | 'erase'>('paint');
+  const [eraseBrushSize, setEraseBrushSize] = useState(1);
+  const ERASE_RGBA: RGBA = { r: 0, g: 0, b: 0, a: 0 };
 
   // Historial de deshacer/rehacer (ticket 003, HU-4). `PaintHistory` es
   // un objeto mutable (igual que `buffer`) -- `historyTick` no se lee
@@ -499,18 +512,29 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
     [buffer, history, symmetryEnabled, uvBoxes, isolatedRegion],
   );
 
+  // Ticket 030: el tamaño de pincel SOLO expande el punto/linea cuando
+  // `paintMode === 'erase'` -- pintar normal (`paintMode === 'paint'`)
+  // sigue siendo exactamente un pixel por punto, sin cambios. La
+  // expansion pasa por `computeBrushFootprint`/`computeBrushFootprintForLine`
+  // (puras, `brush.ts`) ANTES de `applyPixelsWithSymmetry`, que ya
+  // deduplica/filtra por simetria y aislar-parte sobre CUALQUIER lista
+  // de puntos que reciba -- el pincel de borrado no necesita logica
+  // propia de simetria/aislamiento, hereda la misma.
   const setPixel = useCallback(
     (x: number, y: number, rgba: RGBA) => {
-      applyPixelsWithSymmetry([{ x, y }], rgba);
+      const points = paintMode === 'erase' ? computeBrushFootprint({ x, y }, eraseBrushSize) : [{ x, y }];
+      applyPixelsWithSymmetry(points, rgba);
     },
-    [applyPixelsWithSymmetry],
+    [applyPixelsWithSymmetry, paintMode, eraseBrushSize],
   );
 
   const paintLine = useCallback(
     (from: PixelPoint, to: PixelPoint, rgba: RGBA) => {
-      applyPixelsWithSymmetry(bresenhamLine(from.x, from.y, to.x, to.y), rgba);
+      const linePoints = bresenhamLine(from.x, from.y, to.x, to.y);
+      const points = paintMode === 'erase' ? computeBrushFootprintForLine(linePoints, eraseBrushSize) : linePoints;
+      applyPixelsWithSymmetry(points, rgba);
     },
-    [applyPixelsWithSymmetry],
+    [applyPixelsWithSymmetry, paintMode, eraseBrushSize],
   );
 
   const onStrokeStart = useCallback(() => {
@@ -802,6 +826,15 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
             <ColorPicker color={color} onChange={setColor} />
           </Section>
 
+          <Section title="Borrar">
+            <EraseControls
+              active={paintMode === 'erase'}
+              onToggle={(active) => setPaintMode(active ? 'erase' : 'paint')}
+              brushSize={eraseBrushSize}
+              onBrushSizeChange={setEraseBrushSize}
+            />
+          </Section>
+
           <Section title="Resolucion">
             <ResolutionControls
               resolution={resolution}
@@ -919,6 +952,7 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
                   namedRegions={namedRegions}
                   onHoverPixel={handleHoverPixel}
                   isolatedRegion={isolatedRegion}
+                  forcedRgba={paintMode === 'erase' ? ERASE_RGBA : undefined}
                 />
                 {pendingPaste && (
                   <PasteImageOverlay
