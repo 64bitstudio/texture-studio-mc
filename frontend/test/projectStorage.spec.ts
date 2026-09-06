@@ -12,6 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   ProjectAlreadyExistsError,
   PROJECTS_STORAGE_KEY,
+  deleteAllProjects,
   deleteProject,
   listProjects,
   loadProject,
@@ -178,6 +179,32 @@ describe('deleteProject (HU-5)', () => {
     saveProject('b', SAMPLE_MOBS);
     deleteProject('a');
     expect(listProjects().map((p) => p.name)).toEqual(['b']);
+  });
+});
+
+describe('deleteAllProjects (ticket 036)', () => {
+  it('borra todos los proyectos guardados de una vez', () => {
+    saveProject('a', SAMPLE_MOBS);
+    saveProject('b', SAMPLE_MOBS);
+    expect(listProjects()).toHaveLength(2);
+
+    deleteAllProjects();
+
+    expect(listProjects()).toEqual([]);
+  });
+
+  it('es un no-op seguro si nunca hubo proyectos guardados (no lanza)', () => {
+    expect(() => deleteAllProjects()).not.toThrow();
+    expect(listProjects()).toEqual([]);
+  });
+
+  it('no toca otras claves de localStorage ajenas a los proyectos', () => {
+    globalThis.localStorage.setItem('ts-theme', 'light');
+    saveProject('a', SAMPLE_MOBS);
+
+    deleteAllProjects();
+
+    expect(globalThis.localStorage.getItem('ts-theme')).toBe('light');
   });
 });
 

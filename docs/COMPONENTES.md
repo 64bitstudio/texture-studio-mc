@@ -207,3 +207,12 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 ### Ticket 035 -- Acento verde
 
 - **`index.css`** — `--accent` pasa de `#c084fc` a `#4ade80` en ambos bloques de tema. Sin cambios de componentes (todo lo que usa `--accent` ya era token-based).
+
+### Ticket 036 -- Preferencias locales de usuario + pantalla Configuración
+
+- **`userPrefs.ts`** (nuevo) — `getUserPrefs`/`setUserPrefs`/`getAvatarInitial`, persistencia en `localStorage`.
+- **`projectStorage.ts`** — gana `deleteAllProjects()` (borra solo la clave de proyectos, sin tocar tema/preferencias).
+- **`components/Avatar.tsx`** (nuevo) — círculo con la inicial derivada de `displayName`, recibido por props (estado levantado en `App.tsx`).
+- **`components/Settings.tsx`** (nuevo) — overlay con 3 secciones: nombre, tema (controlado, misma fuente que `ThemeToggle`), borrar todos los datos locales (confirmación inline).
+- **`components/ThemeToggle.tsx`** — pasa de estado propio a CONTROLADO (`theme`/`onThemeChange` por props) -- ver `docs/ARQUITECTURA.md`, bug real corregido.
+- **`App.tsx`** — nuevo estado levantado `displayName`/`theme` (fuente única para `Avatar`/`Settings`/`ThemeToggle`); `showSettings` (ubicación temporal del overlay, hasta el ticket 037).

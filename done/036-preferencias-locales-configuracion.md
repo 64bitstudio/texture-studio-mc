@@ -22,3 +22,19 @@ Sale de `docs/definiciones/proyectos-y-navegacion.md` (HU-6, "Diseño técnico" 
 - Dado que cambio mi nombre en Configuración, cuando guardo, entonces el avatar del header muestra la inicial de ese nombre nuevo.
 - Dado que cambio el tema desde Configuración, entonces el toggle rápido del header refleja el mismo cambio (una sola preferencia, no dos).
 - Dado que hago click en "Borrar todos los datos locales", cuando confirmo en el aviso inline, entonces todos los proyectos guardados desaparecen; si cancelo, entonces no se borra nada.
+
+## Hecho
+
+Implementado tal como estaba alcanzado:
+
+- `userPrefs.ts` (nuevo): `getUserPrefs`/`setUserPrefs`/`getAvatarInitial`, mismo patrón que `theme.ts` (persistencia via `globalThis.localStorage`, default seguro ante valor ausente/corrupto).
+- `projectStorage.ts`: `deleteAllProjects()` nuevo, borra solo la clave de proyectos (no toca tema/preferencias).
+- `components/Avatar.tsx`/`components/Settings.tsx` (nuevos): montados temporalmente en el header actual (ícono de engranaje + avatar junto al toggle de tema del ticket 034) -- ubicación temporal, el ticket 037 los reubica sin tocar su lógica.
+
+Bug real encontrado y corregido en vivo (no hipotético, reproducido con `textContent` antes del fix): `ThemeToggle` tenía su propio estado interno inicializado una sola vez -- cambiar el tema desde `Settings` (segundo lugar que ahora también lo cambia) no lo actualizaba, el botón rápido del header quedaba mostrando la acción contraria a la real. Corregido levantando `theme` a `App.tsx` (misma solución ya aplicada a `displayName`/`Avatar`): `ThemeToggle` y `Settings` pasan a ser componentes CONTROLADOS (`theme`/`onThemeChange` por props), sin estado propio para esa preferencia.
+
+Tests: 184/184 en verde (incluye `userPrefs.spec.ts` nuevo y 3 tests nuevos de `deleteAllProjects` en `projectStorage.spec.ts` -- `Avatar`/`Settings`, que tocan DOM/overlay, se verificaron en vivo), `npm run lint` y `npm run build` en verde.
+
+Verificación en vivo (Claude in Chrome, local): cambiar el nombre actualiza el avatar de inmediato; cambiar el tema desde Configuración sincroniza el toggle rápido (bug reproducido y re-verificado corregido); "Borrar todos los datos locales" muestra la confirmación inline (nunca diálogo nativo) y al confirmar la lista de "Guardados" queda vacía.
+
+Sin hallazgos de QA pendientes.
