@@ -354,3 +354,11 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`components/MobEntryCard.tsx`** (nuevo) — tarjeta de mob con miniatura 2D, archivo/dimensiones/escala derivados, "Editar textura" (mismo destino de siempre) y modal de vista previa ampliada (ícono de ojo). Reemplaza a `MobThumbnail2D` (ticket 055, retirado).
 - **`components/Proyecto.tsx`** — su grid de mobs monta `SearchSortToggleBar` + `MobEntryCard` en vez del grid simple del ticket 041.
 - **`components/MisProyectos.tsx`** — refactorizado para consumir `SearchSortToggleBar` (sin cambio de comportamiento).
+
+### Ticket 058 -- Bug de preview 2D en alta resolución + fidelidad visual de tarjetas de mob
+
+- **`renderMobFrontSprite2D.ts`** — fix: el canvas de salida se arma a la resolución REAL de la textura (antes se armaba en tamaño "x1" y se encogía la textura real al copiar, produciendo ruido de color en texturas detalladas de alta resolución).
+- **`components/MobEntryCard.tsx`** — preview 2D más grande, campo "Modelo" reincorporado, ícono de ojo compacto (icon-square), tarjeta "Agregar mob" al final del grid/lista, menú "⋮" con "Eliminar mob del proyecto"; fix del modal ampliado (`width`/`height` fijos en px, no `maxWidth`/`maxHeight` ni porcentajes).
+- **`projectStorage.ts`** — nueva función `removeMobFromProject(name, mobId)`.
+- **`components/Proyecto.tsx`** — pasa `onRemoveMob` a cada tarjeta; nueva tarjeta "Agregar mob".
+- **`components/App.tsx`** — nuevo `handleMobRemoved`/prop `onMobRemoved`: sincroniza `activeProject.mobIds` tras quitar un mob (bug real de datos desactualizados encontrado en vivo).

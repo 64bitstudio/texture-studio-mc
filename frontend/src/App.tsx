@@ -229,6 +229,18 @@ function App() {
     setActiveProject((prev) => (prev ? { ...prev, name: newName } : prev));
   }
 
+  // Ticket 058: "Eliminar mob del proyecto" desde el menú "⋮" de una
+  // tarjeta de `Proyecto.tsx` -- mismo criterio que `handleProjectRenamed`/
+  // `handleMobsAdded`, mantiene `activeProject.mobIds` sincronizado con
+  // lo que de verdad quedó en `localStorage` (`removeMobFromProject`, ya
+  // llamado por `Proyecto.tsx` antes de este callback). Sin este ajuste,
+  // `existingMobIds` de `AgregarMobs.tsx` y el filtro de `editorMobs` de
+  // abajo seguirían viendo el mob recién quitado como si perteneciera al
+  // proyecto (bug real encontrado en vivo).
+  function handleMobRemoved(mobId: string) {
+    setActiveProject((prev) => (prev ? { ...prev, mobIds: prev.mobIds.filter((id) => id !== mobId) } : prev));
+  }
+
   function handleProjectDeleted() {
     setActiveProject(null);
     setView('mis-proyectos');
@@ -361,6 +373,7 @@ function App() {
             onAddMobs={handleAddMobs}
             onProjectRenamed={handleProjectRenamed}
             onProjectDeleted={handleProjectDeleted}
+            onMobRemoved={handleMobRemoved}
             onBackToList={() => setView('mis-proyectos')}
           />
         )}
