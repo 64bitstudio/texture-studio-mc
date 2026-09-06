@@ -17,6 +17,7 @@ import {
   listProjects,
   loadProject,
   projectExists,
+  renameProject,
   saveProject,
 } from '../src/projectStorage';
 
@@ -205,6 +206,41 @@ describe('deleteAllProjects (ticket 036)', () => {
     deleteAllProjects();
 
     expect(globalThis.localStorage.getItem('ts-theme')).toBe('light');
+  });
+});
+
+describe('renameProject (ticket 041)', () => {
+  it('renombra un proyecto -- el contenido se conserva, la clave vieja desaparece', () => {
+    saveProject('nombre-viejo', SAMPLE_MOBS);
+
+    renameProject('nombre-viejo', 'nombre-nuevo');
+
+    expect(projectExists('nombre-viejo')).toBe(false);
+    expect(projectExists('nombre-nuevo')).toBe(true);
+    expect(loadProject('nombre-nuevo')!.mobs).toEqual(SAMPLE_MOBS);
+  });
+
+  it('no altera updatedAt (renombrar es metadato, no trabajo hecho)', () => {
+    saveProject('a', SAMPLE_MOBS);
+    const before = loadProject('a')!.updatedAt;
+
+    renameProject('a', 'b');
+
+    expect(loadProject('b')!.updatedAt).toBe(before);
+  });
+
+  it('lanza si el nombre origen no existe', () => {
+    expect(() => renameProject('no-existe', 'algo')).toThrow(/ya no existe/);
+  });
+
+  it('lanza ProjectAlreadyExistsError si el nombre destino ya existe -- no fusiona ni sobrescribe', () => {
+    saveProject('a', SAMPLE_MOBS);
+    saveProject('b', SAMPLE_MOBS);
+
+    expect(() => renameProject('a', 'b')).toThrow(ProjectAlreadyExistsError);
+    // Ninguno de los dos proyectos originales se toco.
+    expect(projectExists('a')).toBe(true);
+    expect(projectExists('b')).toBe(true);
   });
 });
 

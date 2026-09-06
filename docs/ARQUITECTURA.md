@@ -1121,3 +1121,25 @@ Confirmado con capturas: "Mis proyectos" lista el proyecto guardado en el ticket
 ### Verificación en vivo (Claude in Chrome, local)
 
 Sembrados 7 proyectos de prueba directamente en `localStorage` (con fechas de guardado crecientes) además del ya existente -- confirmado que "Recientes" muestra EXACTAMENTE los 5 más recientes (Proyecto 7 a Proyecto 3), sin controles de búsqueda visibles, y que ni "Proyecto 1"/"Proyecto 2"/"Set Nether" (más antiguos) aparecen. Abrir uno con datos de PNG inválidos (deliberado, para probar el camino de error) mostró el mensaje de error inline ya existente sin romper la pantalla; corregido el dato de un proyecto con un PNG real generado en el propio navegador, abrirlo navegó correctamente a "Proyecto: Proyecto 7" (la vista de detalle, confirmando el flujo de éxito). Datos de prueba limpiados de `localStorage` antes de cerrar. `npm run lint`, `npm test` (184, sin tests nuevos -- mismo criterio que `MisProyectos.tsx`/`NuevoProyecto.tsx`), `npm run build` en verde.
+
+## Ticket 041 -- Vista de detalle de "Proyecto" (HU-2)
+
+### `Proyecto.tsx` (nuevo) -- lee `loadProject` fresco, no confía en `activeProject.mobIds`
+
+`activeProject` en `App.tsx` es solo un resumen liviano (`{name, mobIds}`) poblado al NAVEGAR a esta vista -- `Proyecto.tsx` vuelve a leer el registro COMPLETO con `loadProject(projectName)` en cada render (mismo criterio que `MisProyectos.tsx`/`Recientes.tsx`: la fuente de verdad es `localStorage`, no un estado cacheado que podría quedar desactualizado). Si el proyecto ya no existe (borrado en otra pestaña), se muestra un error en vez de romper.
+
+### Miniatura de cada mob: el propio PNG guardado, sin decodificar
+
+`pngDataUrl` (ya una `data:` URL válida) se usa DIRECTO como `src` de un `<img>` con `image-rendering: pixelated` -- no hace falta pasar por `TextureBuffer`/canvas solo para mostrar una vista chica en la lista. Este proyecto no tenía ningún asset de ícono/miniatura por mob hasta ahora (`MobSelector.tsx`/`NuevoProyecto.tsx` son solo texto) -- es la primera vez que se muestra una miniatura real de la textura guardada.
+
+### `renameProject` (nuevo, en `projectStorage.ts`)
+
+El nombre ES la clave de identidad del registro -- renombrar mueve la entrada de una clave a otra, sin tocar `mobs` ni `updatedAt` (se trata como cambio de metadato, no como trabajo hecho sobre el proyecto -- no afecta su posición en "Recientes"). Si `newName` ya existe, lanza `ProjectAlreadyExistsError` (mismo tipo que `saveProject`) -- **decisión real**: a diferencia de guardar, renombrar-a-un-nombre-existente NO ofrece "sobrescribir" -- fusionar o reemplazar dos proyectos con mobs potencialmente distintos es una operación ambigua que este ticket no define, así que se rechaza con un error claro en vez de inventar una semántica de fusión no pedida.
+
+### Exportar deshabilitado -- explícito, no silencioso
+
+El botón "Exportar proyecto (.zip)" está `disabled` con `title="Disponible cuando se implemente el ticket 044"` -- el ticket explícitamente permite esto ("Qué NO hacer" no aplica a dejarlo pendiente, la sección de alcance lo prevé). Se implementa de verdad en el ticket 044.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Abrir el proyecto "Set Nether" (creado en el ticket 038) mostró su único mob (Esqueleto) con miniatura real de la textura guardada; hacer click en el mob navegó correctamente al editor (buffer restaurado, contenido visible idéntico al guardado); "Renombrar" cambió el nombre en pantalla Y en `localStorage` (confirmado leyendo la clave real); "Eliminar proyecto" mostró la confirmación en línea, y al confirmar navegó de vuelta a "Mis proyectos" mostrando "Todavía no hay proyectos guardados" (el proyecto realmente desapareció de `localStorage`). `npm run lint`, `npm test` (188, incluye 4 tests nuevos de `renameProject`), `npm run build` en verde.

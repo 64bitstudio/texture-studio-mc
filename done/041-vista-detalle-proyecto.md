@@ -22,3 +22,18 @@ Sale de `docs/definiciones/proyectos-y-navegacion.md` (HU-2, "Diseño técnico" 
 - Dado un proyecto abierto, cuando veo su vista de detalle, entonces veo la lista de mobs que ya tiene y las acciones disponibles (agregar mobs, exportar todo, renombrar, eliminar).
 - Dado que elijo uno de los mobs listados, cuando confirmo, entonces entro al editor de ese mob.
 - Dado que elijo "Eliminar proyecto", cuando confirmo en el aviso inline, entonces el proyecto desaparece de "Mis proyectos"/"Recientes"; si cancelo, no se borra nada.
+
+## Hecho
+
+Implementado tal como estaba alcanzado:
+
+- `Proyecto.tsx` (nuevo): lee `loadProject` fresco en cada render (no confía en `activeProject.mobIds`, que es solo un resumen liviano); miniatura de cada mob es su `pngDataUrl` guardado directo como `<img src>` (sin decodificar -- primera miniatura real de textura en la app); elegir un mob navega al editor (reusa `handleSelectMob` ya existente).
+- `renameProject` (nuevo, `projectStorage.ts`): mueve la entrada de clave sin tocar `mobs`/`updatedAt`. Lanza `ProjectAlreadyExistsError` si el nombre destino ya existe -- **decisión real**: NO ofrece sobrescribir (a diferencia de guardar), porque fusionar/reemplazar dos proyectos con mobs distintos es ambiguo y este ticket no lo define.
+- "Exportar proyecto (.zip)": botón deshabilitado con tooltip explicando que se implementa en el ticket 044 (previsto explícitamente por el alcance del ticket, no un recorte silencioso).
+- "Eliminar proyecto": confirmación inline (nunca diálogo nativo), y al confirmar navega de vuelta a "Mis proyectos" limpiando `activeProject`.
+
+Tests: 188/188 en verde (incluye 4 tests nuevos de `renameProject`: renombra conservando contenido, no altera `updatedAt`, lanza si el origen no existe, lanza `ProjectAlreadyExistsError` sin tocar ninguno de los dos proyectos si el destino ya existe), `npm run lint` y `npm run build` en verde.
+
+Verificación en vivo (Claude in Chrome, local): proyecto "Set Nether" mostró su mob con miniatura real; click en el mob navegó al editor con el buffer restaurado correctamente; "Renombrar" cambió el nombre en pantalla Y en `localStorage` (confirmado leyendo la clave real); "Eliminar proyecto" con confirmación inline navegó de vuelta a "Mis proyectos" (vacío, confirmando el borrado real).
+
+Sin hallazgos de QA pendientes.

@@ -240,3 +240,9 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 
 - **`components/Recientes.tsx`** (nuevo) — top 5 proyectos por `updatedAt` (`filterAndSortProjects` sin búsqueda/filtro, solo orden), sin controles propios; abrir un proyecto usa la misma lógica de restaurar buffers que `MisProyectos.tsx` y navega a `'proyecto'` vía `onProjectSelected`.
 - **`App.tsx`** — "Recientes" usa `Recientes` (reemplaza el `PlaceholderScreen` del ticket 037).
+
+### Ticket 041 -- Vista de detalle de "Proyecto"
+
+- **`components/Proyecto.tsx`** (nuevo) — lista de mobs con miniatura real (`<img src={pngDataUrl}>`), elegir uno navega al editor; acciones "Agregar mobs" (navega a `'agregar-mobs'`), "Exportar proyecto (.zip)" (deshabilitado hasta el ticket 044), "Renombrar" (`renameProject`, nuevo) y "Eliminar proyecto" (`deleteProject`, con confirmación inline).
+- **`projectStorage.ts`** — gana `renameProject(oldName, newName)`: mueve la entrada de clave, sin tocar `mobs`/`updatedAt`; lanza `ProjectAlreadyExistsError` si el nombre destino ya existe (sin ofrecer sobrescribir -- decisión real documentada en `docs/ARQUITECTURA.md`).
+- **`App.tsx`** — "Proyecto" usa `Proyecto` (reemplaza el `PlaceholderScreen` del ticket 037); nuevos handlers `handleAddMobs`/`handleProjectRenamed`/`handleProjectDeleted`.
