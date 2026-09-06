@@ -181,8 +181,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
               >
                 <img
                   src={record.mobs[mobId]!.pngDataUrl}
-                  alt=""
-                  aria-hidden="true"
+                  alt={`Miniatura de la textura guardada de ${mobLabelFor(mobId, mobs)}`}
                   style={{ width: 48, height: 24, imageRendering: 'pixelated', border: '1px solid var(--border-strong)', borderRadius: 2 }}
                 />
                 <span>{mobLabelFor(mobId, mobs)}</span>
