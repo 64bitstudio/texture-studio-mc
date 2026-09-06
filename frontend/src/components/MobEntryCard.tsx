@@ -74,10 +74,10 @@ function MobPreviewModal({ label, spriteUrl, onClose }: { label: string; spriteU
             <span className="sr-only">Cerrar vista previa</span>
           </Button>
         </div>
-        <div style={{ width: 256, height: 256, display: 'grid', placeItems: 'center', background: 'var(--bg)', borderRadius: 'var(--radius-md)' }}>
+        <div style={{ width: 340, height: 340, display: 'grid', placeItems: 'center', background: 'var(--bg)', borderRadius: 'var(--radius-md)' }}>
           {spriteUrl ? (
             // Una sola línea -- ver `ProjectCard.tsx` (ticket 053) para el hallazgo real de por qué (bug de `ui-accessibility-guard.sh` con tags multilínea, reportado via `SendFeedback`).
-            <img src={spriteUrl} alt={`Vista previa ampliada de ${label}`} style={{ width: 230, height: 230, objectFit: 'contain', imageRendering: 'pixelated' }} />
+            <img src={spriteUrl} alt={`Vista previa ampliada de ${label}`} style={{ width: 310, height: 310, objectFit: 'contain', imageRendering: 'pixelated' }} />
           ) : (
             <p style={{ margin: 0, fontSize: 'var(--font-sm)', color: 'var(--text-dim)' }}>Generando vista previa…</p>
           )}
@@ -129,12 +129,12 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
   }, [onRemoveMob]);
 
   const isList = layout === 'list';
-  // Ticket 059 (corrección de Marco): en grid, la miniatura va al lado
-  // IZQUIERDO del detalle (antes: grande y centrada debajo del
-  // nombre) -- comparte la fila con el nombre/menú/info en vez de
-  // ocupar el ancho completo de la tarjeta, así que baja de tamaño
-  // (140 -> 96) para dejarle espacio real al texto.
-  const thumbSize = isList ? 40 : 96;
+  // Ticket 060 (corrección de Marco: "las cards deben ser mas grandes y
+  // tambien los renders 2D de cada textura") -- en grid, la miniatura
+  // crece de 96 a 160 y la tarjeta completa gana padding/gaps a juego
+  // (ver el `<li>` de abajo). En modo lista se deja igual: ahí la fila
+  // es angosta y compacta por diseño (ticket 057).
+  const thumbSize = isList ? 40 : 160;
   const dimensions = geometry ? `${geometry.textureWidth * resolution}×${geometry.textureHeight * resolution} px` : '—';
 
   const menu = (
@@ -215,8 +215,8 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
           <span style={{ fontWeight: 600, fontSize: 'var(--font-sm)', display: 'block', marginBottom: 2 }}>{label}</span>
           {info}
         </div>
-        {eyeButton}
         {editButton}
+        {eyeButton}
         {menu}
         {showPreview && <MobPreviewModal label={label} spriteUrl={spriteUrl} onClose={handleClosePreview} />}
       </li>
@@ -224,12 +224,13 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
   }
 
   return (
-    <li style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 14, borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', background: 'var(--surface-raised)' }}>
+    <li style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 20, borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', background: 'var(--surface-raised)' }}>
       {/* Ticket 059 (corrección de Marco: "la card... debe estar de
           lado izquierdo la imagen del mob y del lado derecho el
           detalle") -- miniatura a la izquierda, nombre+menú+info a la
           derecha, en vez de nombre arriba y la miniatura grande
-          centrada debajo. */}
+          centrada debajo. Ticket 060: tarjeta y miniatura más grandes
+          (ver `thumbSize` y el padding/gap del `<li>` de arriba). */}
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         {thumb}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -241,8 +242,8 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
-        {eyeButton}
         {editButton}
+        {eyeButton}
       </div>
       {showPreview && <MobPreviewModal label={label} spriteUrl={spriteUrl} onClose={handleClosePreview} />}
     </li>

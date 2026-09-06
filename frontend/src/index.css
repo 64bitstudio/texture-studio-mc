@@ -257,6 +257,26 @@ body {
   background: var(--surface-raised);
 }
 
+/* Ticket 060: solo el ícono, sin caja -- fondo/borde transparentes,
+   padding mínimo (el suficiente para un área de click decente sin
+   verse como una caja). El color usa `--text-dim` en reposo y
+   `--text` en hover, mismo criterio visual que un link secundario. */
+.ui-button--icon-plain {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+.ui-button--icon-plain:hover {
+  border-color: transparent;
+  color: var(--text);
+  background: transparent;
+}
+
 .ui-button--danger {
   border-color: var(--danger);
   color: var(--danger);

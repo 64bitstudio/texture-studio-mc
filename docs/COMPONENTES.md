@@ -367,3 +367,10 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 
 - **`ui/icons.tsx`** — nuevos íconos: `IconDocument`, `IconMaximize`, `IconScale`, `IconModel`.
 - **`components/MobEntryCard.tsx`** — la lista de info (archivo/dimensiones/escala/modelo) gana un ícono por línea; layout en modo grid invertido a miniatura izquierda + detalle derecha (modo lista ya tenía este orden).
+
+### Ticket 060 -- Tarjetas más grandes, orden de botones, íconos de edición sin caja, breadcrumb más espaciado
+
+- **`components/MobEntryCard.tsx`** — miniatura 2D en modo grid de 96px a 160px, padding/gap de la tarjeta aumentados a juego; orden de botones invertido: "Editar textura" ahora a la izquierda y el ícono de ojo ("Vista previa") a la derecha (en ambos layouts, grid y lista); modal de vista previa ampliada de 256px/230px a 340px/310px.
+- **`ui/Button.tsx`** / **`index.css`** — nuevo `variant="icon-plain"`: mismo criterio de nombre accesible vía `.sr-only` que `icon-square`, pero sin fondo/borde/caja -- solo el ícono. Usado por los botones de renombrar/editar-descripción de `Proyecto.tsx` (antes `icon-square`, Marco pidió "solo el icono sin el cuadro que lo envuelve").
+- **`components/Proyecto.tsx`** — botones de editar título/descripción cambiados a `icon-plain`; el grid de tarjetas de mob sube su columna mínima de 220px a 320px (a juego con la tarjeta más grande); breadcrumb ("Mis proyectos › Nombre") gana padding vertical propio para separarse más del resto del header.
+- Explícitamente NO incluido (pendiente de que Marco reenvíe una imagen de referencia): cambiar la perspectiva del motor de preview 2D (`renderMobFrontSprite2D.ts`/`mobFrontSprite.ts`), que hoy sigue siendo una proyección ortográfica de frente.

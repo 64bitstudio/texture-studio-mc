@@ -209,7 +209,12 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
 
   return (
     <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <nav aria-label="Ruta" style={{ fontSize: 'var(--font-sm)', color: 'var(--text-dim)' }}>
+      {/* Ticket 060 (corrección de Marco: "la seccion de hasta arriba
+          que dice mis proyectos > nombre del proyecto debe estar mas
+          espaciada") -- padding propio en vez de depender solo del gap
+          del contenedor, para que el breadcrumb respire del resto del
+          header. */}
+      <nav aria-label="Ruta" style={{ fontSize: 'var(--font-sm)', color: 'var(--text-dim)', padding: '4px 0 12px' }}>
         <button type="button" onClick={onBackToList} style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', cursor: 'pointer', textDecoration: 'underline' }}>
           Mis proyectos
         </button>
@@ -254,7 +259,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
           ) : (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <h2 style={{ margin: 0, fontSize: 'var(--font-xl)' }}>{projectName}</h2>
-              <Button variant="icon-square" title="Renombrar proyecto" onClick={handleStartEditTitle}>
+              <Button variant="icon-plain" title="Renombrar proyecto" onClick={handleStartEditTitle}>
                 <IconPencil size={16} />
                 <span className="sr-only">Renombrar proyecto</span>
               </Button>
@@ -283,7 +288,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
               <p style={{ margin: 0, fontSize: 'var(--font-sm)', color: 'var(--text-dim)', maxWidth: 480 }}>
                 {record.description ?? 'Sin descripción todavía.'}
               </p>
-              <Button variant="icon-square" title="Editar descripción" onClick={handleStartEditDescription}>
+              <Button variant="icon-plain" title="Editar descripción" onClick={handleStartEditDescription}>
                 <IconPencil size={14} />
                 <span className="sr-only">Editar descripción</span>
               </Button>
@@ -326,7 +331,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
                 <ul
                   style={
                     mobLayout === 'grid'
-                      ? { listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }
+                      ? { listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }
                       : { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }
                   }
                 >
@@ -350,7 +355,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
                       onClick={onAddMobs}
                       style={
                         mobLayout === 'grid'
-                          ? { width: '100%', height: '100%', minHeight: 160, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-strong)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer' }
+                          ? { width: '100%', height: '100%', minHeight: 220, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-strong)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer' }
                           : { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 14px', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-strong)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer' }
                       }
                     >

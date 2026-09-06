@@ -16,8 +16,14 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
    * texto visualmente con la clase `.sr-only` (nunca lo omite del DOM
    * -- el botón sigue necesitando un nombre accesible real, mismo
    * criterio de ticket 032, solo que ya no se ve en pantalla).
+   *
+   * `'icon-plain'` (ticket 060, corrección de Marco: "debe ser solo el
+   * icono sin el cuadro que lo envuelve"): mismo criterio de accesible-
+   * pero-oculto que `'icon-square'` (texto real via `.sr-only`, nunca
+   * omitido del DOM), pero SIN el fondo/borde/caja -- solo el ícono,
+   * usado en los botones de editar título/descripción de `Proyecto.tsx`.
    */
-  variant?: 'secondary' | 'primary' | 'icon' | 'icon-square' | 'danger';
+  variant?: 'secondary' | 'primary' | 'icon' | 'icon-square' | 'icon-plain' | 'danger';
 }
 
 /**
