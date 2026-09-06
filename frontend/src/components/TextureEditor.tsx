@@ -1,6 +1,7 @@
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
 import { hexToRgba } from '../colors';
 import { computeCanvasDisplaySize } from '../canvasSize';
+import { isPixelInActiveRegion } from '../partIsolation';
 import type { NamedUVRegion } from '../regionLabels';
 import type { PixelPoint, RGBA, TextureBuffer } from '../textureBuffer';
 import { ZOOM_STEP, clampZoom } from '../zoom';
@@ -34,7 +35,30 @@ export interface TextureEditorProps {
   namedRegions?: NamedUVRegion[];
   /** Notifica que celda esta bajo el cursor (o `null` al salir del canvas) -- ticket 011, etiqueta de region en el panel. */
   onHoverPixel?: (point: PixelPoint | null) => void;
+  /**
+   * Parte actualmente aislada (ticket 012), o `null`/`undefined` en modo
+   * "Mostrar todo". Cuando esta presente:
+   * - Se dibuja un overlay que atenua (oscurece) todo lo que NO
+   *   pertenece a esta region (ver `isolationCanvasRef` mas abajo).
+   * - El cursor cambia a `not-allowed` sobre el area atenuada (feedback
+   *   inmediato de que pintar ahi no tendra efecto -- el bloqueo real de
+   *   la escritura ocurre en `Editor.tsx`, este componente solo da la
+   *   señal visual).
+   */
+  isolatedRegion?: NamedUVRegion | null;
 }
+
+/**
+ * Color del overlay de atenuado del ticket 012 (aislar parte para
+ * pintar). Se dibuja en un canvas separado (mismo patron que el grid/
+ * fronteras) que cubre TODO el area de presentacion salvo un "agujero"
+ * (`clearRect`) exactamente sobre el rectangulo de la parte aislada --
+ * asi el resto de la cuadricula queda visualmente diferenciado como
+ * no-editable sin tocar ni un pixel del `TextureBuffer` real (la
+ * atenuacion es puramente de presentacion, ver docs/ARQUITECTURA.md,
+ * "Ticket 012").
+ */
+const ISOLATION_DIM_COLOR = 'rgba(0, 0, 0, 0.7)';
 
 /** Color de las lineas de cuadricula sobre el canvas de textura -- sutil, no compite con los colores pintados. */
 const GRID_LINE_COLOR = 'rgba(0, 0, 0, 0.3)';
@@ -113,12 +137,19 @@ export function TextureEditor({
   onStrokeEnd,
   namedRegions,
   onHoverPixel,
+  isolatedRegion,
 }: TextureEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const gridCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isolationCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const regionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isPaintingRef = useRef(false);
   const lastCellRef = useRef<PixelPoint | null>(null);
+  // Cursor `not-allowed` sobre el area atenuada (ticket 012) -- estado
+  // separado (no derivado en cada render) porque solo debe cambiar
+  // cuando el cursor CRUZA la frontera dentro/fuera de la parte
+  // aislada, no en cada `pointermove` dentro de la misma zona.
+  const [cursorBlocked, setCursorBlocked] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -189,6 +220,30 @@ export function TextureEditor({
     }
   }, [namedRegions, zoom, displayWidth, displayHeight]);
 
+  /**
+   * Overlay de atenuado de la parte aislada (ticket 012). Mismo patron
+   * que los canvas de grid/fronteras de arriba -- backing store =
+   * resolucion de PRESENTACION, `pointer-events: none`. Se dibuja DESPUES
+   * del canvas de grid pero ANTES del de fronteras en el JSX (ver mas
+   * abajo) para que las lineas amarillas de fronteras (ticket 011) sigan
+   * visibles incluso sobre el area oscurecida -- ayuda a orientarse
+   * dentro de la zona atenuada.
+   */
+  useEffect(() => {
+    const canvas = isolationCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    if (!isolatedRegion) return;
+
+    ctx.fillStyle = ISOLATION_DIM_COLOR;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const { x0, y0, x1, y1 } = isolatedRegion.rect;
+    ctx.clearRect(x0 * zoom, y0 * zoom, (x1 - x0) * zoom, (y1 - y0) * zoom);
+  }, [isolatedRegion, zoom, displayWidth, displayHeight]);
+
   function cellFromEvent(e: ReactPointerEvent<HTMLCanvasElement>): PixelPoint | null {
     const canvas = canvasRef.current;
     if (!canvas) return null;
@@ -218,6 +273,12 @@ export function TextureEditor({
     // (!isPaintingRef.current) return` de abajo.
     onHoverPixel?.(cell);
 
+    // Cursor `not-allowed` fuera de la parte aislada (ticket 012) --
+    // misma funcion pura que usa `Editor.tsx` para bloquear la
+    // escritura real, reusada aca solo para la señal visual del cursor.
+    const blocked = !!isolatedRegion && (!cell || !isPixelInActiveRegion(cell, isolatedRegion));
+    setCursorBlocked((prev) => (prev === blocked ? prev : blocked));
+
     if (!isPaintingRef.current) return;
     if (!cell) return;
     const last = lastCellRef.current;
@@ -234,6 +295,7 @@ export function TextureEditor({
   /** Limpia la etiqueta de region al salir del canvas (ticket 011) -- no interfiere con el pintado (`stopPainting` sigue atado a pointerup/pointercancel). */
   function handlePointerLeave() {
     onHoverPixel?.(null);
+    setCursorBlocked(false);
   }
 
   function stopPainting(e: ReactPointerEvent<HTMLCanvasElement>) {
@@ -286,13 +348,17 @@ export function TextureEditor({
         ref={canvasRef}
         width={buffer.width}
         height={buffer.height}
-        aria-label={`Editor de textura pixel a pixel, cuadricula de ${buffer.width} por ${buffer.height} pixeles`}
+        aria-label={
+          isolatedRegion
+            ? `Editor de textura pixel a pixel, cuadricula de ${buffer.width} por ${buffer.height} pixeles. Parte aislada: ${isolatedRegion.label}. El resto de la cuadricula esta bloqueado para pintar.`
+            : `Editor de textura pixel a pixel, cuadricula de ${buffer.width} por ${buffer.height} pixeles`
+        }
         style={{
           width: displayWidth,
           height: displayHeight,
           imageRendering: 'pixelated',
           touchAction: 'none',
-          cursor: 'crosshair',
+          cursor: cursorBlocked ? 'not-allowed' : 'crosshair',
           display: 'block',
         }}
         onPointerDown={handlePointerDown}
@@ -305,6 +371,22 @@ export function TextureEditor({
       {showGrid && (
         <canvas
           ref={gridCanvasRef}
+          width={displayWidth}
+          height={displayHeight}
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: displayWidth,
+            height: displayHeight,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {isolatedRegion && (
+        <canvas
+          ref={isolationCanvasRef}
           width={displayWidth}
           height={displayHeight}
           aria-hidden="true"
