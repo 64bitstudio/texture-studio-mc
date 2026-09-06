@@ -1017,3 +1017,13 @@ Botón compacto (ícono ☀️/🌙 + texto, `variant="icon"`, mismo criterio de
 ### Verificación en vivo (Claude in Chrome, local)
 
 Confirmado con captura de pantalla en ambos temas: toggle cambia toda la UI visible al instante (Sections, botones, checkbox, menú "Proyecto" desplegable); recargar la página mantiene el tema elegido (persistencia real, no solo en memoria); el bug de `color-scheme` se reprodujo y se re-verificó corregido con capturas antes/después. `npm run lint`, `npm test` (174, incluye `theme.spec.ts` nuevo), `npm run build` en verde -- este último atrapó un bug real de sintaxis en `index.html` (comentario HTML cerrado accidentalmente con `*/` de JS en vez de `-->`, error `parse5: eof-in-comment`), corregido antes de continuar.
+
+## Ticket 035 -- Acento verde (HU-mockup)
+
+### Un solo valor de `--accent` para ambos temas
+
+`--accent` pasa de `#c084fc` (morado) a `#4ade80` (verde, mismo valor en `[data-theme='dark']` y `[data-theme='light']`) -- no hizo falta un verde distinto por tema porque `--accent` en este proyecto SOLO se usa como borde (mob activo del selector, color seleccionado en `ColorPicker`, contorno del overlay de "pegar imagen") o como fondo de `.ui-button--primary` con texto oscuro fijo (`#1b1c22`, sin cambios) -- nunca como color de TEXTO sobre el fondo del tema, que es el caso que sí exigiría dos tonos distintos por contraste. Verificado visualmente en ambos temas antes de cerrar el ticket, confirmando que un solo verde funciona en los dos.
+
+### Fuera de alcance, confirmado sin regresión: checkbox nativo
+
+El `<input type="checkbox">` de `ui/Checkbox.tsx` nunca tuvo `accent-color` fijado (usa el color de sistema del navegador, no `--accent`) -- no es una regresión de este ticket, ya era así desde el ticket 026, y queda fuera de alcance (no pedido en la definición ni en el ticket).
