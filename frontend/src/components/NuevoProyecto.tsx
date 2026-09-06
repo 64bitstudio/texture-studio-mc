@@ -20,15 +20,19 @@ export interface NuevoProyectoProps {
 
 const EMPTY_BUFFER = new TextureBuffer(1, 1);
 
-/** Fondo cuadriculado sutil del panel del visor 3D (ticket 046, revisión 2 -- detalle de la referencia). */
-const VIEWER_GRID_STYLE = {
+/**
+ * Contenedor del visor 3D. Ticket 046 (revisión 2) había puesto una
+ * cuadrícula CSS aca como aproximación, pero quedaba tapada por el
+ * fondo opaco de la propia escena (`<color attach="background">` en
+ * `Viewer3D.tsx`) en cuanto el modelo cargaba -- ticket 048 movió la
+ * cuadrícula DENTRO de la escena 3D real (`<Grid>` de drei, ver
+ * `Viewer3D.tsx`), así que este contenedor vuelve a ser solo el marco.
+ */
+const VIEWER_FRAME_STYLE = {
   height: 300,
   borderRadius: 'var(--radius-lg)',
   overflow: 'hidden',
   border: '1px solid var(--border)',
-  backgroundColor: 'var(--bg)',
-  backgroundImage: 'linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px)',
-  backgroundSize: '24px 24px',
 } as const;
 
 /**
@@ -358,7 +362,7 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
         )}
         {selectedMobId && previewAsset && previewBuffer && (
           <>
-            <div style={VIEWER_GRID_STYLE}>
+            <div style={VIEWER_FRAME_STYLE}>
               <Viewer3D texture={previewTexture} geometry={previewAsset.geometry} mobLabel={selectedMobLabel} />
             </div>
 
@@ -397,10 +401,15 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
                 border: '1px solid var(--border)',
               }}
             >
-              <span aria-hidden="true" style={{ color: 'var(--text-dim)', flexShrink: 0, marginTop: 1 }}>
-                <IconInfo size={16} />
+              {/* Ticket 048: `IconInfo` ya es un badge relleno con
+                  colores fijos (ver `ui/icons.tsx`) -- el `span`
+                  envolvente ya no necesita fijar `color` (no queda
+                  ningún `currentColor` que heredar), solo el
+                  alineado/flexShrink. */}
+              <span aria-hidden="true" style={{ flexShrink: 0 }}>
+                <IconInfo size={28} />
               </span>
-              <p style={{ margin: 0, fontSize: 'var(--font-xs)', color: 'var(--text-dim)' }}>
+              <p style={{ margin: 0, fontSize: 'var(--font-xs)', color: 'var(--text-dim)', alignSelf: 'center' }}>
                 Esta es solo una vista previa aproximada del modelo -- no representa todas las animaciones del juego.
               </p>
             </div>

@@ -1348,3 +1348,37 @@ El hallazgo central de "todos los íconos no tienen el estilo correcto": la revi
 Comparación directa contra la imagen de referencia con recortes ampliados de: ícono de tema (relleno, con rayos), ícono de Configuración (relleno, con agujero central), input (borde con tinte de acento), tarjeta de marca del pie del sidebar (legible sobre el degradado de píxeles verdes tras subir la opacidad de su fondo de 0.55 a 0.88 -- otro hallazgo en vivo, se veía demasiado transparente contra la zona más intensa del degradado). Se confirmó tema claro sin el bug de contraste del sidebar (ya corregido) y sin errores de consola.
 
 `npm run lint`, `npm test` (197, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde (638 módulos, +2 assets PNG de marca).
+
+## Ticket 048 -- Topbar compartida, cuadrícula 3D real e ícono de info corregido
+
+Tercera pasada de corrección sobre el rediseño visual (046/047). Marco confirmó "todo está perfecto" y pidió 3 detalles puntuales -- se resolvieron los 3 sin necesidad de re-muestrear la imagen de referencia (ya se tenía suficiente contexto de las 2 pasadas anteriores), salvo el ícono de info que sí se recortó/verificó de nuevo.
+
+### Topbar compartida (`AppShell.tsx`) -- el logo se muda del sidebar a una barra que cruza todo el ancho
+
+Antes: el logo/marca vivía arriba del `Sidebar` (columna vertical, a la izquierda) y los controles de tema/Configuración/avatar vivían en un `<header>` que solo cruzaba el ancho del ÁREA DE CONTENIDO (a la derecha del sidebar, no desde el borde izquierdo real de la ventana). Marco pidió que ambos vivan en la MISMA topbar, cruzando TODO el ancho.
+
+`AppShell.tsx` se reestructuró de "fila (sidebar + columna de contenido)" a "columna (topbar + fila (sidebar + contenido))": la topbar nueva es un `<header>` de altura fija (68px) con el logo a la izquierda y los 3 controles a la derecha, `width: 100%` implícito por vivir en el nivel más externo del layout -- el `Sidebar` y el `<main>` ahora viven DEBAJO de esa topbar, dentro de un `<div style={{flex:1, display:'flex'}}>`.
+
+**Decisión de color**: a diferencia de `Sidebar.tsx` (superficie permanentemente oscura, con texto en colores FIJOS por el bug real del ticket 047), esta topbar nueva SIGUE usando tokens de tema (`var(--panel-bg)`/`var(--text)`/`var(--text-dim)`) -- no lleva la imagen de fondo de Marco, así que no hay ningún fondo fijo-oscuro con el que su texto pueda desincronizarse; sigue el tema activo sin problema, verificado en ambos temas en vivo.
+
+`Sidebar.tsx` pierde el bloque de marca superior que tenía desde el ticket 037 -- conserva la tarjeta de marca del pie (con el logo chico) sin cambios. `height: '100%'` (antes `'100vh'`): ya no ocupa la ventana completa desde arriba, vive dentro del contenedor flex de abajo de la topbar.
+
+### Cuadrícula 3D real (`Viewer3D.tsx`, componente compartido)
+
+El ticket 046 había puesto una cuadrícula aproximada con CSS (`background-image` de gradientes lineales) detrás del contenedor del canvas en `NuevoProyecto.tsx` -- pero quedaba completamente tapada en cuanto el modelo cargaba, porque la escena de Three.js ya pinta su propio fondo OPACO (`<color attach="background" args={['#2b2d36']} />`). Marco pidió la cuadrícula real.
+
+Fix: `<Grid>` de `@react-three/drei` (ya una dependencia del proyecto, mismo paquete que `OrbitControls`) DENTRO de la escena -- un piso cuadriculado real con perspectiva, en `position={[0, 0, 0]}` (asume pies en y=0, cierto para los 4 mobs actuales del catálogo -- ver comentario de `computeGeometryCenter`/`geometryBounds.ts`, ticket 020). `infiniteGrid` para que se extienda más allá del `args` inicial; `fadeDistance`/`fadeStrength` para que se atenúe con la distancia (igual que la referencia) en vez de cortar abruptamente.
+
+**Efecto colateral deliberado, no un descuido**: `Viewer3D.tsx` es un componente COMPARTIDO (`Editor.tsx`, `AgregarMobs.tsx`, `NuevoProyecto.tsx`) -- agregar la cuadrícula ahí la agrega a los 3 consumidores, no solo a "Nuevo proyecto". Verificado en vivo que el Editor (fuera del alcance nominal de 046/047/048) también la muestra correctamente, sin romper nada -- una mejora incidental bienvenida, no una regresión, dado que es puramente decorativo/no cambia ningún comportamiento.
+
+`NuevoProyecto.tsx` (`VIEWER_GRID_STYLE`, renombrado a `VIEWER_FRAME_STYLE`): se retira el truco de CSS del ticket 046 (ya redundante y menos fiel que la cuadrícula 3D real) -- el contenedor vuelve a ser solo el marco (borde/radio/overflow).
+
+### `IconInfo` -- badge relleno, más grande (`ui/icons.tsx`)
+
+Recorte ampliado de la referencia confirmó: círculo SÓLIDO gris claro (`#8b93a1`, muestreado) con una "i" oscura adentro (punto + palo, vía dos `<rect>` con `rx` para las puntas redondeadas) -- no el ícono de trazo fino chico (`currentColor`, tamaño 16-20) que tenía la revisión 1. Mismo criterio que `IconCube`/`IconGrassBlockLogo`: colores FIJOS, no `currentColor` -- este badge se ve igual sin importar dónde se use. `size` default sube de 20 a 28.
+
+### Verificación en vivo (Claude in Chrome, local, ambos temas)
+
+Topbar compartida cruzando todo el ancho confirmada en "Nuevo proyecto" y "Mis proyectos" (misma `AppShell`), en ambos temas -- en tema claro la topbar sigue el tema (fondo blanco, texto oscuro) sin ningún bug de contraste (a diferencia del sidebar, no lleva un fondo fijo-oscuro). Cuadrícula 3D confirmada visible en el visor de "Nuevo proyecto" (recorte ampliado, perspectiva con desvanecido hacia el fondo) Y en el Editor (mismo componente compartido, sin errores de consola). Ícono de info confirmado como badge relleno más grande, coincide con la referencia.
+
+`npm run lint`, `npm test` (197, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde.
