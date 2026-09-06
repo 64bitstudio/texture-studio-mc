@@ -1474,3 +1474,53 @@ Los colores de la cuadrícula del piso (ticket 051, `#20392c`/`#2c4d3c`) NO se t
 Comparación directa contra la imagen de referencia en "Nuevo proyecto" (recorte ampliado) y en el Editor (mismo componente/hook compartido, sin errores de consola) -- fondo y saturación/contraste del modelo ahora coinciden visiblemente con la referencia, una mejora sustancial sobre el resultado del ticket 051.
 
 `npm run lint`, `npm test` (197, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde.
+
+## Ticket 053 -- Rediseño de "Mis proyectos" + acciones reales por tarjeta
+
+A diferencia de los tickets 046-052 (puramente visuales), este pedido de Marco mezcla layout nuevo (imagen de referencia) CON comportamiento nuevo real: qué hace cada botón de cada tarjeta, y una capacidad que no existía en absoluto ("Duplicar" un proyecto).
+
+### Decisiones de alcance (confirmadas con Marco via `AskUserQuestion`, no asumidas)
+
+- **Filtro por mob**: se RETIRA. La imagen de referencia no lo muestra (solo buscar + ordenar) -- Marco confirmó quitarlo en vez de conservarlo fuera de la referencia. `mobFilter`/`collectMobIdsInProjects` (ticket 028) dejan de usarse en `MisProyectos.tsx` -- `projectFilter.ts` no cambia (sigue siendo puro/reusable, `Recientes.tsx` no lo usaba de todos modos).
+- **Toggle grid/lista**: REAL, no decorativo -- ambos layouts funcionan de verdad (`ProjectCard.tsx` recibe `layout` y cambia su propio markup).
+- **"Duplicar"**: crea la copia al instante con nombre autogenerado (`" (copia)"`, incrementando a `" (copia 2)"` etc. si ya existe) -- sin pedir nombre antes. Ver `duplicateProject()` en `projectStorage.ts`.
+- **"Editar" con proyectos de varios mobs**: Marco dio discreción explícita ("el editor podría abrir la última textura editada o una vista para elegir cuál editar"). Se eligió la vista-selector en vez de trackear "último mob editado" (dato que HOY no existe en `ProjectRecord` y agregarlo sería alcance nuevo no pedido) -- y resulta que `Proyecto.tsx` (ticket 041) YA ES exactamente esa "vista para elegir cuál editar", así que no hizo falta construir nada nuevo para ese caso, solo enrutar ahí.
+
+### `handleProjectEdit` (`App.tsx`) -- "Editar" es una acción DISTINTA de "abrir"
+
+Antes de este ticket, `MisProyectos`/`Recientes` solo tenían UN camino de salida (`onProjectSelected` → siempre `setView('proyecto')`, la vista de detalle). Este ticket agrega un segundo camino real: `onProjectEdit`, cableado a `handleProjectEdit` en `App.tsx` --
+
+```ts
+function handleProjectEdit(projectName: string, mobIds: string[]) {
+  setActiveProject({ name: projectName, mobIds });
+  if (mobIds.length === 1) {
+    handleSelectMob(mobIds[0]!); // directo al editor
+  } else {
+    setView('proyecto'); // Proyecto.tsx como selector
+  }
+}
+```
+
+`MisProyectos.tsx` restaura los buffers (`restoreProjectBuffers`, mismo mecanismo que ya existía) UNA sola vez vía `openProject()`, y decide a cuál de los dos callbacks del padre entregar el resultado (`onProjectSelected` para "abrir"/click en la tarjeta, `onProjectEdit` para "Editar") -- evita duplicar la lógica de restaurar buffers para las dos acciones.
+
+### `ProjectCard.tsx` (nuevo) -- tarjeta autocontenida
+
+Reemplaza la fila de texto plano de `MisProyectos.tsx` (ticket 039). Autocontenida para Renombrar/Duplicar/Exportar/Eliminar -- llama directo a `projectStorage.ts`/`export.ts` (mismas funciones que ya usaba `Proyecto.tsx`, sin duplicar lógica) porque esas 4 acciones no tocan `bufferCache` ni navegan; solo "abrir" (click en la tarjeta/nombre) y "Editar" suben al padre (`MisProyectos.tsx`), que sí necesita coordinar `bufferCache` + navegación.
+
+El menú "⋮" (`ui/Menu.tsx`, ticket 025) recibe TODO su contenido como `children` (no `items`) -- mismo patrón que el menú "Archivo" de `Editor.tsx` (ticket 031): Renombrar y Eliminar necesitan quedarse abiertos mostrando un campo/confirmación inline (sin diálogos nativos, ver memoria `texture-studio-mc-sin-dialogos-nativos`), y `Menu` solo autocierra los items de la lista `items` (patrón ARIA "menu" de acciones planas), no el contenido libre de `children`.
+
+**Extensión aditiva de `ui/Menu.tsx`**: se agregó `triggerVariant?: ButtonProps['variant']` (default `undefined`, Button ya cae a `'secondary'`) para que el botón disparador del menú "⋮" pueda verse compacto (`'icon-square'`, mismo variant que ya usa la topbar) sin romper el uso existente de `Editor.tsx` (que no pasa esa prop y sigue igual).
+
+### `duplicateProject()` (`projectStorage.ts`, nuevo)
+
+Copia PROFUNDA de `mobs` (no una referencia -- editar la copia nunca debe afectar al original) bajo un nombre autogenerado. A diferencia de `saveProject`/`renameProject` (que exigen que quien llama resuelva una colisión de nombre lanzando `ProjectAlreadyExistsError`), esta función resuelve la colisión ella misma incrementando el sufijo (`" (copia)"` → `" (copia 2)"` → ...) porque aquí no hay una persona eligiendo el nombre a mano.
+
+### Hallazgo real: bug de `ui-accessibility-guard.sh` con tags multilínea
+
+Al escribir `ProjectCard.tsx`/`MisProyectos.tsx` con el estilo de formato ya establecido en el proyecto (una prop de JSX por línea), el hook `PreToolUse:Write` `ui-accessibility-guard.sh` bloqueó el guardado reportando docenas de falsos "MISSING ALT"/"UNLABELED INPUT" -- el `<img>`/`<input>` real SÍ tenían `alt=`/`aria-label=`. Causa real (verificada corriendo el hook a mano con `bash -x`): el hook extrae el tag COMPLETO correctamente (incluye `alt=`), pero el loop que lo consume usa `while read -r tag`, que corta por cada salto de línea INTERNO del match -- un tag multilínea se evalúa como N fragmentos independientes, y solo el fragmento que contiene literalmente `alt=` pasa. Reportado vía `SendFeedback`. Mientras no se corrija: el `<img>` de las miniaturas y el `<input>` de renombrar en este ticket se dejan en una sola línea (única excepción de formato en estos 2 archivos, documentada in situ).
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Se crearon proyectos de prueba reales (1 mob, 3 mobs, 4 mobs -- para ver el badge "+1" de overflow) vía el flujo normal de la app. Confirmado en vivo, dark y light theme, sin errores de consola: layout coincide con la imagen de referencia (folder+título+⋮, meta "N mobs · Última modificación", miniaturas + overflow, botón "Editar"); clic en la tarjeta/título abre la vista de detalle; "Editar" con 1 mob va directo al editor (con el selector de mob del editor ya restringido a los mobs del proyecto, ticket 043); "Editar" con varios mobs navega a `Proyecto.tsx` como selector; Renombrar/Duplicar/Eliminar (con confirmación inline) funcionan y refrescan la lista; toggle grid/lista cambia de verdad el layout; búsqueda filtra por nombre.
+
+`npm run lint`, `npx tsc --noEmit`, `npm test` (201 -- 4 tests nuevos de `duplicateProject`), `npm run build` en verde.

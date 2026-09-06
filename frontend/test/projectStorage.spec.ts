@@ -14,6 +14,7 @@ import {
   PROJECTS_STORAGE_KEY,
   deleteAllProjects,
   deleteProject,
+  duplicateProject,
   listProjects,
   loadProject,
   projectExists,
@@ -241,6 +242,45 @@ describe('renameProject (ticket 041)', () => {
     // Ninguno de los dos proyectos originales se toco.
     expect(projectExists('a')).toBe(true);
     expect(projectExists('b')).toBe(true);
+  });
+});
+
+describe('duplicateProject (ticket 053)', () => {
+  it('crea una copia independiente con nombre autogenerado " (copia)"', () => {
+    saveProject('Mobs del Bosque', SAMPLE_MOBS);
+
+    const newName = duplicateProject('Mobs del Bosque');
+
+    expect(newName).toBe('Mobs del Bosque (copia)');
+    expect(projectExists('Mobs del Bosque')).toBe(true);
+    expect(projectExists('Mobs del Bosque (copia)')).toBe(true);
+    expect(loadProject('Mobs del Bosque (copia)')!.mobs).toEqual(SAMPLE_MOBS);
+  });
+
+  it('incrementa el sufijo si " (copia)" ya existe -- nunca lanza ProjectAlreadyExistsError por colisión propia', () => {
+    saveProject('a', SAMPLE_MOBS);
+    duplicateProject('a'); // 'a (copia)'
+
+    const second = duplicateProject('a');
+
+    expect(second).toBe('a (copia 2)');
+    expect(projectExists('a (copia)')).toBe(true);
+    expect(projectExists('a (copia 2)')).toBe(true);
+  });
+
+  it('editar la copia no afecta al original (copia profunda de `mobs`, no una referencia compartida)', () => {
+    saveProject('original', SAMPLE_MOBS);
+    const copyName = duplicateProject('original');
+
+    const copyRecord = loadProject(copyName)!;
+    copyRecord.mobs['nuevo-mob'] = { resolution: 1, pngDataUrl: 'data:image/png;base64,extra' };
+    saveProject(copyName, copyRecord.mobs, { overwrite: true });
+
+    expect(loadProject('original')!.mobs).toEqual(SAMPLE_MOBS);
+  });
+
+  it('lanza si el proyecto origen no existe', () => {
+    expect(() => duplicateProject('no-existe')).toThrow(/ya no existe/);
   });
 });
 

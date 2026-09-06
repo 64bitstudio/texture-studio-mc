@@ -318,3 +318,12 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 
 - **`hooks/useCanvasTexture.ts`** — `colorSpace = THREE.SRGBColorSpace` explícito en la `CanvasTexture` (defaultea a `NoColorSpace` en three.js, causando un descalce sRGB de un solo sentido -- causa real del modelo "lavado", distinta del tone mapping ya corregido en el ticket 051). Componente compartido, aplica a toda la app.
 - **`components/Viewer3D.tsx`** — fondo revertido a `#0f171d` (el mismo `--bg` del resto de la app, antes `#122015` verde del ticket 049) -- muestreo de la nueva imagen de referencia confirmó que no es verde.
+
+### Ticket 053 -- Rediseño de "Mis proyectos" + acciones reales por tarjeta
+
+- **`components/ProjectCard.tsx`** (nuevo) — tarjeta de un proyecto guardado, layout `grid`/`list`; autocontenida para Renombrar/Duplicar/Exportar/Eliminar (llama directo a `projectStorage.ts`/`export.ts`); "Editar" y click en la tarjeta/nombre suben al padre.
+- **`components/MisProyectos.tsx`** — rediseño completo: tarjetas (`ProjectCard`) en vez de lista de texto plano; se retira el filtro por mob (no está en la referencia); toggle grid/lista real; nuevo prop `onProjectEdit` (distinto de `onProjectSelected`).
+- **`components/App.tsx`** — nuevo `handleProjectEdit`: con 1 mob va directo al editor, con varios navega a `Proyecto.tsx` como selector (decisión de Marco, discreción explícita).
+- **`projectStorage.ts`** — nueva función `duplicateProject(name)`: copia profunda con nombre autogenerado (`" (copia)"`, `" (copia 2)"`, ...).
+- **`ui/Menu.tsx`** — nuevo prop opcional `triggerVariant` (aditivo, default no rompe `Editor.tsx`) para un disparador compacto (`'icon-square'`).
+- **`ui/icons.tsx`** — nuevos íconos: `IconSearch`, `IconDots`, `IconGridView`, `IconListView`, `IconPencil`.

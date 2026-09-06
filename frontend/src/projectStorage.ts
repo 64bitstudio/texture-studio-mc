@@ -222,6 +222,46 @@ export function renameProject(oldName: string, newName: string): void {
 }
 
 /**
+ * Duplica un proyecto guardado (ticket 053, menú "⋮" de "Mis proyectos") --
+ * copia COMPLETA de `mobs` (mismos PNGs/resolución, sin volver a
+ * codificar nada) bajo un nombre nuevo autogenerado, con `updatedAt`
+ * propio (es un proyecto nuevo e independiente desde este momento, no
+ * un alias -- editar la copia nunca debe afectar al original ni
+ * viceversa).
+ *
+ * DECISION de este ticket (confirmada con Marco via `AskUserQuestion`,
+ * no la ronda de "pedir nombre antes" -- ver `docs/ARQUITECTURA.md`,
+ * "Ticket 053"): el nombre se autogenera al instante, sufijo
+ * `" (copia)"`; si ya existe, incrementa a `" (copia 2)"`, `" (copia 3)"`,
+ * etc. hasta encontrar uno libre -- nunca lanza `ProjectAlreadyExistsError`
+ * por colisión de nombre generado (a diferencia de `saveProject`/
+ * `renameProject`, que sí exigen que el LLAMADOR resuelva la colisión --
+ * aca no hay llamador humano eligiendo el nombre, así que esta función
+ * resuelve la colisión ella misma).
+ *
+ * Devuelve el nombre final asignado a la copia -- la UI lo usa para
+ * confirmar/resaltar la tarjeta recién creada.
+ */
+export function duplicateProject(name: string): string {
+  const all = readAllProjects();
+  const record = all[name];
+  if (!record) {
+    throw new Error(`El proyecto "${name}" ya no existe -- puede que se haya eliminado en otra pestaña.`);
+  }
+
+  let candidate = `${name} (copia)`;
+  let attempt = 2;
+  while (candidate in all) {
+    candidate = `${name} (copia ${attempt})`;
+    attempt += 1;
+  }
+
+  all[candidate] = { updatedAt: new Date().toISOString(), mobs: { ...record.mobs } };
+  writeAllProjects(all);
+  return candidate;
+}
+
+/**
  * Borra TODOS los proyectos guardados de una vez (ticket 036, pantalla
  * "Configuración", "Borrar todos los datos locales"). Elimina solo la
  * clave `PROJECTS_STORAGE_KEY` -- NO toca ninguna otra clave de
