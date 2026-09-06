@@ -1,11 +1,10 @@
-import { useCallback, useState, type ChangeEvent } from 'react';
+import { useCallback, useState } from 'react';
 import type { MobSummary } from '../types/mobs';
 import type { TextureBuffer } from '../textureBuffer';
 import { listProjects, loadProject } from '../projectStorage';
 import { restoreProjectBuffers } from '../projectSnapshot';
 import { filterAndSortProjects, type ProjectSortBy } from '../projectFilter';
-import { Button, InlineError, Select } from '../ui';
-import { IconGridView, IconListView, IconSearch } from '../ui/icons';
+import { InlineError, SearchSortToggleBar, type ToggleLayout } from '../ui';
 import { ProjectCard } from './ProjectCard';
 
 export interface MisProyectosProps {
@@ -23,8 +22,6 @@ export interface MisProyectosProps {
    */
   onProjectEdit: (projectName: string, loadedMobIds: string[]) => void;
 }
-
-type ViewLayout = 'grid' | 'list';
 
 /**
  * Vista "Mis proyectos" (ticket 039, HU-5 -- rediseño visual y de
@@ -56,7 +53,7 @@ export function MisProyectos({ mobs, bufferCache, onProjectSelected, onProjectEd
   const [error, setError] = useState<string | null>(null);
   const [searchText, setSearchText] = useState('');
   const [sortBy, setSortBy] = useState<ProjectSortBy>('updatedAt');
-  const [layout, setLayout] = useState<ViewLayout>('grid');
+  const [layout, setLayout] = useState<ToggleLayout>('grid');
   // Ticket 053: ninguna acción de `ProjectCard` (renombrar/duplicar/
   // eliminar) actualiza estado propio de este componente -- `allProjects`
   // se deriva de `listProjects()` en cada render (mismo criterio que
@@ -66,14 +63,6 @@ export function MisProyectos({ mobs, bufferCache, onProjectSelected, onProjectEd
 
   const allProjects = listProjects();
   const projects = filterAndSortProjects(allProjects, { searchText, sortBy });
-
-  function handleSearchTextChange(e: ChangeEvent<HTMLInputElement>) {
-    setSearchText(e.target.value);
-  }
-
-  function handleSortByChange(e: ChangeEvent<HTMLSelectElement>) {
-    setSortBy(e.target.value as ProjectSortBy);
-  }
 
   const handleCardChanged = useCallback(() => {
     setRefreshTick((t) => t + 1);
@@ -128,44 +117,21 @@ export function MisProyectos({ mobs, bufferCache, onProjectSelected, onProjectEd
         </div>
 
         {allProjects.length > 0 && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ position: 'relative' }}>
-              <IconSearch size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)', pointerEvents: 'none' }} />
-              {/* Una sola línea -- ver `ProjectCard.tsx` para el hallazgo real de por qué (bug de `ui-accessibility-guard.sh` con tags multilínea, reportado via `SendFeedback`). */}
-              <input type="search" aria-label="Buscar proyectos por nombre" placeholder="Buscar proyectos…" value={searchText} onChange={handleSearchTextChange} style={{ fontSize: 13, padding: '9px 12px 9px 32px', width: 220, borderRadius: 'var(--radius-md)', border: '1px solid var(--border-strong)', background: 'var(--bg)', color: 'var(--text)' }} />
-            </div>
-
-            <label style={{ display: 'flex', flexDirection: 'column', gap: 2, fontSize: 'var(--font-xs)', color: 'var(--text-dim)' }}>
-              Ordenar por
-              <Select value={sortBy} onChange={handleSortByChange} aria-label="Ordenar proyectos" style={{ fontSize: 13, padding: '8px 10px' }}>
-                <option value="updatedAt">Última modificación</option>
-                <option value="name">Nombre (A-Z)</option>
-              </Select>
-            </label>
-
-            <div style={{ display: 'flex', gap: 6 }}>
-              <Button
-                variant="icon-square"
-                onClick={() => setLayout('grid')}
-                aria-pressed={layout === 'grid'}
-                title="Vista de cuadrícula"
-                style={layout === 'grid' ? { background: 'var(--accent)', borderColor: 'var(--accent)', color: '#0f171d' } : undefined}
-              >
-                <IconGridView size={18} />
-                <span className="sr-only">Vista de cuadrícula</span>
-              </Button>
-              <Button
-                variant="icon-square"
-                onClick={() => setLayout('list')}
-                aria-pressed={layout === 'list'}
-                title="Vista de lista"
-                style={layout === 'list' ? { background: 'var(--accent)', borderColor: 'var(--accent)', color: '#0f171d' } : undefined}
-              >
-                <IconListView size={18} />
-                <span className="sr-only">Vista de lista</span>
-              </Button>
-            </div>
-          </div>
+          <SearchSortToggleBar
+            searchValue={searchText}
+            onSearchChange={setSearchText}
+            searchPlaceholder="Buscar proyectos…"
+            searchAriaLabel="Buscar proyectos por nombre"
+            sortOptions={[
+              { value: 'updatedAt', label: 'Última modificación' },
+              { value: 'name', label: 'Nombre (A-Z)' },
+            ]}
+            sortValue={sortBy}
+            onSortChange={(value) => setSortBy(value as ProjectSortBy)}
+            sortAriaLabel="Ordenar proyectos"
+            layout={layout}
+            onLayoutChange={setLayout}
+          />
         )}
       </div>
 

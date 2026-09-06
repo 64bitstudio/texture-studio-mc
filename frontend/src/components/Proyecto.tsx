@@ -1,71 +1,12 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { Button, FormField, InlineError, Section } from '../ui';
+import { useCallback, useRef, useState, type ChangeEvent } from 'react';
+import { Button, FormField, InlineError, Section, SearchSortToggleBar, type ToggleLayout } from '../ui';
 import { IconDuplicate, IconExport, IconFolder, IconPencil, IconTrash } from '../ui/icons';
 import { loadProject, updateProjectCover, updateProjectDescription } from '../projectStorage';
 import { useProjectActions } from '../hooks/useProjectActions';
-import { fetchMobBaseAssets } from '../api/baseAssets';
-import { useMobFrontSprite2D } from '../hooks/useMobFrontSprite2D';
+import { filterAndSortProjectMobs } from '../projectMobFilter';
+import { MobEntryCard } from './MobEntryCard';
 import type { MobSummary } from '../types/mobs';
 import type { MobGeometry } from '../types/baseAssets';
-
-interface MobThumbnail2DProps {
-  mobId: string;
-  pngDataUrl: string;
-  resolution: number;
-  label: string;
-  /** Cache de geometrías COMPARTIDA entre todas las miniaturas de esta pantalla -- la geometría de un mob es la misma sin importar cuántas veces aparezca (mismo criterio de cache local por pantalla ya establecido desde el ticket 045, que retiró el cache de sesión completa de `App.tsx`). */
-  geometryCache: Map<string, MobGeometry>;
-}
-
-/**
- * Miniatura 2D de un mob dentro de "Proyecto" (ticket 055 -- integración
- * mínima de prueba del motor `renderMobFrontSprite2D`/
- * `useMobFrontSprite2D`; el rediseño completo de esta tarjeta, con
- * buscador/orden/toggle e info adicional, es el ticket 057).
- *
- * Reemplaza la imagen cruda que mostraba esta pantalla desde el ticket
- * 041 (la hoja de textura completa comprimida en un cuadro chico,
- * difícil de reconocer) por la silueta 2D "de frente" compuesta con la
- * textura real -- mientras la geometría del mob no terminó de cargar (o
- * el compositor todavía no devolvió resultado), se sigue mostrando la
- * textura cruda como fallback, nunca un hueco vacío.
- */
-function MobThumbnail2D({ mobId, pngDataUrl, resolution, label, geometryCache }: MobThumbnail2DProps) {
-  // Derivado directo del cache durante el render (no via `setState`
-  // dentro del efecto -- oxlint `react/set-state-in-effect`, mismo
-  // criterio ya establecido en `App.tsx`): si `mobId` cambia a un mob ya
-  // cacheado, esto se refleja de inmediato sin esperar un ciclo extra de
-  // render. `fetchedGeometry` solo cubre el caso real de sincronizar con
-  // un sistema externo (la promesa de `fetchMobBaseAssets` todavia sin
-  // resolver) -- ahi si corresponde un efecto.
-  const cachedGeometry = geometryCache.get(mobId) ?? null;
-  const [fetchedGeometry, setFetchedGeometry] = useState<MobGeometry | null>(null);
-  const geometry = cachedGeometry ?? fetchedGeometry;
-
-  useEffect(() => {
-    if (geometryCache.has(mobId)) return;
-    let cancelled = false;
-    fetchMobBaseAssets(mobId)
-      .then((asset) => {
-        geometryCache.set(mobId, asset.geometry);
-        if (!cancelled) setFetchedGeometry(asset.geometry);
-      })
-      .catch((err: unknown) => {
-        console.warn(`MobThumbnail2D: no se pudo cargar la geometría de "${mobId}" para el preview 2D.`, err);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [mobId, geometryCache]);
-
-  const spriteUrl = useMobFrontSprite2D(geometry, pngDataUrl, resolution);
-  const thumbStyle = { width: 48, height: 48, objectFit: 'contain' as const, imageRendering: 'pixelated' as const, border: '1px solid var(--border-strong)', borderRadius: 2, background: 'var(--bg)' };
-
-  // Una sola línea -- ver `ProjectCard.tsx` (ticket 053) para el
-  // hallazgo real de por qué (bug de `ui-accessibility-guard.sh` con
-  // tags multilínea, reportado via `SendFeedback`).
-  return <img src={spriteUrl ?? pngDataUrl} alt={`Miniatura de la textura guardada de ${label}`} style={thumbStyle} />;
-}
 
 export interface ProyectoProps {
   projectName: string;
@@ -130,9 +71,12 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
   // (`refreshTick`).
   const [refreshTick, setRefreshTick] = useState(0);
   const coverInputRef = useRef<HTMLInputElement>(null);
+  const [mobSearchText, setMobSearchText] = useState('');
+  const [mobLayout, setMobLayout] = useState<ToggleLayout>('grid');
 
   const record = loadProject(projectName);
   const mobIds = record ? Object.keys(record.mobs) : [];
+  const visibleMobIds = filterAndSortProjectMobs(mobIds, mobs, mobSearchText);
 
   const handleStartEditTitle = useCallback(() => {
     setTitleInput(projectName);
@@ -345,23 +289,40 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
           {mobIds.length === 0 ? (
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-dim)' }}>Este proyecto todavía no tiene mobs -- usa "Agregar mob".</p>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 12 }}>
-              {mobIds.map((mobId) => (
-                <Button
-                  key={mobId}
-                  onClick={() => onSelectMob(mobId)}
-                  style={{ flexDirection: 'column', alignItems: 'center', gap: 6, padding: 8, height: 'auto' }}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <SearchSortToggleBar
+                searchValue={mobSearchText}
+                onSearchChange={setMobSearchText}
+                searchPlaceholder="Buscar mobs…"
+                searchAriaLabel="Buscar mobs de este proyecto por nombre"
+                layout={mobLayout}
+                onLayoutChange={setMobLayout}
+              />
+
+              {visibleMobIds.length === 0 ? (
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--text-dim)' }}>Ningún mob coincide con la búsqueda.</p>
+              ) : (
+                <ul
+                  style={
+                    mobLayout === 'grid'
+                      ? { listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }
+                      : { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }
+                  }
                 >
-                  <MobThumbnail2D
-                    mobId={mobId}
-                    pngDataUrl={record.mobs[mobId]!.pngDataUrl}
-                    resolution={record.mobs[mobId]!.resolution}
-                    label={mobLabelFor(mobId, mobs)}
-                    geometryCache={geometryCache}
-                  />
-                  <span>{mobLabelFor(mobId, mobs)}</span>
-                </Button>
-              ))}
+                  {visibleMobIds.map((mobId) => (
+                    <MobEntryCard
+                      key={mobId}
+                      mobId={mobId}
+                      label={mobLabelFor(mobId, mobs)}
+                      pngDataUrl={record.mobs[mobId]!.pngDataUrl}
+                      resolution={record.mobs[mobId]!.resolution}
+                      layout={mobLayout}
+                      geometryCache={geometryCache}
+                      onEditTexture={() => onSelectMob(mobId)}
+                    />
+                  ))}
+                </ul>
+              )}
             </div>
           )}
         </Section>
