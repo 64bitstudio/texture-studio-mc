@@ -11,23 +11,24 @@
 
 import JSZip from 'jszip';
 import type { TextureBuffer } from './textureBuffer';
-import { buildResourcePackFiles, DEFAULT_PACK_DESCRIPTION } from './exportPack';
+import { buildResourcePackFiles, DEFAULT_PACK_DESCRIPTION, dataUrlToBytes, projectZipFilename } from './exportPack';
 import type { UVBoxRect } from './symmetry';
 import { maskPixelsOutsideUVBoxes } from './uvBoxCleanup';
+import type { ProjectMobEntry } from './projectStorage';
 
 /** Nombre de archivo fijo pedido por el ticket (HU-10). */
 export const EXPORTED_PNG_FILENAME = 'skeleton.png';
-
-/** Nombre de archivo del ZIP -- ver diagrama de secuencia en docs/definiciones/editor-3d-texturas-esqueleto.md. */
-export const EXPORTED_ZIP_FILENAME = 'resource-pack.zip';
 
 /**
  * Codifica el contenido ACTUAL del `TextureBuffer` (unica fuente de
  * verdad -- ticket 006, item 4: no importa si vino de pintar a mano, de
  * importar o de pegar una imagen, ver HU-12) como PNG real, via un
- * `<canvas>` offscreen + `canvas.toBlob`. Reutilizada tanto por
- * `exportTexturePng` (HU-10) como por `exportResourcePackZip` (HU-11)
- * para no duplicar la logica de codificacion en dos lugares.
+ * `<canvas>` offscreen + `canvas.toBlob`. Usada por `exportTexturePng`
+ * (HU-10, unico export de un solo mob que sigue vivo) y tambien por
+ * `buildProjectSnapshot` (`projectSnapshot.ts`) al guardar un proyecto
+ * -- el ZIP de proyecto (ticket 044, `exportProjectZip`) YA NO llama a
+ * esta funcion directamente: reusa el PNG guardado tal cual via
+ * `dataUrlToBytes` (`exportPack.ts`), sin volver a codificar.
  *
  * MITIGACION ticket 015 (bug critico "hat overlay contaminado en
  * export"): antes de volcar los pixeles al canvas, se pasan por
@@ -89,25 +90,46 @@ export async function exportTexturePng(buffer: TextureBuffer, uvBoxes: UVBoxRect
 }
 
 /**
- * Exporta el ZIP completo del resource pack (HU-11): codifica la
- * textura actual a PNG (limpia de zonas fuera de `uvBoxes`, ticket
- * 015), arma `pack.mcmeta` + `skeleton.png` en la estructura de
- * carpetas correcta (`buildResourcePackFiles`, logica pura) y descarga
- * el `.zip` resultante.
+ * Exporta el ZIP completo de un PROYECTO (ticket 044, HU-4) -- itera
+ * TODOS los mobs guardados del proyecto activo (`ProjectRecord.mobs`,
+ * ver `projectStorage.ts`) y arma un unico resource pack con la
+ * textura de cada uno en su ruta vanilla real
+ * (`buildResourcePackFiles`, ahora generalizada a N mobs). REEMPLAZA a
+ * la exportacion anterior de "solo el mob activo del editor"
+ * (`exportResourcePackZip`, ticket 006/HU-11, retirada en este ticket
+ * -- ver `docs/ARQUITECTURA.md`, "Ticket 044"): esa opcion ya no existe
+ * en ningun lado de la UI, esta es la unica forma de exportar un ZIP.
+ *
+ * Cada `pngDataUrl` guardado YA es el PNG final, limpio de zonas fuera
+ * de `uvBoxes` (`maskPixelsOutsideUVBoxes` corrio una vez al guardar,
+ * ver `buildProjectSnapshot`) -- se decodifica a bytes crudos con
+ * `dataUrlToBytes` (sin canvas/Image, ver esa funcion) en vez de volver
+ * a decodificar a pixeles y re-codificar a PNG, que seria trabajo
+ * redundante y un segundo lugar donde el masking podria desalinearse.
+ *
+ * Lanza si el proyecto no tiene ningun mob -- un ZIP vacio (solo
+ * `pack.mcmeta`, sin ninguna textura) no es un resource pack util y no
+ * deberia poder dispararse desde la UI (el boton solo aparece en la
+ * vista de detalle de un proyecto que, por construccion, siempre tiene
+ * al menos un mob desde que se creo con "Nuevo proyecto").
  */
-export async function exportResourcePackZip(
-  buffer: TextureBuffer,
-  uvBoxes: UVBoxRect[],
+export async function exportProjectZip(
+  projectName: string,
+  mobs: Record<string, ProjectMobEntry>,
   description: string = DEFAULT_PACK_DESCRIPTION,
 ): Promise<void> {
-  const pngBlob = await encodeBufferToPngBlob(buffer, uvBoxes);
-  const pngBytes = await pngBlob.arrayBuffer();
+  const entries = Object.entries(mobs);
+  if (entries.length === 0) {
+    throw new Error(`El proyecto "${projectName}" no tiene ningun mob que exportar.`);
+  }
+
+  const mobInputs = entries.map(([mobId, entry]) => ({ mobId, pngBytes: dataUrlToBytes(entry.pngDataUrl) }));
 
   const zip = new JSZip();
-  for (const file of buildResourcePackFiles(pngBytes, description)) {
+  for (const file of buildResourcePackFiles(mobInputs, description)) {
     zip.file(file.path, file.data);
   }
 
   const zipBlob = await zip.generateAsync({ type: 'blob' });
-  triggerBlobDownload(zipBlob, EXPORTED_ZIP_FILENAME);
+  triggerBlobDownload(zipBlob, projectZipFilename(projectName));
 }

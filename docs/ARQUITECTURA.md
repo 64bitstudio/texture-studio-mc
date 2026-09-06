@@ -1191,3 +1191,41 @@ Con el proyecto "Set Nether" (Esqueleto/Zombie/Creeper), el selector del editor 
 ### Hallazgo de QA (falso positivo, PR #71)
 
 El gate `🔍 QA Review (auto)` volvió a marcar "&lt;img&gt; sin atributo alt" en este PR. Revisando el diff completo (`gh pr diff 71 --patch | grep -n "<img"`), la ÚNICA aparición del texto `<img>` en todo el diff cae dentro de la prosa de esta misma sección de `docs/ARQUITECTURA.md` (citando entre backticks el trabajo de thumbnails del ticket 041) -- ni `MobSelector.tsx` (solo agrega un `<Button>`/`<span>`, sin `<img>`) ni `App.tsx` (solo agrega el filtro `editorMobs`, sin JSX nuevo) tienen ningún `<img>` real en este PR. Mismo patrón exacto que el falso positivo ya documentado en el ticket 042 (PR #70): el chequeo de patrones del gate escanea el texto completo del diff, incluyendo Markdown, en vez de limitarse a JSX/TSX real. Confirmado falso positivo por inspección directa del diff antes de mergear -- no se abrió un segundo reporte de bug porque ya existe uno abierto (ver ticket 042) cubriendo esta misma clase de falso positivo.
+
+## Ticket 044 -- Exportar proyecto completo como .zip (HU-4)
+
+### `exportPack.ts` generaliza de "un mob hardcodeado" a "N mobs, cada uno en su ruta vanilla real"
+
+Antes de este ticket, `exportPack.ts` tenía la ruta del PNG dentro del ZIP hardcodeada a `SKELETON_PNG_PATH` (`assets/minecraft/textures/entity/skeleton/skeleton.png`) -- un gap real que sobrevivió intacto desde el ticket 006 a través de 043 tickets, porque nada hasta ahora había ejercitado exportar un mob que no fuera el Esqueleto. `entityTexturePngPath(mobId)` reemplaza esa constante con el mismo convenio vanilla parametrizado (`assets/minecraft/textures/entity/<mobId>/<mobId>.png`), confirmado contra los 4 `MobId` del catálogo (`backend/src/mobs/registry.ts`). `buildResourcePackFiles` pasó de recibir un solo `pngBytes` a recibir `ResourcePackMobInput[]` (`{mobId, pngBytes}`), produciendo `pack.mcmeta` + una entrada por mob.
+
+### Sin volver a codificar PNG -- se reusa el `pngDataUrl` ya guardado
+
+La alternativa obvia (y la que sugería el ticket, `Map<mobId, {buffer, uvBoxes}>`) hubiera significado decodificar cada `pngDataUrl` guardado a pixeles (`decodePngDataUrlToImageData`), reconstruir un `TextureBuffer`, y volver a codificarlo a PNG (`encodeBufferToPngBlob`, que vuelve a correr `maskPixelsOutsideUVBoxes`). Eso es trabajo redundante: el `pngDataUrl` guardado YA es el PNG final, YA pasó por el masking del ticket 015 al guardarse (`buildProjectSnapshot`, ticket 019). **Decisión real de este ticket** (no especificada así en el alcance original): `dataUrlToBytes` (`exportPack.ts`, pura -- usa `atob`, disponible tanto en navegador como en Node 16+, por eso puede vivir en el módulo puro y testeable sin DOM) decodifica el `pngDataUrl` DIRECTO a los bytes crudos del PNG, sin pasar por canvas/Image ni recalcular el masking una segunda vez -- menos trabajo, y un solo lugar (`buildProjectSnapshot`) donde ese masking puede desalinearse en vez de dos.
+
+### Reemplazo real del export de un solo mob (regla 9 de CLAUDE.md)
+
+Tal como señalaba el documento de definición: `exportResourcePackZip` (ticket 006, HU-11 -- exportaba solo el mob activo del editor) se ELIMINÓ de `export.ts`, y su botón "Exportar pack (.zip)" se retiró de `ExportControls.tsx` -- no coexiste con la exportación nueva. `ExportControls.tsx` ahora solo tiene "Exportar PNG" (HU-10, un archivo suelto, sin empaquetar -- fuera del alcance de este ticket, sigue viviendo sin cambios). La única forma de exportar un `.zip` en la app hoy es "Exportar proyecto (.zip)" en `Proyecto.tsx`, que exporta TODOS los mobs guardados del proyecto -- verificado en vivo que el botón dejó de estar `disabled` y que el editor ya no muestra ningún botón de zip de un solo mob.
+
+### Nombre de archivo derivado del proyecto (`projectZipFilename`)
+
+El ZIP de un solo mob tenía nombre fijo (`resource-pack.zip`). Con proyectos múltiples, un nombre fijo pisaría descargas de distintos proyectos entre sí -- `projectZipFilename(projectName)` (pura, testeada) deriva un slug del nombre del proyecto (minúsculas, sin acentos, separado por guiones, con fallback a `"proyecto"` si el nombre normaliza a vacío) y produce `<slug>-resource-pack.zip`.
+
+### `DEFAULT_PACK_DESCRIPTION` deja de mencionar "Esqueleto"
+
+Era `'Texture Studio MC — Esqueleto'` (tenía sentido cuando solo existía un mob exportable); ahora es `'Texture Studio MC'` a secas, porque un mismo pack puede traer varios mobs distintos del proyecto.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Se sembró un proyecto de 3 mobs ("Set Nether QA 044": Esqueleto=rojo, Zombie=verde, Creeper=azul, PNGs reales generados con `canvas.toDataURL`) directo en `localStorage` para no depender de pintar a mano. Se abrió la vista de detalle: "Exportar proyecto (.zip)" ya NO estaba `disabled`. Se interceptó `URL.createObjectURL`/`HTMLAnchorElement.prototype.click` desde la consola (sin completar ninguna descarga real a disco -- el archivo nunca se guardó, solo se inspeccionó el `Blob` en memoria) y se hizo click real en el botón:
+
+- `Blob` capturado: `type: "application/zip"`, `size: 2011 bytes`, nombre `set-nether-qa-044-resource-pack.zip` (confirma `projectZipFilename`).
+- Parseando los "local file headers" crudos del ZIP: contiene `pack.mcmeta` + `assets/minecraft/textures/entity/skeleton/skeleton.png` + `.../zombie/zombie.png` + `.../creeper/creeper.png` -- las 3 texturas del proyecto, cada una en su ruta vanilla real, ninguna otra ni ninguna faltante.
+- `pack.mcmeta` inflado y parseado: `{pack: {pack_format: 75, min_format: 75, max_format: 75, description: "Texture Studio MC"}}` -- correcto.
+- `zombie.png` inflado y decodificado con `<img>`+canvas real: firma PNG válida (`89 50 4E 47...`), `4x2` px (dimensión sembrada), pixel `(0,200,0,255)` -- EXACTAMENTE el verde sembrado para Zombie, confirmando que cada mob exporta su propio contenido y no el de otro.
+- Se confirmó además que el editor ya no muestra ningún botón de zip de un solo mob (`find` sobre la página: único match "Exportar PNG").
+
+`npm run lint`, `npm test` (197 -- 9 tests nuevos en `exportPack.spec.ts` cubriendo `entityTexturePngPath`, `buildResourcePackFiles` multi-mob, `dataUrlToBytes`, `projectZipFilename`), `npm run build` en verde.
+
+### Hallazgo de QA (falso positivo, PR #72) -- tercera repetición del mismo patrón
+
+El gate `🔍 QA Review (auto)` volvió a marcar "&lt;img&gt; sin atributo alt". `gh pr diff 72 --patch | grep -n "<img"` mostró que TODAS las apariciones de `<img>` en el diff caen dentro de prosa de `docs/ARQUITECTURA.md`/`docs/COMPONENTES.md` (citando el hallazgo del ticket 043 y describiendo la miniatura de `Proyecto.tsx`) -- el `<img>` real de `Proyecto.tsx` (la miniatura del mob, con `alt` correcto desde el ticket 041) NO forma parte de ningún hunk modificado en este PR (`Proyecto.tsx` solo cambió las líneas del botón de exportar/el nuevo `handleExportProject`, confirmado revisando los rangos `@@` del diff). Mismo patrón que los falsos positivos ya documentados en los tickets 042 (PR #70) y 043 (PR #71) -- tercera repetición exacta, refuerza que el bug del gate (reportado una vez, ticket 042) sigue sin corregirse. Confirmado falso positivo por inspección directa del diff antes de mergear.
