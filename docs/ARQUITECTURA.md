@@ -1165,3 +1165,25 @@ Con `'agregar-mobs'` (este ticket) siendo el último de los tres destinos que to
 ### Verificación en vivo (Claude in Chrome, local)
 
 Con el proyecto "Set Nether" (1 mob, Esqueleto) recién creado, "Agregar mobs" mostró únicamente Zombie/Araña/Creeper -- Esqueleto NO apareció en el grid (confirmando la exclusión estructural). Seleccionar Zombie y Creeper (multi-selección, `✓` visible en ambos, botón "Agregar (2)") y confirmar navegó de vuelta a "Proyecto: Set Nether" mostrando los 3 mobs con miniaturas reales y distintas -- confirmado con `localStorage` real que el registro del proyecto tiene exactamente `["skeleton", "zombie", "creeper"]`. `npm run lint`, `npm test` (188, sin tests nuevos -- mismo criterio que `NuevoProyecto.tsx`), `npm run build` en verde (confirmó también que ningún import roto quedó apuntando a `PlaceholderScreen.tsx` tras eliminarlo).
+
+### Hallazgo de QA automático del PR -- falso positivo confirmado
+
+El gate `🔍 QA Review (auto)` volvió a marcar "&lt;img&gt; sin atributo alt" en este PR. Revisando el diff completo, la ÚNICA aparición del texto `<img>` estaba dentro de prosa de `docs/ARQUITECTURA.md`/`docs/COMPONENTES.md` (citando entre backticks el trabajo del ticket 041) -- `AgregarMobs.tsx` no tiene ningún `<img>` real, y `Proyecto.tsx` (que sí tiene uno, ya con `alt` correcto desde el ticket 041) no cambió en este PR. Confirmado falso positivo por inspección directa del diff antes de mergear -- reportado como bug del gate (el chequeo de patrones no distingue código JSX real de menciones de código dentro de Markdown).
+
+## Ticket 043 -- Selector de mob del editor restringido al proyecto activo (HU-2)
+
+### `MobSelector.tsx` sigue siendo genérico -- el filtro vive en `App.tsx`
+
+`MobSelector` no gana ninguna noción de "proyecto" -- sigue recibiendo `mobs: MobSummary[]` tal cual (mismo criterio "genérico" del ticket 018). Es `App.tsx` quien calcula `editorMobs = mobsState.mobs.filter(m => activeProject.mobIds.includes(m.id))` ANTES de pasárselo al componente. `MobSelector` sí gana un prop opcional nuevo, `onAddMob`, que renderiza un botón "+ Agregar mob" al final de la lista SOLO si se lo pasan -- no rompe ningún otro consumidor futuro que no tenga noción de proyecto.
+
+### `activeProject` siempre poblado al llegar a `'editor'` en este punto del epic -- el fallback es defensivo
+
+Desde los tickets 038-042, la ÚNICA forma de llegar a `'editor'` es a través de `Proyecto.tsx` (elegir un mob de la lista) -- toda la navegación pasa por un proyecto activo. El fallback de `editorMobs` al catálogo completo cuando `activeProject` es `null` es puramente defensivo (no debería ser alcanzable desde ninguna UI real hoy) -- se documenta así en vez de asumir silenciosamente que `activeProject` siempre existe.
+
+### "+ Agregar mob" reusa `handleAddMobs` sin cambios -- mismo destino que el botón de `Proyecto.tsx`
+
+El control nuevo del selector llama al MISMO handler que ya usa el botón "Agregar mobs" de la vista de detalle (ticket 041) -- sin duplicar lógica de navegación. Salir de `'editor'` hacia `'agregar-mobs'` NO pierde el trabajo en curso porque el buffer del mob activo ya vive en el `bufferCache` compartido de `App.tsx` desde el ticket 018 -- `Editor` simplemente se desmonta al cambiar de vista y lo recupera de ahí si el usuario vuelve a ese mob.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Con el proyecto "Set Nether" (Esqueleto/Zombie/Creeper), el selector del editor mostró EXACTAMENTE esos 3 mobs (Araña, el cuarto del catálogo, NO apareció) más el control "+ Agregar mob"; hacer click en él navegó al flujo de selección múltiple mostrando solo Araña como disponible (los otros 3 ya en el proyecto). Prueba de preservación de trabajo: se pintó un píxel rojo distintivo en Esqueleto (confirmado con `getImageData`, 1 píxel rojo), se navegó a "Agregar mob", se canceló, y al volver a entrar a Esqueleto el mismo píxel rojo seguía presente (`getImageData` de nuevo, 1 píxel rojo) -- confirma que el `bufferCache` preserva el trabajo en curso a través de la navegación. `npm run lint`, `npm test` (188, sin tests nuevos -- cambio de UI/routing verificado en vivo), `npm run build` en verde.
