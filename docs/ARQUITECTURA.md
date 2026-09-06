@@ -270,3 +270,15 @@ El documento de definicion (`docs/definiciones/editor-3d-texturas-esqueleto.md`,
 ### Verificado en vivo
 
 Copiado el archivo a `/home/ubuntu/vanilla-assets/texture-studio-mc/skeleton.png` en la VM (`chown ubuntu:ubuntu`, `chmod 644`), agregado el volumen a `docker-compose.{dev,qa,prod}.yml`, desplegado a DEV -- `GET /api/base-assets/skeleton` responde `isPlaceholder: false` y el visor 3D muestra la textura real del Esqueleto vanilla (huesos visibles, sin el placeholder gris con grid).
+
+## Segundo backlog (tickets 009-013) -- correccion de geometria + mejoras de UX de edicion
+
+Feedback directo de Marco tras ver el MVP desplegado (2026-09-05/06). Investigacion real hecha antes de escribir los tickets:
+
+- **Causa raiz del modelo 3D incorrecto**: `armRight`/`armLeft`/`legRight`/`legLeft` usaban `size [4,12,4]` (proporcion de Steve/humanoide generico) -- el Esqueleto real de Minecraft usa huesos delgados `[2,12,2]`. Confirmado contra dos fuentes independientes:
+  1. [`Mojang/bedrock-samples/resource_pack/models/entity/skeleton.geo.json`](https://github.com/Mojang/bedrock-samples/blob/main/resource_pack/models/entity/skeleton.geo.json) -- repo oficial y publico de Mojang para creadores de add-ons, con la geometria exacta de cada mob vanilla.
+  2. **Verificacion empirica pixel a pixel** contra el `skeleton.png` vanilla real ya cacheado: el patron de pixeles opacos en las columnas 0-7 (piernas) y 40-47 (brazos) coincide EXACTAMENTE con el cross UV que genera una caja de 2x12x2 en esos origenes (8 columnas de ancho total, no 16 como se habia asumido) -- mismo criterio ya establecido en este proyecto de "no adivinar, verificar contra la fuente real" (ver `minecraft-texture-pack-pipeline`).
+  3. Esta fuente (`bedrock-samples`) queda como el metodo estandar a seguir para calibrar la geometria de cualquier mob futuro -- no repetir el error de copiar proporciones genericas de otro pipeline sin verificar.
+- Referencia de UX: [Blockbench UV Editor](https://blockbench.org/blockbench-uv-editor-tutorial-basics-to-advanced/) resalta la cara de UV seleccionada -- inspiro el ticket 011 (regiones nombradas), sin copiar su UI completa.
+
+Ver `pending/009-corregir-y-generalizar-geometria.md` a `pending/013-pegar-imagen-ajuste-automatico-parte.md`. El ticket 008 (distorsion de pixeles) queda cerrado en `done/`, reemplazado por el ticket 010 (panel redimensionable con pixeles siempre cuadrados, requisito explicito de Marco).

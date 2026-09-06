@@ -16,3 +16,6 @@ Requiere una decisión de diseño (impacto en layout general de la app) — no a
 ## Criterios de aceptación
 - Dado el editor en su estado por defecto (zoom inicial), cuando se mide el tamaño renderizado de un texel individual, entonces su ancho y alto en pixeles de pantalla son iguales (dentro de un margen de redondeo de 1px).
 - Dado cualquier nivel de zoom soportado, cuando se redimensiona la ventana, entonces los texeles se mantienen cuadrados (no solo en el tamaño inicial).
+
+## Reemplazado por el ticket 010
+Marco pidió algo mejor que elegir entre las 3 opciones fijas de arriba: que el ancho del panel sea ajustable por el usuario (no fijo) Y que los pixeles se mantengan siempre cuadrados en cualquier ancho elegido. Ver `pending/010-panel-lateral-redimensionable.md` — este ticket queda cerrado sin implementación propia, superado por ese.
