@@ -59,7 +59,14 @@
   --panel-bg: #24262e;
   --text: #e8e6f0;
   --text-dim: #9d9aab;
-  --accent: #c084fc;
+  /* Ticket 035: acento verde (mockup de referencia) reemplaza el morado
+     original (#c084fc) -- mismo valor en ambos temas (ver bloque
+     `[data-theme='light']` de abajo), verificado visualmente en ambos
+     antes de cerrar el ticket. Solo se usa como BORDE/fondo-con-texto-
+     oscuro-fijo en toda la app (nunca como texto sobre el fondo del
+     tema), así que un único verde funciona sin ajustar el tono por
+     tema (ver docs/ARQUITECTURA.md, "Ticket 035"). */
+  --accent: #4ade80;
   --border: rgba(255, 255, 255, 0.14);
   --border-strong: rgba(255, 255, 255, 0.28);
   --surface-raised: #2c2f3a;
@@ -76,7 +83,7 @@
   --panel-bg: #ffffff;
   --text: #1e1f26;
   --text-dim: #62636f;
-  --accent: #c084fc;
+  --accent: #4ade80;
   --border: rgba(0, 0, 0, 0.12);
   --border-strong: rgba(0, 0, 0, 0.22);
   --surface-raised: #ffffff;

@@ -203,3 +203,7 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`components/ThemeToggle.tsx`** (nuevo) — botón ícono+texto en el header de `App.tsx` (ambas vistas).
 - **`index.css`** — tokens de color separados en `:root[data-theme='dark']`/`:root[data-theme='light']`; nuevos tokens `--hover-overlay`/`--overlay-bg`; `color-scheme` fijado por tema (ver `docs/ARQUITECTURA.md`, bug real corregido).
 - **`index.html`** — script inline que aplica el tema guardado antes del primer render (sin parpadeo).
+
+### Ticket 035 -- Acento verde
+
+- **`index.css`** — `--accent` pasa de `#c084fc` a `#4ade80` en ambos bloques de tema. Sin cambios de componentes (todo lo que usa `--accent` ya era token-based).

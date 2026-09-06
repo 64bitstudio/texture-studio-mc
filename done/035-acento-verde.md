@@ -18,3 +18,15 @@ Sale de `docs/definiciones/proyectos-y-navegacion.md` ("Diseño técnico" — ac
 ## Criterios de aceptación
 - Dado cualquier elemento que usa `--accent` (botón primario, checkbox marcado, mob activo en el selector), cuando lo veo en tema oscuro, entonces es verde con contraste legible.
 - Dado el mismo tipo de elemento, cuando lo veo en tema claro, entonces también es verde con contraste legible (no el mismo verde exacto si el contraste lo exige, pero de la misma familia).
+
+## Hecho
+
+`--accent` cambiado de `#c084fc` (morado) a `#4ade80` (verde) -- mismo valor en ambos bloques de tema (`[data-theme='dark']`/`[data-theme='light']`), no hizo falta un segundo tono: `--accent` en este proyecto solo se usa como borde o como fondo de `.ui-button--primary` con texto oscuro FIJO, nunca como color de texto sobre el fondo del tema (que sí hubiera exigido ajustar el tono por contraste). Sin cambios de componentes -- todos los usos ya eran `var(--accent)`, ningún hex hardcodeado suelto (confirmado con grep).
+
+Confirmado que el checkbox nativo (`ui/Checkbox.tsx`) no usa `--accent` (nunca tuvo `accent-color` fijado, desde el ticket 026) -- no es una regresión de este ticket, queda fuera de alcance.
+
+Tests: 174/174 en verde (sin tests nuevos -- cambio puramente de valor de token, verificado en vivo), `npm run lint` y `npm run build` en verde.
+
+Verificación en vivo (Claude in Chrome, local): mob activo del selector, borde de color seleccionado en el picker, y botones primarios confirmados en verde con buen contraste en AMBOS temas (capturas de pantalla).
+
+Sin hallazgos de QA pendientes.
