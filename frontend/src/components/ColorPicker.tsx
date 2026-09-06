@@ -43,7 +43,7 @@ export function ColorPicker({ color, onChange }: ColorPickerProps) {
                 height: 28,
                 borderRadius: 4,
                 background: swatch.hex,
-                border: selected ? '2px solid var(--accent)' : '1px solid rgba(255,255,255,0.25)',
+                border: selected ? '2px solid var(--accent)' : '1px solid var(--border-strong)',
                 cursor: 'pointer',
                 padding: 0,
               }}
