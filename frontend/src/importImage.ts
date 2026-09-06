@@ -100,6 +100,62 @@ export function fitRectToBox(image: ImageDimensions, box: UVBoxRect): OverlayRec
 }
 
 /**
+ * Rectangulo inicial EXACTO del overlay cuando hay una parte aislada
+ * activa (ticket 012) al pegar/subir una imagen (ticket 013). A
+ * diferencia de `fitRectToBox` (ajuste por CONTENCION: preserva la
+ * proporcion original de la imagen, puede dejar franjas de la caja sin
+ * cubrir), este ajuste ESTIRA la imagen -- escalado no uniforme en X/Y
+ * si hace falta -- para ocupar exactamente la region activa completa.
+ * Decision explicita de este ticket, no una reinterpretacion de
+ * `fitRectToBox`: el criterio de aceptacion pide que el overlay quede
+ * "ajustado exactamente a los pixeles de la region... sin necesidad de
+ * ajuste manual previo a confirmar" -- con un ajuste por contencion,
+ * una imagen de proporcion distinta a la de la region seguiria dejando
+ * pixeles de esta sin cubrir, obligando igual a un ajuste manual para
+ * completarla (justo lo que Marco pidio evitar, ver
+ * `pending/013-pegar-imagen-ajuste-automatico-parte.md`). El
+ * resampling real (nearest-neighbor) ocurre despues, al confirmar, en
+ * `computeBurnPixels`/`sampleSourceForDestPixel` -- esta funcion solo
+ * fija la posicion/tamaño INICIAL del overlay (el usuario puede seguir
+ * moviendolo/redimensionandolo libremente antes de confirmar, ver
+ * `computeInitialPasteRect`).
+ */
+export function fitRectToRegionExact(region: UVBoxRect): OverlayRect {
+  return {
+    x: region.x0,
+    y: region.y0,
+    width: Math.max(1, region.x1 - region.x0),
+    height: Math.max(1, region.y1 - region.y0),
+  };
+}
+
+/**
+ * Punto de entrada UNICO para calcular el rect inicial del overlay de
+ * pegado/insertar imagen (ticket 005 HU-9 + ticket 013, aditivo):
+ *
+ * - Con una parte aislada activa (`activeRegion` no nulo, ver
+ *   `Editor.tsx`/`isolatedRegion` del ticket 012): ajusta EXACTO a sus
+ *   dimensiones (`fitRectToRegionExact`) -- deliberadamente IGNORA
+ *   `image` (la proporcion/tamaño original de la imagen fuente no
+ *   importa, el ajuste automatico cubre la region completa sin dejar
+ *   pixeles sin cubrir, ver comentario de `fitRectToRegionExact`).
+ * - Sin parte aislada (`activeRegion === null`): comportamiento EXACTO
+ *   del ticket 005, SIN CAMBIOS -- `fitRectToBox` contra `fallbackBox`
+ *   (la primera caja UV que expone `Editor.tsx`), o el tamaño original
+ *   de la imagen centrado en el origen si no hay ninguna caja UV
+ *   conocida (mismo fallback que ya existia).
+ */
+export function computeInitialPasteRect(
+  image: ImageDimensions,
+  activeRegion: UVBoxRect | null,
+  fallbackBox: UVBoxRect | null,
+): OverlayRect {
+  if (activeRegion) return fitRectToRegionExact(activeRegion);
+  if (fallbackBox) return fitRectToBox(image, fallbackBox);
+  return { x: 0, y: 0, width: image.width, height: image.height };
+}
+
+/**
  * Interseccion entre `rect` y `box`, o `null` si no se superponen.
  * Ambos en el mismo espacio de texeles semiabierto `[x0,x1) x [y0,y1)`
  * que ya usa `UVBoxRect` (ver `symmetry.ts`).

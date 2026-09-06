@@ -3,8 +3,10 @@ import {
   clampRectToBox,
   computeBurnPixels,
   computeFullReplaceDiff,
+  computeInitialPasteRect,
   findTargetUVBox,
   fitRectToBox,
+  fitRectToRegionExact,
   nearestSourceIndex,
   sampleSourceForDestPixel,
   validateImportDimensions,
@@ -102,6 +104,51 @@ describe('fitRectToBox', () => {
     const rect = fitRectToBox({ width: 100, height: 1 }, tinyBox);
     expect(rect.width).toBeGreaterThanOrEqual(1);
     expect(rect.height).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('fitRectToRegionExact (ticket 013)', () => {
+  it('devuelve exactamente la posicion y dimensiones de la region, sin preservar proporcion', () => {
+    const region: UVBoxRect = { x0: 8, y0: 8, x1: 16, y1: 16 }; // region "Cara", 8x8
+    expect(fitRectToRegionExact(region)).toEqual({ x: 8, y: 8, width: 8, height: 8 });
+  });
+
+  it('estira (escala no uniforme) para una region rectangular no cuadrada', () => {
+    const region: UVBoxRect = { x0: 0, y0: 16, x1: 24, y1: 32 }; // 24x16
+    expect(fitRectToRegionExact(region)).toEqual({ x: 0, y: 16, width: 24, height: 16 });
+  });
+
+  it('nunca produce un rectangulo de ancho o alto menor a 1', () => {
+    const degenerate: UVBoxRect = { x0: 5, y0: 5, x1: 5, y1: 5 };
+    const rect = fitRectToRegionExact(degenerate);
+    expect(rect.width).toBeGreaterThanOrEqual(1);
+    expect(rect.height).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('computeInitialPasteRect (ticket 013)', () => {
+  const firstBox: UVBoxRect = { x0: 0, y0: 0, x1: 32, y1: 16 }; // caja cabeza, 32x16
+  const isolatedRegion: UVBoxRect = { x0: 8, y0: 8, x1: 16, y1: 16 }; // region "Cara", 8x8
+
+  it('con una parte aislada activa, ajusta EXACTO a sus dimensiones sin importar el tamaño/proporcion de la imagen fuente', () => {
+    const rect = computeInitialPasteRect({ width: 200, height: 10 }, isolatedRegion, firstBox);
+    expect(rect).toEqual({ x: 8, y: 8, width: 8, height: 8 });
+  });
+
+  it('con una parte aislada activa, el resultado es identico independientemente de la imagen (misma region, imagenes distintas)', () => {
+    const rectA = computeInitialPasteRect({ width: 1, height: 1 }, isolatedRegion, firstBox);
+    const rectB = computeInitialPasteRect({ width: 512, height: 512 }, isolatedRegion, firstBox);
+    expect(rectA).toEqual(rectB);
+  });
+
+  it('sin parte aislada, delega en fitRectToBox contra la caja de respaldo -- comportamiento identico al ticket 005', () => {
+    const rect = computeInitialPasteRect({ width: 64, height: 16 }, null, firstBox);
+    expect(rect).toEqual(fitRectToBox({ width: 64, height: 16 }, firstBox));
+  });
+
+  it('sin parte aislada y sin caja de respaldo, usa el tamaño original de la imagen en el origen', () => {
+    const rect = computeInitialPasteRect({ width: 12, height: 7 }, null, null);
+    expect(rect).toEqual({ x: 0, y: 0, width: 12, height: 7 });
   });
 });
 
