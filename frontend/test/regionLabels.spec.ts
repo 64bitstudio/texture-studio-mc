@@ -12,16 +12,16 @@ const HEAD_FACE_LABELS = {
   back: 'Nuca',
   top: 'Parte superior',
   bottom: 'Parte inferior',
-  left: 'Lateral derecho',
-  right: 'Lateral izquierdo',
+  left: 'Lateral izquierdo',
+  right: 'Lateral derecho',
 };
 const BODY_FACE_LABELS = {
   front: 'Pecho',
   back: 'Espalda',
   top: 'Parte superior',
   bottom: 'Parte inferior',
-  left: 'Costado derecho',
-  right: 'Costado izquierdo',
+  left: 'Costado izquierdo',
+  right: 'Costado derecho',
 };
 const ARM_FACE_LABELS = {
   front: 'Brazo — Frente',

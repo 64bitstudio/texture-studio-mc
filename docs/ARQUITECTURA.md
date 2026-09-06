@@ -800,3 +800,19 @@ Puramente despliegue de infraestructura -- sin ningún cambio de código, mismo 
 - `zombie.png`, `spider.png`, `creeper.png` copiados por `scp` desde `~/tools/minecraft-texture-pack/vanilla-cache/` a `/home/ubuntu/vanilla-assets/texture-studio-mc/` en la VM (alias SSH `ampere-free`).
 - Permisos ajustados igual que el Esqueleto: `chown ubuntu:ubuntu`, `chmod 644`.
 - Verificado en vivo en DEV (`https://texture-studio-dev.64bitstudio.com/`) inmediatamente después de copiar los archivos, sin ningún redeploy: los 4 mobs (`GET /api/base-assets/skeleton|zombie|spider|creeper`) responden `isPlaceholder: false`, y el visor 3D de cada uno muestra su textura vanilla real correctamente aplicada (Esqueleto con huesos visibles, Zombie con piel verde y ropa característica, Araña con ojos rojos, Creeper con camuflaje verde y cara fruncida icónica).
+
+## Ticket 023 -- Corregir etiquetas "Lateral derecho"/"Lateral izquierdo" para que coincidan con la pantalla
+
+### Diagnóstico (investigado en vivo antes de tocar código)
+
+Feedback de Marco: "la preview del render... el lado izquierdo va en el derecho y viceversa". Se pintó literalmente la región etiquetada "Lateral derecho" de la cabeza del Esqueleto y se confirmó por `getImageData` + captura de pantalla que aparecía en el lado IZQUIERDO de la pantalla con el modelo mirando de frente a la cámara. **No era un bug de mapeo de píxeles/UV** -- `computeBoxFaceRects`/`applyBoxUV.ts` estaban (y siguen estando) correctos, verificados contra `mc_render_preview.py` y compatibles con el formato real de Minecraft. Era la convención "anatómica" (lado REAL del personaje, no de pantalla) decidida a propósito en el ticket 011 y "verificada en vivo" en ese momento -- una decisión válida entonces, pero que Marco ahora reporta como confusa/incorrecta para el flujo real de uso de la herramienta.
+
+### Decisión (VoBo explícito de Marco vía AskUserQuestion)
+
+Cambiar SOLO el texto de las etiquetas (`HEAD_FACE_LABELS`/`BODY_FACE_LABELS` en `classicBipedGeometry.ts`, y los catálogos análogos de `spiderGeometry.ts`/`creeperGeometry.ts`) para que "...derecho"/"...izquierdo" describan el lado de PANTALLA cuando el modelo mira de frente a la cámara, no el lado anatómico del personaje. Las claves internas `left`/`right` (usadas por `computeBoxFaceRects`, `applyBoxUV.ts`, `mirrorX`, el mapeo UV y el export) NO cambian -- es un intercambio 100% cosmético del texto que le corresponde a cada clave. El PNG exportado es pixel-a-pixel idéntico antes/después de este cambio (ningún dato de posición/UV/pixeles se toca), preservando compatibilidad total con Minecraft real.
+
+Esta corrección aplica por igual a CUALQUIER mob (no solo el Esqueleto) porque el visor 3D usa la misma cámara fija para todos -- la cara `right` (+x local) siempre proyecta hacia el lado derecho de la pantalla y `left` (-x local) hacia el izquierdo, independientemente de en qué mob o en qué posición del mundo esté la caja (confirmado por razonamiento geométrico: la dirección "pantalla-derecha" depende solo de la orientación de la cámara, no de la posición del objeto observado).
+
+### Verificación en vivo
+
+Se repintó la región ahora etiquetada "Lateral derecho" (misma clave interna `right`, antes etiquetada "Lateral izquierdo") en la cabeza del Esqueleto -- confirmado por captura de pantalla que ahora aparece en el lado DERECHO de la pantalla con el modelo de frente a la cámara. `npm run lint`, `npm test`, `npm run build` en verde en backend y frontend (tests actualizados para reflejar el nuevo texto esperado, ninguna lógica de cálculo tocada).

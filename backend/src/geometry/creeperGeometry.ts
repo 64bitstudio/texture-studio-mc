@@ -69,13 +69,17 @@ import type { FaceLabels, MobGeometry } from '../types/baseAssets.js';
 //    el efecto visual de "cargado" por rayo, pero usa la MISMA textura
 //    y las MISMAS cajas -- no aplica a este ticket, que es sobre el
 //    modelo/textura BASE).
+// Ticket 023: `left`/`right` describen el lado de PANTALLA (no el lado
+// anatomico del personaje) -- ver `classicBipedGeometry.ts` para la
+// justificacion completa de este cambio, aplicado por igual a cualquier
+// mob porque la camara del visor 3D es la misma para todos.
 const HEAD_FACE_LABELS: FaceLabels = {
   front: 'Cara',
   back: 'Nuca',
   top: 'Parte superior',
   bottom: 'Parte inferior',
-  left: 'Lateral derecho',
-  right: 'Lateral izquierdo',
+  left: 'Lateral izquierdo',
+  right: 'Lateral derecho',
 };
 
 const BODY_FACE_LABELS: FaceLabels = {
@@ -83,8 +87,8 @@ const BODY_FACE_LABELS: FaceLabels = {
   back: 'Espalda',
   top: 'Parte superior',
   bottom: 'Parte inferior',
-  left: 'Costado derecho',
-  right: 'Costado izquierdo',
+  left: 'Costado izquierdo',
+  right: 'Costado derecho',
 };
 
 // Sin lateralidad (mismo criterio que ARM_FACE_LABELS/SPIDER_LEG_FACE_LABELS):
