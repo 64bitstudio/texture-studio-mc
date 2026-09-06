@@ -1542,3 +1542,31 @@ Los 4 `<span aria-hidden>✏️/🗂️/📦/🗑</span>` del menú "⋮" se ree
 Confirmado en vivo, grid y lista, dark y light theme: los 4 íconos del menú "⋮" son SVG (sin emoji), "Eliminar" se ve en rojo, "Editar" tiene esquinas notablemente menos curvas. Sin errores de consola.
 
 `npm run lint`, `npx tsc --noEmit`, `npm test` (201, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde.
+
+## Ticket 055 -- Motor de preview 2D "de frente" de un mob
+
+Primera pieza del rediseño definido en `docs/definiciones/preview-2d-y-rediseno-proyecto.md` (VoBo de Marco obtenido) -- ver ese documento para el "por qué" completo. Este ticket construye y verifica el motor en aislado; los tickets 056/057 lo integran a la UI real de "Proyecto".
+
+### `geometry/mobFrontSprite.ts` -- capa pura
+
+`computeMobFrontSpriteLayout(geometry: MobGeometry): MobFrontSpriteLayout` reusa `computeBoxFaceRects` (`applyBoxUV.ts`, ya existente y verificado) para el rect `front` de cada parte -- CONFIRMADO leyendo `applyBoxUV` que `mirrorX` sí invierte horizontalmente la cara `front` (no solo left/right, ver el comentario del propio módulo), así que se traduce a `flipX` en el comando de dibujado. La posición 2D se proyecta ortográficamente: `x = position[0]` (misma convención "+x = derecha de pantalla" que ya usa el visor 3D, sin necesidad de invertir), `y = -position[1]` (Minecraft: Y crece hacia arriba; canvas: hacia abajo). El orden de dibujado es por `position[2]` ascendente (más lejos primero), para que las partes más cercanas a la cámara oculten correctamente a las de atrás -- verificado con el caso real del Creeper (4 patas con offsets de z distintos, `creeperGeometry.ts`).
+
+**Limitación conocida y aceptada** (documentada en el documento de definición ANTES de implementar, no descubierta después): partes con `pivot`/`rotation` (las 8 patas de la Araña, ticket 024, `size: [16,2,2]` sin rotar) se dibujan en su posición de reposo. Verificado en vivo: el resultado es una franja delgada a cada lado del cuerpo (las 8 patas, casi idénticas en posición/tamaño, se superponen casi exactamente unas sobre otras) -- reconocible como "algo con patas a los lados" pero lejos de una araña realista. Aceptado explícitamente para esta iteración; una rotación 2D correcta alrededor del pivote proyectado es una mejora incremental de este mismo motor, no un bloqueante.
+
+### `renderMobFrontSprite2D.ts` -- capa DOM
+
+Separado del módulo puro por el mismo criterio ya establecido en el proyecto (`textureBuffer.ts`/`decodeTexture.ts`, `exportPack.ts`/`export.ts`). Recibe la textura real (`pngDataUrl`) y la `resolution` de trabajo con la que se guardó (ticket 009) -- los rects de origen se escalan por `resolution` al leer la textura (que mide `textureWidth*resolution x textureHeight*resolution`), pero el sprite de salida se queda en tamaño "x1" (chico); quien lo consuma lo escala más grande vía CSS, igual que ya hace `mobIcons.ts`.
+
+### `hooks/useMobFrontSprite2D.ts`
+
+**Hallazgo real durante la implementación** (oxlint `react/set-state-in-effect`): la primera versión llamaba `setSpriteUrl(null)` sincrónicamente dentro del efecto para el caso "todavía no hay geometría/textura". Se corrigió derivando ese caso directamente en el valor de retorno (`if (!geometry || !pngDataUrl) return null;`) en vez de pasar por `setState` -- el efecto solo corre cuando SÍ hay algo que sincronizar con el sistema externo (la promesa de `renderMobFrontSprite2D`), mismo criterio ya aplicado en `App.tsx`. Mismo hallazgo, mismo fix, en el `MobThumbnail2D` de `Proyecto.tsx` (la geometría cacheada se deriva del `Map` compartido durante el render, no via un efecto que solo copia el valor).
+
+### Integración mínima de prueba (`components/Proyecto.tsx`)
+
+Nuevo componente interno `MobThumbnail2D` reemplaza el `<img>` que mostraba la textura guardada cruda (la hoja completa de 64x32/64x64 comprimida en un cuadro chico, difícil de reconocer) desde el ticket 041 -- con fallback a esa misma textura cruda mientras la geometría/el sprite todavía no están listos. `geometryCache` es un `Map` local a la pantalla (mismo criterio de cache-por-pantalla del ticket 045, que retiró el cache de sesión completa de `App.tsx`).
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Confirmado con un proyecto real de 4 mobs (Esqueleto/Zombie/Creeper/Araña): Esqueleto/Zombie/Creeper se ven como siluetas 2D reconocibles del personaje (antes: una hoja de texturas ilegible). Araña muestra la limitación conocida de arriba (patas sin rotar). Sin errores de consola.
+
+`npm run lint`, `npx tsc --noEmit`, `npm test` (206 -- 5 tests nuevos de `computeMobFrontSpriteLayout`), `npm run build` en verde.
