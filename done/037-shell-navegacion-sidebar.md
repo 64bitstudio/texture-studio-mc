@@ -19,3 +19,19 @@ Sale de `docs/definiciones/proyectos-y-navegacion.md` (HU-5, "Diseño técnico" 
 - Dado cualquier punto de la app, cuando miro el sidebar, entonces veo los 3 destinos y cuál está activo resaltado visualmente.
 - Dado que hago click en el ícono de configuración, entonces navego a la pantalla de Configuración (ticket 036).
 - Dado que hago click en el ícono de tema, entonces se comporta igual que el toggle ya construido en el ticket 034 (misma preferencia, sin duplicar lógica).
+
+## Hecho
+
+Implementado tal como estaba alcanzado, con una decisión real documentada:
+
+- `AppShell.tsx`/`Sidebar.tsx`/`PlaceholderScreen.tsx` (nuevos): sidebar + header envolviendo las 6 vistas no-editor; el editor conserva su layout dedicado propio (sin sidebar).
+- `View` en `App.tsx` pasa de `'home' | 'editor'` a los 7 destinos pedidos por el ticket.
+- `Settings.tsx` (ticket 036) pasa de overlay (`position: fixed`) a vista real dentro de `AppShell` -- pierde el prop `onClose` (salir es solo navegar a otro item del sidebar).
+
+Decisión real (documentada en `docs/ARQUITECTURA.md`, no silenciosa): "Nuevo proyecto" y "Mis proyectos" muestran TEMPORALMENTE el mismo `HomeScreen` ya existente en vez de placeholders vacíos -- construir placeholders para ambos hubiera dejado la app sin ninguna forma real de seleccionar un mob o abrir un proyecto guardado hasta que los tickets 038/039 lleguen. "Recientes"/"Proyecto"/"Agregar mobs" sí usan `PlaceholderScreen` (son pantallas nuevas sin equivalente previo, sin regresión al dejarlas pendientes).
+
+Tests: 184/184 en verde (sin tests nuevos -- cambio de layout/routing interno, verificado en vivo), `npm run lint` y `npm run build` en verde.
+
+Verificación en vivo (Claude in Chrome, local): los 3 destinos del sidebar navegan y resaltan el activo correctamente; el avatar navega a Configuración, que se renderiza como vista real (sidebar/header visibles alrededor, no un modal); seleccionar un mob entra al editor con su layout propio sin sidebar; "Volver al inicio" regresa a "Nuevo proyecto" con el sidebar resaltado de nuevo.
+
+Sin hallazgos de QA pendientes.

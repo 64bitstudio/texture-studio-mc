@@ -3,9 +3,12 @@ import { Editor } from './components/Editor';
 import { MobSelector } from './components/MobSelector';
 import { ProjectControls } from './components/ProjectControls';
 import { HomeScreen } from './components/HomeScreen';
+import { AppShell } from './components/AppShell';
+import type { NavView } from './components/Sidebar';
 import { ThemeToggle } from './components/ThemeToggle';
 import { Avatar } from './components/Avatar';
 import { Settings } from './components/Settings';
+import { PlaceholderScreen } from './components/PlaceholderScreen';
 import { getUserPrefs } from './userPrefs';
 import { getTheme, type Theme } from './theme';
 import { fetchMobBaseAssets } from './api/baseAssets';
@@ -15,8 +18,19 @@ import type { MobSummary } from './types/mobs';
 import { TextureBuffer } from './textureBuffer';
 import { Button, LoadingOverlay, Menu } from './ui';
 
-/** Ticket 027, HU-1: pantalla de inicio en vez de cargar directo al editor. Estado interno, sin router (ver docs/definiciones/rediseno-ux-ui-y-navegacion.md, "Diseño técnico"). */
-type View = 'home' | 'editor';
+/**
+ * Ticket 037 (HU-5): union ampliado -- reemplaza el binario `'home' |
+ * 'editor'` del ticket 027 por los 7 destinos del mockup de navegación
+ * nueva. Sigue sin router (mismo criterio del ticket 027: sin
+ * necesidad de URLs compartibles/marcables para este flujo de sesión
+ * única) -- estado interno de React, no rutas reales. `'proyecto'`/
+ * `'agregar-mobs'` todavía no son alcanzables desde ninguna UI en este
+ * ticket (los tickets 041/042 los conectan) -- existen en el tipo
+ * desde ya porque el ticket lo pide explícitamente ("el union type más
+ * grande"), con `PlaceholderScreen` cubriendo el contenido mientras
+ * tanto (ver docs/definiciones/proyectos-y-navegacion.md).
+ */
+type View = 'nuevo-proyecto' | 'mis-proyectos' | 'recientes' | 'proyecto' | 'agregar-mobs' | 'editor' | 'configuracion';
 
 type MobsState =
   | { status: 'loading' }
@@ -29,18 +43,15 @@ type AssetState =
   | { status: 'ready'; data: MobBaseAssetsResponse };
 
 function App() {
-  // Ticket 027, HU-1: arranca en 'home', no directo al editor.
-  const [view, setView] = useState<View>('home');
+  // Ticket 037: arranca en 'nuevo-proyecto' (primer destino del
+  // sidebar, mismo rol que 'home' antes de este ticket).
+  const [view, setView] = useState<View>('nuevo-proyecto');
 
   // Ticket 036 (HU-6): nombre del perfil local, levantado aca porque lo
   // leen DOS componentes hermanos (`Avatar` en el header, `Settings` al
   // editarlo) -- evita releer `localStorage` en cada uno o inventar un
-  // mecanismo de eventos para un caso de 2 consumidores. `showSettings`
-  // es la ubicacion TEMPORAL de la pantalla de Configuracion (overlay
-  // disparado por el icono de engranaje) -- el ticket 037 la conecta
-  // como destino real de la navegacion nueva, sin tocar `Settings.tsx`.
+  // mecanismo de eventos para un caso de 2 consumidores.
   const [displayName, setDisplayName] = useState(() => getUserPrefs().displayName);
-  const [showSettings, setShowSettings] = useState(false);
   // Mismo criterio que `displayName` de arriba -- `ThemeToggle` (header)
   // y `Settings` (Configuración) son DOS componentes hermanos que
   // pueden cambiar la MISMA preferencia; levantar el estado aca es lo
@@ -172,12 +183,12 @@ function App() {
     setAssetRetryCount((c) => c + 1);
   }
 
+  // Ticket 037: Configuración ya es un destino real de navegación (no
+  // un overlay con su propio "Cerrar", ver `Settings.tsx`) -- salir de
+  // ahí es simplemente navegar a cualquier otro item del sidebar, que
+  // sigue visible siempre.
   function handleOpenSettings() {
-    setShowSettings(true);
-  }
-
-  function handleCloseSettings() {
-    setShowSettings(false);
+    setView('configuracion');
   }
 
   // Ticket 027: unico punto de entrada para "activar este mob y mostrar
@@ -201,10 +212,10 @@ function App() {
   // ver `HomeScreen.tsx`) -- este callback solo decide a que mob
   // navegar (el primero del proyecto cargado) y cambia la vista a
   // 'editor'. NO necesita bump de `loadGeneration`: `Editor` esta
-  // desmontado mientras `view === 'home'` (ver el render de abajo), asi
-  // que el proximo montaje ya lee `bufferCache` desde cero via su
-  // inicializador perezoso -- sin una instancia vieja que forzar a
-  // remontar.
+  // desmontado mientras `view` no es `'editor'` (ver el render de
+  // abajo), asi que el proximo montaje ya lee `bufferCache` desde cero
+  // via su inicializador perezoso -- sin una instancia vieja que
+  // forzar a remontar.
   function handleProjectOpenedFromHome(loadedMobIds: string[]) {
     const targetMobId = loadedMobIds[0] ?? selectedMobId;
     if (targetMobId && targetMobId !== selectedMobId) {
@@ -236,57 +247,64 @@ function App() {
   const selectedMobLabel =
     (mobsState.status === 'ready' && mobsState.mobs.find((m) => m.id === selectedMobId)?.label) || null;
 
-  // Ticket 027, HU-1: pantalla de inicio en vez del editor directo.
-  // `mobsState`/`bufferCache`/`geometryCache` viven POR ENCIMA de
-  // `view` (declarados antes, sin depender de el) -- por eso volver al
-  // inicio y elegir el mismo mob de nuevo no pierde nada ya pintado.
-  if (view === 'home') {
+  // Ticket 037: todas las vistas EXCEPTO 'editor' se envuelven en
+  // `<AppShell>` (sidebar + header persistentes) -- el editor conserva
+  // su layout dedicado propio, sin sidebar, para maximizar el espacio
+  // de trabajo (ver el bloque `if (view === 'editor')` mas abajo).
+  if (view !== 'editor') {
+    // `activeNav` resalta el item del sidebar SOLO si `view` es
+    // exactamente uno de sus 3 destinos -- `'proyecto'`/`'agregar-mobs'`/
+    // `'configuracion'` son subvistas alcanzadas DESDE ahi, no items
+    // propios del sidebar (ver `Sidebar.tsx`).
+    const activeNav: NavView | null =
+      view === 'nuevo-proyecto' || view === 'mis-proyectos' || view === 'recientes' ? view : null;
+
     return (
-      // `position: relative` (ticket 033, HU-8): ancla `LoadingOverlay`
-      // (`inset: 0`, ver `ui/LoadingOverlay.tsx`) a este contenedor en
-      // vez de a toda la ventana -- ya mide 100vw/100vh, asi que en la
-      // practica cubre lo mismo, pero deja el mecanismo correcto si
-      // algun dia este `<main>` deja de ser pantalla completa.
-      <main style={{ width: '100vw', height: '100vh', overflow: 'auto', position: 'relative' }}>
-        <header
-          style={{
-            padding: '10px 16px',
-            borderBottom: '1px solid var(--border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}
-        >
-          <h1 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Texture Studio MC</h1>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ThemeToggle theme={theme} onThemeChange={setTheme} />
-            <Button variant="icon" title="Configuración" onClick={handleOpenSettings}>
-              <span aria-hidden="true">⚙️</span> Configuración
-            </Button>
-            <Avatar displayName={displayName} />
-          </div>
-        </header>
-
-        {showSettings && <Settings displayName={displayName} onDisplayNameSaved={setDisplayName} theme={theme} onThemeChange={setTheme} onClose={handleCloseSettings} />}
-
-        {mobsState.status === 'loading' && <LoadingOverlay message="Cargando catálogo de mobs…" />}
-
-        {mobsState.status === 'error' && (
-          <div style={{ display: 'grid', placeItems: 'center', padding: 48, gap: 12 }}>
-            <p role="alert">No se pudo cargar el catálogo de mobs: {mobsState.message}</p>
-            <Button onClick={handleRetryMobs}>Reintentar</Button>
-          </div>
+      <AppShell
+        activeNav={activeNav}
+        onNavigate={setView}
+        displayName={displayName}
+        theme={theme}
+        onThemeChange={setTheme}
+        onOpenSettings={handleOpenSettings}
+      >
+        {view === 'configuracion' && (
+          <Settings displayName={displayName} onDisplayNameSaved={setDisplayName} theme={theme} onThemeChange={setTheme} />
         )}
 
-        {mobsState.status === 'ready' && (
-          <HomeScreen
-            mobs={mobsState.mobs}
-            onSelectMob={handleSelectMob}
-            bufferCache={bufferCache}
-            onProjectOpened={handleProjectOpenedFromHome}
-          />
+        {/* Ticket 037, decisión real (documentada, no silenciosa -- ver
+            docs/ARQUITECTURA.md, "Ticket 037"): "Nuevo proyecto" y "Mis
+            proyectos" muestran TEMPORALMENTE el mismo `HomeScreen` ya
+            existente (selección de mob + Guardados, tickets 027/028)
+            para no dejar la app sin poder editar/abrir nada mientras
+            el resto del epic (038/039) construye el contenido real y
+            diferenciado de cada destino. */}
+        {(view === 'nuevo-proyecto' || view === 'mis-proyectos') && (
+          <>
+            {mobsState.status === 'loading' && <LoadingOverlay message="Cargando catálogo de mobs…" />}
+
+            {mobsState.status === 'error' && (
+              <div style={{ display: 'grid', placeItems: 'center', padding: 48, gap: 12 }}>
+                <p role="alert">No se pudo cargar el catálogo de mobs: {mobsState.message}</p>
+                <Button onClick={handleRetryMobs}>Reintentar</Button>
+              </div>
+            )}
+
+            {mobsState.status === 'ready' && (
+              <HomeScreen
+                mobs={mobsState.mobs}
+                onSelectMob={handleSelectMob}
+                bufferCache={bufferCache}
+                onProjectOpened={handleProjectOpenedFromHome}
+              />
+            )}
+          </>
         )}
-      </main>
+
+        {view === 'recientes' && <PlaceholderScreen title="Recientes" ticket={40} />}
+        {view === 'proyecto' && <PlaceholderScreen title="Proyecto" ticket={41} />}
+        {view === 'agregar-mobs' && <PlaceholderScreen title="Agregar mobs" ticket={42} />}
+      </AppShell>
     );
   }
 
@@ -309,7 +327,7 @@ function App() {
               solo icono (`aria-label` se elimina, el texto real es
               ahora el nombre accesible; `title` se conserva como
               tooltip adicional). */}
-          <Button variant="icon" title="Volver al inicio" onClick={() => setView('home')}>
+          <Button variant="icon" title="Volver al inicio" onClick={() => setView('nuevo-proyecto')}>
             <span aria-hidden="true">←</span> Volver al inicio
           </Button>
           <h1 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>
@@ -343,8 +361,6 @@ function App() {
           <Avatar displayName={displayName} />
         </div>
       </header>
-
-      {showSettings && <Settings displayName={displayName} onDisplayNameSaved={setDisplayName} theme={theme} onThemeChange={setTheme} onClose={handleCloseSettings} />}
 
       {/* Ticket 019 (HU-3/HU-4/HU-5): fila propia, hermana del header --
           un proyecto agrupa VARIOS mobs a la vez (no es un control por
@@ -388,7 +404,7 @@ function App() {
           ya no son alcanzables en la vista de editor (ticket 027): solo
           se llega a `view === 'editor'` desde `HomeScreen`/`MobSelector`,
           y ambos solo renderizan con `mobsState.status === 'ready'`. Esos
-          dos estados se manejan en la vista 'home' de arriba. */}
+          dos estados se manejan en 'nuevo-proyecto'/'mis-proyectos' de arriba. */}
       {/* `position: relative` (ticket 033, HU-8): ancla `LoadingOverlay`
           a esta area (el editor), no a toda la ventana -- cubre el
           cambio de mob (`assetState` vuelve a `loading` en
