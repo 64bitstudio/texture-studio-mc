@@ -28,3 +28,6 @@ npm-debug.log*
 # client .jar legitimo. Este patrón es una red de seguridad por si algún
 # día se crea localmente dentro del repo por error.
 vanilla-assets/
+
+# macOS
+.DS_Store

@@ -30,15 +30,15 @@ Respuesta `200`:
   "mobs": [
     { "id": "skeleton", "label": "Esqueleto" },
     { "id": "zombie", "label": "Zombie" },
-    { "id": "spider", "label": "Araña" } // ticket 020
-    // Creeper se agrega en su propio ticket (021).
+    { "id": "spider", "label": "Araña" }, // ticket 020
+    { "id": "creeper", "label": "Creeper" } // ticket 021
   ]
 }
 ```
 
 ## `GET /api/base-assets/:mobId`
 
-Generaliza el endpoint literal `GET /api/base-assets/skeleton` del ticket 001 (ticket 016) — ver `docs/ARQUITECTURA.md` ("Contrato de `GET /api/base-assets/:mobId`") para la decisión de diseño. `mobId` es cualquier `id` del catálogo de `GET /api/mobs` (`"skeleton"`, `"zombie"` o `"spider"` por ahora).
+Generaliza el endpoint literal `GET /api/base-assets/skeleton` del ticket 001 (ticket 016) — ver `docs/ARQUITECTURA.md` ("Contrato de `GET /api/base-assets/:mobId`") para la decisión de diseño. `mobId` es cualquier `id` del catálogo de `GET /api/mobs` (`"skeleton"`, `"zombie"`, `"spider"` o `"creeper"`).
 
 > **Ticket 020 — ensanchamiento de contrato (aditivo, no rompe compatibilidad con Esqueleto/Zombie):** `geometry.parts` deja de ser un objeto con exactamente las 6 claves `head`/`body`/`armRight`/`armLeft`/`legRight`/`legLeft` y pasa a ser un diccionario de nombre-de-parte → caja de **tamaño arbitrario**, necesario para dar cabida a la Araña (cabeza+tórax+abdomen+8 patas, sin brazos). Esqueleto y Zombie siguen devolviendo exactamente las mismas 6 claves de siempre, sin ningún cambio. Cada caja también puede traer un campo nuevo opcional `group` (mismo criterio que `mirrorX`/`faceLabels`: úsalo para saber qué partes comparten la misma región UV — ver el ejemplo de la Araña más abajo, donde las 8 patas comparten `group: "spiderLeg"`). Ver `docs/ARQUITECTURA.md`, "Ticket 020", para la justificación completa.
 
@@ -134,6 +134,30 @@ Primera anatomía NO-biped del catálogo: 3 cajas de cuerpo (`head`, `thorax`, `
 - Ningún campo `body`/`armRight`/`armLeft`/`legRight`/`legLeft` — anatomía distinta, ver el ensanchamiento de contrato arriba.
 - Las 8 patas comparten `group: "spiderLeg"`: pintar la región UV de una pata en el editor pinta las 8 a la vez (mismo comportamiento que `armRight`/`armLeft` en el biped, solo que con 8 partes en vez de 2 compartiendo el grupo).
 - `faceLabels` de cada caja (omitidos arriba por brevedad): prefijados por parte (`"Tórax — Frente"`, `"Abdomen — Frente"`, `"Pata — Frente"`, sin lateralidad en las patas) para que el selector "Aislar parte" no muestre dos regiones distintas con el mismo nombre "Frente" — ver `backend/src/geometry/spiderGeometry.ts`.
+
+### `GET /api/base-assets/creeper` (ticket 021)
+
+Segunda anatomía no-biped: solo `head` + `body` (sin torso/tórax/abdomen separados) + 4 patas cortas, sin brazos. Su asset vanilla real tuvo que extraerse primero (no estaba cacheado) — ver `docs/ARQUITECTURA.md`, "Ticket 021".
+
+```jsonc
+{
+  "texture": { "dataUrl": "data:image/png;base64,....", "width": 64, "height": 32, "isPlaceholder": false },
+  "geometry": {
+    "textureWidth": 64,
+    "textureHeight": 32,
+    "parts": {
+      "head":          { "size": [8, 8, 8], "position": [0, 22, 0], "uv": { "x": 0, "y": 0 } },
+      "body":          { "size": [8, 12, 4], "position": [0, 12, 0], "uv": { "x": 16, "y": 16 } },
+      "legFrontRight": { "size": [4, 6, 4], "position": [-2, 3, 4],  "uv": { "x": 0, "y": 16 }, "group": "creeperLeg" },
+      "legFrontLeft":  { "size": [4, 6, 4], "position": [2, 3, 4],   "uv": { "x": 0, "y": 16 }, "group": "creeperLeg" }
+      // legBackRight/legBackLeft: mismo size/uv/group, solo cambia `position.z` (ver creeperGeometry.ts).
+    }
+  }
+}
+```
+
+- Ningún campo `mirrorX` en ninguna pata — a diferencia de la Araña, el `.geo.json` oficial del Creeper NO declara mirror para ninguna de sus 4 patas (verificado, no asumido por simetría visual).
+- Las 4 patas comparten `group: "creeperLeg"` (misma región UV, mismo comportamiento de "pintar una pinta las 4" que `spiderLeg`).
 
 ## `GET /*` (catch-all SPA)
 

@@ -218,4 +218,66 @@ describe('GET /api/base-assets/:mobId', () => {
       expect(firstLabels.front).not.toMatch(/derech|izquierd/i);
     });
   });
+
+  // El Creeper (ticket 021) es la segunda anatomia no-biped: cabeza +
+  // cuerpo (sin torso/tórax/abdomen separados) + 4 patas cortas, sin
+  // brazos. A diferencia de la Araña, sus 4 patas NO llevan `mirrorX`
+  // en la fuente oficial (`bedrock-samples/creeper.geo.json`) -- se
+  // verifica explicitamente que este proyecto no lo inventa. Su asset
+  // vanilla real tuvo que extraerse primero (no estaba cacheado) -- ver
+  // `backend/src/geometry/creeperGeometry.ts` para la investigacion
+  // completa.
+  describe('creeper (anatomia no-biped, ticket 021)', () => {
+    it('responde con textura 64x32 y las cajas de cabeza/cuerpo correctas', async () => {
+      const app = createApp();
+      const res = await request(app).get('/api/base-assets/creeper');
+
+      expect(res.status).toBe(200);
+      expect(res.body.texture.width).toBe(64);
+      expect(res.body.texture.height).toBe(32);
+      expect(res.body.geometry.textureWidth).toBe(64);
+      expect(res.body.geometry.textureHeight).toBe(32);
+
+      const { head, body } = res.body.geometry.parts;
+      expect(head.size).toEqual([8, 8, 8]);
+      expect(head.position).toEqual([0, 22, 0]);
+      expect(head.uv).toEqual({ x: 0, y: 0 });
+      expect(body.size).toEqual([8, 12, 4]);
+      expect(body.position).toEqual([0, 12, 0]);
+      expect(body.uv).toEqual({ x: 16, y: 16 });
+    });
+
+    it('tiene 4 patas, todas del mismo tamaño y UV, sin mirrorX (no esta en la fuente oficial)', async () => {
+      const app = createApp();
+      const res = await request(app).get('/api/base-assets/creeper');
+      const { parts } = res.body.geometry;
+
+      const legKeys = Object.keys(parts).filter((k) => k.startsWith('leg'));
+      expect(legKeys).toHaveLength(4);
+
+      for (const key of legKeys) {
+        expect(parts[key].size).toEqual([4, 6, 4]);
+        expect(parts[key].uv).toEqual({ x: 0, y: 16 });
+        expect(parts[key].group).toBe('creeperLeg');
+        expect(parts[key].mirrorX).toBeFalsy();
+      }
+
+      // 4 posiciones unicas (una por esquina: frente/atras x derecha/izquierda).
+      const positions = new Set(legKeys.map((k) => parts[k].position.join(',')));
+      expect(positions.size).toBe(4);
+    });
+
+    it('las 4 patas comparten faceLabels identicos y sin lateralidad', async () => {
+      const app = createApp();
+      const res = await request(app).get('/api/base-assets/creeper');
+      const { parts } = res.body.geometry;
+      const legKeys = Object.keys(parts).filter((k) => k.startsWith('leg'));
+
+      const firstLabels = parts[legKeys[0]].faceLabels;
+      for (const key of legKeys) {
+        expect(parts[key].faceLabels).toEqual(firstLabels);
+      }
+      expect(firstLabels.front).not.toMatch(/derech|izquierd/i);
+    });
+  });
 });
