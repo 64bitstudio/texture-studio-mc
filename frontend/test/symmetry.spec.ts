@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeUVBoxRects, mirrorPointHorizontal, type UVBoxRect } from '../src/symmetry';
-import type { SkeletonGeometry } from '../src/types/baseAssets';
+import type { MobGeometry } from '../src/types/baseAssets';
 
 // Mismos valores que `backend/src/geometry/skeletonGeometry.ts` (formato
 // clasico 64x32 del Esqueleto/Player, YA con la correccion del ticket
@@ -12,10 +12,10 @@ import type { SkeletonGeometry } from '../src/types/baseAssets';
 // este ticket -- el contenido exacto no importa para estos tests (no
 // ejercitan `regionLabels.ts`, ver `test/regionLabels.spec.ts` para
 // eso), solo debe estar presente para que el fixture siga
-// satisfaciendo el tipo `SkeletonGeometry`.
+// satisfaciendo el tipo `MobGeometry`.
 const NOOP_FACE_LABELS = { front: 'f', back: 'b', top: 't', bottom: 'bo', left: 'l', right: 'r' };
 
-const SKELETON_GEOMETRY: SkeletonGeometry = {
+const SKELETON_GEOMETRY: MobGeometry = {
   textureWidth: 64,
   textureHeight: 32,
   parts: {

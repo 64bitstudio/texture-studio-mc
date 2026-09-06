@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { computeNamedRegions, findRegionAtPixel, findRegionAt, type NamedUVRegion } from '../src/regionLabels';
-import type { SkeletonGeometry } from '../src/types/baseAssets';
+import type { MobGeometry } from '../src/types/baseAssets';
 
 // Mismos valores (size/position/uv/mirrorX) Y mismo catalogo de
 // `faceLabels` que `backend/src/geometry/skeletonGeometry.ts` (ticket
@@ -40,7 +40,7 @@ const LEG_FACE_LABELS = {
   right: 'Pierna — Lateral',
 };
 
-const SKELETON_GEOMETRY: SkeletonGeometry = {
+const SKELETON_GEOMETRY: MobGeometry = {
   textureWidth: 64,
   textureHeight: 32,
   parts: {
