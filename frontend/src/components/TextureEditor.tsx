@@ -1,5 +1,6 @@
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
 import { hexToRgba } from '../colors';
+import { computeCanvasDisplaySize } from '../canvasSize';
 import type { PixelPoint, RGBA, TextureBuffer } from '../textureBuffer';
 import { ZOOM_STEP, clampZoom } from '../zoom';
 
@@ -61,6 +62,21 @@ const GRID_LINE_COLOR = 'rgba(0, 0, 0, 0.3)';
  * dependencias). Tiene `pointer-events: none` y `aria-hidden` -- es
  * puramente decorativo, todos los eventos de puntero siguen llegando
  * al canvas de textura de abajo.
+ *
+ * **Ticket 010 -- ya NO usa `maxWidth: '100%'` en el canvas.** Antes
+ * de este ticket, el `<canvas>` tenia `style.maxWidth: '100%'` ademas
+ * de `style.width/height` fijos -- dentro de un `<aside>` de ancho
+ * FIJO, cuando el ancho logico (`displayWidth`) excedia el ancho
+ * disponible, el navegador comprimia SOLO el ancho renderizado (sin
+ * `height: auto`), produciendo texeles no cuadrados (hallazgo
+ * documentado en `docs/ARQUITECTURA.md`, tickets 005/008). Ahora el
+ * ancho del `<aside>` es ajustable por el usuario (ver `Editor.tsx`,
+ * `PanelResizeHandle`) y el canvas SIEMPRE se renderiza a
+ * `computeCanvasDisplaySize(buffer.width, buffer.height, zoom)` --
+ * mismo factor de escala en ambos ejes, sin importar el ancho
+ * disponible. Si no cabe, el CONTENEDOR (el wrapper en `Editor.tsx`)
+ * scrollea horizontalmente (`overflow-x: auto`) en vez de comprimir el
+ * canvas.
  */
 export function TextureEditor({
   buffer,
@@ -88,8 +104,7 @@ export function TextureEditor({
     ctx.putImageData(buffer.toImageData(), 0, 0);
   }, [buffer, version]);
 
-  const displayWidth = buffer.width * zoom;
-  const displayHeight = buffer.height * zoom;
+  const { width: displayWidth, height: displayHeight } = computeCanvasDisplaySize(buffer.width, buffer.height, zoom);
 
   useEffect(() => {
     if (!showGrid) return;
@@ -196,7 +211,6 @@ export function TextureEditor({
       style={{
         position: 'relative',
         display: 'inline-block',
-        maxWidth: '100%',
         border: '1px solid rgba(255,255,255,0.15)',
         borderRadius: 4,
         overflow: 'hidden',
@@ -214,7 +228,6 @@ export function TextureEditor({
           touchAction: 'none',
           cursor: 'crosshair',
           display: 'block',
-          maxWidth: '100%',
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
