@@ -1049,3 +1049,25 @@ Igual que `ThemeToggle` (ticket 034): se montan en el header EXISTENTE de `App.t
 ### Verificación en vivo (Claude in Chrome, local)
 
 Cambiar el nombre en Configuración actualiza el avatar del header de inmediato ("U" → "M"); cambiar el tema desde Configuración sincroniza el toggle rápido (bug reproducido y re-verificado corregido); "Borrar todos los datos locales" muestra la confirmación en línea (nunca diálogo nativo), y al confirmar la sección "Guardados" pasa a "Todavía no hay proyectos guardados" (capturas de pantalla). `npm run lint`, `npm test` (184, incluye `userPrefs.spec.ts` nuevo y 3 tests nuevos de `deleteAllProjects` en `projectStorage.spec.ts`), `npm run build` en verde.
+
+## Ticket 037 -- Shell de navegación nueva (sidebar + header) (HU-5)
+
+### `View` pasa de binario a 7 destinos -- sigue sin router
+
+`App.tsx`: `type View = 'nuevo-proyecto' | 'mis-proyectos' | 'recientes' | 'proyecto' | 'agregar-mobs' | 'editor' | 'configuracion'` (antes `'home' | 'editor'`). Mismo criterio del ticket 027 (sin `react-router` ni URLs) -- sigue siendo un `useState` interno, ahora con más valores. `'proyecto'`/`'agregar-mobs'` existen en el tipo desde ya (el ticket lo pide explícitamente) pero NO son alcanzables desde ninguna UI todavía -- los tickets 041/042 los conectan.
+
+### `AppShell.tsx`/`Sidebar.tsx` (nuevos) -- envuelven TODO excepto el editor
+
+`AppShell` (sidebar fijo + header con tema/configuración/avatar) envuelve las 6 vistas no-editor. El editor CONSERVA su layout dedicado propio (sin sidebar, para maximizar el área de trabajo) -- `if (view !== 'editor') { return <AppShell>...` vs. el `return` final sin cambios estructurales para `'editor'`. `Sidebar` resalta el item activo (`aria-current="page"`, variant `primary` vs `secondary`) solo cuando `view` es exactamente uno de sus 3 destinos -- `'proyecto'`/`'agregar-mobs'`/`'configuracion'` no resaltan nada (son subvistas, no items del sidebar).
+
+### `Settings.tsx` deja de ser un overlay -- ahora es una vista real
+
+El ticket 036 lo construyó como `position: fixed; inset: 0` porque todavía no existía un sistema de vistas real. Con `AppShell` ya construido, Configuración se conecta como una vista NORMAL (`view === 'configuracion'`, contenido dentro de `<main>`) -- se le quita el wrapper fijo/backdrop y el prop `onClose` (ya no hace falta: salir de Configuración es simplemente navegar a cualquier item del sidebar, que sigue siempre visible). `handleOpenSettings` pasa de `setShowSettings(true)` a `setView('configuracion')`.
+
+### Decisión real (documentada, no silenciosa): "Nuevo proyecto" y "Mis proyectos" muestran el mismo `HomeScreen` temporalmente
+
+Los tickets 038 (Nuevo proyecto real) y 039 (Mis proyectos real) todavía no existen en este punto del backlog -- construir placeholders vacíos para ambos hubiera dejado la app SIN NINGUNA forma de seleccionar un mob o abrir un proyecto guardado durante la transición (una regresión real, aunque temporal). Se optó por mostrar el `HomeScreen` ya existente (selección de mob + Guardados, tickets 027/028) sin cambios bajo AMBOS destinos por ahora -- documentado explícitamente como decisión de transición, no un descuido; 038/039 lo reemplazan con el contenido real y diferenciado de cada uno. `'recientes'`/`'proyecto'`/`'agregar-mobs'` sí usan `PlaceholderScreen` (nuevo, mínimo) porque son pantallas genuinamente NUEVAS sin equivalente previo -- no hay regresión al dejarlas en placeholder.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Confirmado con capturas: sidebar muestra los 3 destinos, el activo resaltado en verde cambia correctamente al navegar entre ellos; "Recientes" muestra el placeholder ("Esta pantalla todavía no está implementada -- ver ticket 040"); el avatar del header navega a Configuración, que se renderiza como vista real (sidebar/header siguen visibles alrededor, no un modal); seleccionar un mob desde "Nuevo proyecto" entra al editor con su layout dedicado sin sidebar; "Volver al inicio" regresa a "Nuevo proyecto" con el sidebar de nuevo resaltado correctamente. `npm run lint`, `npm test` (184, sin tests nuevos -- cambio de layout/routing interno, verificado en vivo), `npm run build` en verde.

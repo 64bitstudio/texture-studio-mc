@@ -216,3 +216,11 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`components/Settings.tsx`** (nuevo) — overlay con 3 secciones: nombre, tema (controlado, misma fuente que `ThemeToggle`), borrar todos los datos locales (confirmación inline).
 - **`components/ThemeToggle.tsx`** — pasa de estado propio a CONTROLADO (`theme`/`onThemeChange` por props) -- ver `docs/ARQUITECTURA.md`, bug real corregido.
 - **`App.tsx`** — nuevo estado levantado `displayName`/`theme` (fuente única para `Avatar`/`Settings`/`ThemeToggle`); `showSettings` (ubicación temporal del overlay, hasta el ticket 037).
+
+### Ticket 037 -- Shell de navegación nueva (sidebar + header)
+
+- **`components/AppShell.tsx`** (nuevo) — sidebar + header, envuelve todas las vistas excepto el editor.
+- **`components/Sidebar.tsx`** (nuevo) — 3 destinos (`NavView`), item activo resaltado, tarjeta de marca al pie.
+- **`components/PlaceholderScreen.tsx`** (nuevo) — contenido mínimo para destinos sin implementación real todavía.
+- **`components/Settings.tsx`** — deja de ser overlay (`position: fixed`), ahora se renderiza como vista normal dentro de `AppShell`; pierde el prop `onClose` (ya no hace falta).
+- **`App.tsx`** — `View` pasa de `'home' | 'editor'` a 7 destinos; `showSettings` se elimina (`handleOpenSettings` navega directo a `'configuracion'`); "Nuevo proyecto"/"Mis proyectos" muestran temporalmente el mismo `HomeScreen` (decisión real documentada, ver `docs/ARQUITECTURA.md`).
