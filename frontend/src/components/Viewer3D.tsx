@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { applyBoxUV } from '../geometry/applyBoxUV';
+import { computeGeometryCenter } from '../geometry/geometryBounds';
 import type { MobGeometry, MobBoxPart } from '../types/baseAssets';
 
 interface MobPartMeshProps {
@@ -94,6 +95,14 @@ export interface Viewer3DProps {
  * Ver docs/COMPONENTES.md.
  */
 export function Viewer3D({ texture, geometry, mobLabel }: Viewer3DProps) {
+  // Ticket 020 (hallazgo durante la Araña): el `target` de OrbitControls
+  // era un valor fijo `[0, 16, 0]` -- correcto SOLO por coincidencia
+  // para el biped clasico (ver `geometryBounds.ts`). Se calcula ahora
+  // del bounding box real de la geometria activa, para que cualquier
+  // mob futuro (Araña, Creeper, lo que sea) quede centrado en camara sin
+  // tener que ajustar este componente de nuevo.
+  const target = useMemo(() => computeGeometryCenter(geometry), [geometry]);
+
   return (
     <div
       role="img"
@@ -103,7 +112,7 @@ export function Viewer3D({ texture, geometry, mobLabel }: Viewer3DProps) {
       <Canvas camera={{ position: [45, 40, 65], fov: 40, near: 0.1, far: 1000 }}>
         <color attach="background" args={['#2b2d36']} />
         <MobModel texture={texture} geometry={geometry} />
-        <OrbitControls target={[0, 16, 0]} enableDamping />
+        <OrbitControls target={target} enableDamping />
       </Canvas>
     </div>
   );

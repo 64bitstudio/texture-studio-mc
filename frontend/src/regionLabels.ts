@@ -23,25 +23,9 @@ export type BoxFaceKey = 'front' | 'back' | 'top' | 'bottom' | 'left' | 'right';
 
 const FACE_KEYS: BoxFaceKey[] = ['front', 'back', 'top', 'bottom', 'left', 'right'];
 
-/**
- * Agrupador de partes que comparten el MISMO rectangulo UV (ticket 009:
- * `armRight`/`armLeft` y `legRight`/`legLeft` apuntan al mismo `uv` y
- * tamaño -- ver `docs/ARQUITECTURA.md`, "Mapeo UV de cajas"). Se usa
- * para generar un `id` estable por region que no duplique entradas
- * identicas entre el lado derecho/izquierdo de brazo y pierna.
- */
-const PART_GROUP_KEY: Record<keyof MobGeometry['parts'], string> = {
-  head: 'head',
-  body: 'body',
-  armRight: 'arm',
-  armLeft: 'arm',
-  legRight: 'leg',
-  legLeft: 'leg',
-};
-
 /** Una region nombrada del "cross" UV: un rectangulo de pixeles + su nombre legible. */
 export interface NamedUVRegion {
-  /** Id estable, ej. `"head.front"`/`"arm.left"` -- deduplicado entre partes que comparten UV (ver `PART_GROUP_KEY`). */
+  /** Id estable, ej. `"head.front"`/`"arm.left"` -- deduplicado entre partes que comparten UV (ver `part.group` en `MobBoxPart`, ticket 020). */
   id: string;
   /** Grupo de la parte (`head`/`body`/`arm`/`leg`) -- util para el ticket 012 (aislar por parte). */
   groupKey: string;
@@ -61,9 +45,10 @@ function scaleRect(rect: PixelRect, scale: number): PixelRect {
  * Deriva el catalogo completo de regiones UV nombradas a partir de la
  * geometria servida por el backend. Deduplica regiones que comparten
  * exactamente el mismo `id` (mismo grupo + misma cara) -- ocurre para
- * `armRight`/`armLeft` y `legRight`/`legLeft`, que comparten region UV
- * (ver `PART_GROUP_KEY`) y, por diseño, tambien el mismo `faceLabels`
- * (sin lateralidad -- ver docs/ARQUITECTURA.md, "Ticket 011").
+ * `armRight`/`armLeft` y `legRight`/`legLeft` (y, desde el ticket 020,
+ * las 8 patas de la Araña), que comparten region UV (ver `part.group`
+ * en `MobBoxPart`) y, por diseño, tambien el mismo `faceLabels` (sin
+ * lateralidad -- ver docs/ARQUITECTURA.md, "Ticket 011").
  *
  * `scale` (igual criterio que `computeUVBoxRects` en `symmetry.ts`,
  * ticket 009): la geometria del backend describe el UV en pixeles
@@ -75,11 +60,11 @@ export function computeNamedRegions(geometry: MobGeometry, scale: number = 1): N
   const seen = new Set<string>();
   const regions: NamedUVRegion[] = [];
 
-  (Object.keys(geometry.parts) as Array<keyof MobGeometry['parts']>).forEach((partKey) => {
+  Object.keys(geometry.parts).forEach((partKey) => {
     const part = geometry.parts[partKey];
     const [w, h, d] = part.size;
     const faceRects = computeBoxFaceRects(part.uv.x, part.uv.y, w, h, d);
-    const groupKey = PART_GROUP_KEY[partKey];
+    const groupKey = part.group ?? partKey;
 
     FACE_KEYS.forEach((face) => {
       const id = `${groupKey}.${face}`;

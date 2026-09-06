@@ -69,16 +69,24 @@ export function filterPointsToActiveRegion(points: PixelPoint[], activeRegion: N
  * "Selector de partes"). Puramente de PRESENTACION -- no interviene en
  * ningun calculo de pixeles ni de geometria (esas siguen siendo
  * responsabilidad exclusiva de `regionLabels.ts`). Los 4 grupos del
- * Esqueleto ya conocidos (ver `regionLabels.ts`, `PART_GROUP_KEY`) tienen
- * nombre fijo; cualquier `groupKey` futuro no listado cae al propio
- * valor capitalizado en vez de romper (defensivo ante un mob futuro con
- * partes nuevas, sin necesidad de tocar este archivo primero).
+ * Esqueleto ya conocidos (`groupKey` viene de `part.group` en cada
+ * `MobBoxPart`, ver `backend/src/types/baseAssets.ts`, ticket 020)
+ * tienen nombre fijo; cualquier `groupKey` futuro no listado cae al
+ * propio valor capitalizado en vez de romper (defensivo ante un mob
+ * futuro con partes nuevas, sin necesidad de tocar este archivo primero).
  */
 const GROUP_DISPLAY_LABELS: Record<string, string> = {
   head: 'Cabeza',
   body: 'Torso',
   arm: 'Brazo',
   leg: 'Pierna',
+  // Ticket 020 (Araña) -- grupos propios de una anatomia no-biped. `leg`
+  // arriba sigue siendo "Pierna" (biped) porque `spiderLeg` es una clave
+  // DISTINTA (nunca colisionan) -- las 8 patas de la Araña comparten esta,
+  // no la de arriba.
+  thorax: 'Tórax',
+  abdomen: 'Abdomen',
+  spiderLeg: 'Pata',
 };
 
 export function groupDisplayLabel(groupKey: string): string {

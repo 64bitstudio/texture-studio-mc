@@ -1,5 +1,6 @@
 import { SKELETON_GEOMETRY } from '../geometry/skeletonGeometry.js';
 import { ZOMBIE_GEOMETRY } from '../geometry/zombieGeometry.js';
+import { SPIDER_GEOMETRY } from '../geometry/spiderGeometry.js';
 import type { MobGeometry } from '../types/baseAssets.js';
 
 // Registro central de mobs soportados (ticket 016 -- ver
@@ -18,11 +19,16 @@ import type { MobGeometry } from '../types/baseAssets.js';
 // textura (`services/mobTexture.ts`), que ya eran 100% genericos sobre
 // `MobDefinition`, confirmando la prediccion del ticket 016.
 //
-// `MobId` ya es una union de dos literales ('skeleton' | 'zombie') --
-// el ticket 016 dejo dicho que se ampliaria aqui cuando 017/020/021
-// agregaran su entrada, sin tocar la forma de `MobDefinition` ni de las
+// `MobId` ya es una union de tres literales ('skeleton' | 'zombie' |
+// 'spider') -- la Araña (ticket 020) SI requirio ampliar la forma de
+// `MobGeometry.parts` (de 6 claves fijas a `Record<string, MobBoxPart>`,
+// ver `backend/src/types/baseAssets.ts`, "Ticket 020") porque su
+// anatomia no es un biped, pero `MobDefinition`/las rutas de abajo
+// siguieron sin cambios, confirmando la prediccion del ticket 016 para
+// esa parte. El ticket 016 dejo dicho que se ampliaria aqui cuando
+// 017/020/021 agregaran su entrada, sin tocar la forma de las
 // rutas (asi fue: cero cambios a esos archivos en este ticket).
-export type MobId = 'skeleton' | 'zombie';
+export type MobId = 'skeleton' | 'zombie' | 'spider';
 
 export interface MobDefinition {
   id: MobId;
@@ -51,6 +57,12 @@ export const MOB_REGISTRY: Record<MobId, MobDefinition> = {
     label: 'Zombie',
     geometry: ZOMBIE_GEOMETRY,
     vanillaAssetFileName: 'zombie.png',
+  },
+  spider: {
+    id: 'spider',
+    label: 'Araña',
+    geometry: SPIDER_GEOMETRY,
+    vanillaAssetFileName: 'spider.png',
   },
 };
 

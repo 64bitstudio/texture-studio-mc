@@ -30,25 +30,25 @@ export interface FaceLabels {
   right: string;
 }
 
+// TICKET 020 -- `group` y `parts: Record<string, MobBoxPart>` generalizan
+// el contrato para mobs con anatomia distinta a un biped clasico (la
+// Araña no tiene brazos ni un torso unico, y tiene 8 patas que comparten
+// la misma region UV). Ver `backend/src/types/baseAssets.ts` para la
+// justificacion completa -- espejo exacto de ese cambio, mismo criterio
+// de sincronizacion manual que el resto de este archivo.
 export interface MobBoxPart {
   size: [number, number, number];
   position: [number, number, number];
   uv: BoxUvOrigin;
   mirrorX?: boolean;
   faceLabels: FaceLabels;
+  group?: string;
 }
 
 export interface MobGeometry {
   textureWidth: number;
   textureHeight: number;
-  parts: {
-    head: MobBoxPart;
-    body: MobBoxPart;
-    armRight: MobBoxPart;
-    armLeft: MobBoxPart;
-    legRight: MobBoxPart;
-    legLeft: MobBoxPart;
-  };
+  parts: Record<string, MobBoxPart>;
 }
 
 export interface MobTexture {

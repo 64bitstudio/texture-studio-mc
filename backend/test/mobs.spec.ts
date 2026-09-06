@@ -5,13 +5,14 @@ import { createApp } from '../src/app.js';
 // Ticket 016: catalogo de mobs soportados, consumido por el selector de
 // mob del frontend (ticket 018).
 describe('GET /api/mobs', () => {
-  it('devuelve el catalogo con el Esqueleto y el Zombie (ticket 017)', async () => {
+  it('devuelve el catalogo con Esqueleto, Zombie (ticket 017) y Araña (ticket 020)', async () => {
     const app = createApp();
     const res = await request(app).get('/api/mobs');
 
     expect(res.status).toBe(200);
     expect(res.body.mobs).toContainEqual({ id: 'skeleton', label: 'Esqueleto' });
     expect(res.body.mobs).toContainEqual({ id: 'zombie', label: 'Zombie' });
+    expect(res.body.mobs).toContainEqual({ id: 'spider', label: 'Araña' });
   });
 
   it('cada entrada solo expone id y label (sin geometria/detalles internos)', async () => {
