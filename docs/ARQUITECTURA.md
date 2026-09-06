@@ -766,3 +766,29 @@ Esto es fiel al archivo `.geo.json` oficial, no un error de esta implementacion:
 
 - `npm run lint`, `npm test`, `npm run build` en verde en `backend/` y `frontend/` (suite completa, incluyendo tests nuevos: `backend/test/baseAssets.spec.ts` con bloque dedicado para `spider`, `frontend/test/regionLabels.spec.ts` con el caso de dedupe de mas de 2 partes por `group`, `frontend/test/geometryBounds.spec.ts` nuevo).
 - En vivo (local, `npm run dev`): `GET /api/base-assets/spider` responde `isPlaceholder: false` con las 11 partes esperadas (`head`, `thorax`, `abdomen`, `leg1Right`..`leg4Left`); el selector de mob muestra "Araña"; el editor 2D muestra la textura real con las cajas UV correctamente delimitadas (cabeza, tórax, patas, abdomen, sin solapamientos); el visor 3D carga el modelo con la textura real aplicada (ver hallazgo de patas amontonadas arriba).
+
+## Ticket 021 -- Investigacion y geometria del Creeper (+ extraccion de su asset vanilla real)
+
+### Paso 0 (nuevo respecto a Zombie/Araña): extraccion del asset vanilla real
+
+A diferencia de Zombie/Araña, `creeper.png` NO estaba cacheado en `~/tools/minecraft-texture-pack/vanilla-cache/` -- el ticket pedia explicitamente reportarlo como bloqueo si la extraccion no fuera posible, en vez de aproximar/inventar la textura. Se confirmo acceso: esta Mac tiene un client de Minecraft instalado (`~/Library/Application Support/minecraft/versions/1.21.11/1.21.11.jar`, la misma version usada para los demas mobs), y `creeper.png` esta presente ahi en `assets/minecraft/textures/entity/creeper/creeper.png` -- se extrajo con `unzip -p` (misma naturaleza de extraccion legitima ya usada para Esqueleto/Zombie/Araña, ningun mecanismo nuevo) y se cacheo en la misma carpeta para reuso futuro. No fue necesario reportar bloqueo.
+
+### Investigacion (regla permanente del equipo)
+
+1. **Fuente oficial**: fetch real de `Mojang/bedrock-samples/resource_pack/models/entity/creeper.geo.json`. `texturewidth`/`textureheight` = 64x32 (igual al PNG real extraido, sin mitad extra sin usar). 2 cajas de cuerpo (`body`, `head`) + 4 patas (`leg0`..`leg3`), TODAS con el MISMO `size [4,6,4]` y el MISMO `uv [0,16]` -- comparten una unica region UV, igual criterio que las 8 patas de la Araña. **Diferencia real respecto a la Araña**: ninguna de las 4 patas declara `mirror` en el .geo.json oficial -- se preservo tal cual (sin `mirrorX` en ninguna), en vez de asumir que "deberian" tener mirror por simetria visual.
+2. **Verificacion empirica**: mapa de luminancia/alpha pixel a pixel contra el `creeper.png` recien extraido, cruzado contra el rectangulo UV "cross" que predice cada caja -- coincide EXACTAMENTE en las filas clave revisadas (filas 0-7 solo cabeza top/bottom, filas 8-15 cabeza completa, fila 16 solo pata top/bottom, fila 20 patas+cuerpo concatenados sin hueco). Ver el comentario completo en `backend/src/geometry/creeperGeometry.ts`.
+3. Existe una variante `geometry.creeper.charged.v1.8` en el mismo archivo (con `inflate: 2.0`, para el efecto visual de "Creeper cargado" por rayo) -- usa la MISMA textura y las MISMAS cajas base, no aplica a este ticket (que es sobre el modelo/textura base, no las variantes de estado).
+
+### Nomenclatura de partes del Creeper
+
+`head`, `body` (sin torso/tórax/abdomen separados -- el Creeper solo tiene estos 2 segmentos de cuerpo, a diferencia de la Araña con 3), y `legFrontRight`/`legFrontLeft`/`legBackRight`/`legBackLeft` (4 patas, cada una con su propia posicion pero compartiendo `group: 'creeperLeg'` -- misma region UV para las 4). "Right"/"Left" = lado anatomico del personaje (mismo criterio que `armRight`/`legRight` del biped y `leg1Right`/`leg1Left` de la Araña).
+
+### Verificación en vivo -- silueta correcta, sin el problema de "patas amontonadas" de la Araña
+
+A diferencia de la Araña (ticket 020), donde las 8 patas quedaban visualmente amontonadas por diferir solo 1 unidad entre si, las 4 patas del Creeper tienen posiciones bien separadas en x/z (`±2, ±4`) -- el modelo en bind pose (sin ninguna rotacion) ya se ve como un Creeper reconocible de inmediato: cabeza con la cara fruncida caracteristica, cuerpo alto, 4 patas cortas claramente separadas en las 4 esquinas. Confirmado en vivo (local, `npm run dev`, con el asset real extraido en el paso 0): el visor 3D muestra el Creeper con su camuflaje verde y cara icónica correctamente aplicados, sin ningun hallazgo/limitacion que documentar (a diferencia del ticket 020).
+
+### Verificación
+
+- `npm run lint`, `npm test`, `npm run build` en verde en `backend/` y `frontend/` (tests nuevos: bloque dedicado a `creeper` en `backend/test/baseAssets.spec.ts` -- incluye assert explicito de que ninguna pata tiene `mirrorX`, para dejar la diferencia con la Araña cubierta por test, no solo documentada).
+- `creeper.png` copiado a `backend/vanilla-assets/` (no versionado) para desarrollo local -- el despliegue del asset real a la VM (DEV/QA/PROD) sigue siendo responsabilidad del ticket 022, junto con Zombie y Araña.
+- En vivo (local): `GET /api/base-assets/creeper` responde `isPlaceholder: false` con las 6 partes esperadas; selector de mob muestra "Creeper"; visor 3D muestra un Creeper reconocible de inmediato (ver arriba).

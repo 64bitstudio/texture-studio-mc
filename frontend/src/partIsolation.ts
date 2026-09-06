@@ -87,6 +87,13 @@ const GROUP_DISPLAY_LABELS: Record<string, string> = {
   thorax: 'Tórax',
   abdomen: 'Abdomen',
   spiderLeg: 'Pata',
+  // Ticket 021 (Creeper) -- clave propia (no reusa `spiderLeg`) aunque
+  // el texto sea el mismo "Pata": son grupos de mobs distintos, cada
+  // uno con su propia region UV -- reusar la clave mezclaria por
+  // accidente el dedupe de `computeNamedRegions` entre dos mobs
+  // distintos si algun dia compartieran una misma respuesta (no ocurre
+  // hoy, pero es mas seguro no depender de esa coincidencia).
+  creeperLeg: 'Pata',
 };
 
 export function groupDisplayLabel(groupKey: string): string {

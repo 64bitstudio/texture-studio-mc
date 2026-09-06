@@ -40,6 +40,13 @@
       }
     },
     {
+      "name": "Base assets - Creeper (ticket 021)",
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/base-assets/creeper"
+      }
+    },
+    {
       "name": "Base assets - Mob inexistente (404)",
       "request": {
         "method": "GET",
