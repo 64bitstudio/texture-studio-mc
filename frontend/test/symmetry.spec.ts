@@ -7,16 +7,36 @@ import type { SkeletonGeometry } from '../src/types/baseAssets';
 // 009 -- brazos/piernas delgados [2,12,2]) -- duplicados aca a
 // proposito, igual que `frontend/src/types/baseAssets.ts` ya duplica el
 // contrato del backend (ver docs/ARQUITECTURA.md).
+//
+// `faceLabels` (ticket 011) es un campo requerido del contrato desde
+// este ticket -- el contenido exacto no importa para estos tests (no
+// ejercitan `regionLabels.ts`, ver `test/regionLabels.spec.ts` para
+// eso), solo debe estar presente para que el fixture siga
+// satisfaciendo el tipo `SkeletonGeometry`.
+const NOOP_FACE_LABELS = { front: 'f', back: 'b', top: 't', bottom: 'bo', left: 'l', right: 'r' };
+
 const SKELETON_GEOMETRY: SkeletonGeometry = {
   textureWidth: 64,
   textureHeight: 32,
   parts: {
-    head: { size: [8, 8, 8], position: [0, 28, 0], uv: { x: 0, y: 0 } },
-    body: { size: [8, 12, 4], position: [0, 18, 0], uv: { x: 16, y: 16 } },
-    armRight: { size: [2, 12, 2], position: [-5, 18, 0], uv: { x: 40, y: 16 } },
-    armLeft: { size: [2, 12, 2], position: [5, 18, 0], uv: { x: 40, y: 16 }, mirrorX: true },
-    legRight: { size: [2, 12, 2], position: [-2, 6, 0], uv: { x: 0, y: 16 } },
-    legLeft: { size: [2, 12, 2], position: [2, 6, 0], uv: { x: 0, y: 16 }, mirrorX: true },
+    head: { size: [8, 8, 8], position: [0, 28, 0], uv: { x: 0, y: 0 }, faceLabels: NOOP_FACE_LABELS },
+    body: { size: [8, 12, 4], position: [0, 18, 0], uv: { x: 16, y: 16 }, faceLabels: NOOP_FACE_LABELS },
+    armRight: { size: [2, 12, 2], position: [-5, 18, 0], uv: { x: 40, y: 16 }, faceLabels: NOOP_FACE_LABELS },
+    armLeft: {
+      size: [2, 12, 2],
+      position: [5, 18, 0],
+      uv: { x: 40, y: 16 },
+      mirrorX: true,
+      faceLabels: NOOP_FACE_LABELS,
+    },
+    legRight: { size: [2, 12, 2], position: [-2, 6, 0], uv: { x: 0, y: 16 }, faceLabels: NOOP_FACE_LABELS },
+    legLeft: {
+      size: [2, 12, 2],
+      position: [2, 6, 0],
+      uv: { x: 0, y: 16 },
+      mirrorX: true,
+      faceLabels: NOOP_FACE_LABELS,
+    },
   },
 };
 

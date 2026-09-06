@@ -1,6 +1,7 @@
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react';
 import { hexToRgba } from '../colors';
 import { computeCanvasDisplaySize } from '../canvasSize';
+import type { NamedUVRegion } from '../regionLabels';
 import type { PixelPoint, RGBA, TextureBuffer } from '../textureBuffer';
 import { ZOOM_STEP, clampZoom } from '../zoom';
 
@@ -21,10 +22,31 @@ export interface TextureEditorProps {
   onStrokeStart: () => void;
   /** Marca el fin de un trazo (pointerup/pointercancel) -- ticket 003. */
   onStrokeEnd: () => void;
+  /**
+   * Catalogo de regiones UV nombradas (ticket 011), ya escalado a la
+   * resolucion de trabajo activa -- ver `regionLabels.ts`. Se usa para
+   * dibujar el overlay de fronteras entre regiones (lineas mas
+   * marcadas que la cuadricula normal, siempre visible -- ver
+   * docs/ARQUITECTURA.md, "Ticket 011", decision de no agregar un
+   * toggle dedicado). Opcional para no romper ningun consumidor/test
+   * futuro que no necesite el overlay.
+   */
+  namedRegions?: NamedUVRegion[];
+  /** Notifica que celda esta bajo el cursor (o `null` al salir del canvas) -- ticket 011, etiqueta de region en el panel. */
+  onHoverPixel?: (point: PixelPoint | null) => void;
 }
 
 /** Color de las lineas de cuadricula sobre el canvas de textura -- sutil, no compite con los colores pintados. */
 const GRID_LINE_COLOR = 'rgba(0, 0, 0, 0.3)';
+
+/**
+ * Color/grosor del overlay de fronteras entre regiones UV nombradas
+ * (ticket 011) -- deliberadamente mas marcado que `GRID_LINE_COLOR`
+ * (mayor opacidad + 2px en vez de 1px) para que sea distinguible de la
+ * cuadricula normal de texeles sin necesidad de hover, tal como pide el
+ * criterio de aceptacion del ticket.
+ */
+const REGION_BORDER_COLOR = 'rgba(255, 214, 89, 0.85)';
 
 /**
  * Editor de textura pixel a pixel (HU-2): `<canvas>` 2D que renderiza
@@ -89,9 +111,12 @@ export function TextureEditor({
   onPaintLine,
   onStrokeStart,
   onStrokeEnd,
+  namedRegions,
+  onHoverPixel,
 }: TextureEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const gridCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const regionCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isPaintingRef = useRef(false);
   const lastCellRef = useRef<PixelPoint | null>(null);
 
@@ -133,6 +158,37 @@ export function TextureEditor({
     ctx.stroke();
   }, [showGrid, zoom, buffer.width, buffer.height, displayWidth, displayHeight]);
 
+  /**
+   * Overlay de fronteras entre regiones UV nombradas (ticket 011).
+   * Mismo patron que el canvas de grid de arriba (segundo `<canvas>`
+   * superpuesto, backing store = resolucion de PRESENTACION, para poder
+   * trazar lineas sin corromper el color real de los texeles) -- pero
+   * SIEMPRE visible (no depende de `showGrid`, criterio de este ticket:
+   * las fronteras entre regiones deben ser "visualmente claras" sin
+   * necesidad de hover ni de activar nada, ver docs/ARQUITECTURA.md).
+   * Dibuja el borde de cada rectangulo de `namedRegions` -- como
+   * regiones adyacentes comparten aristas, el resultado es exactamente
+   * la cuadricula de fronteras entre TODAS las caras de TODAS las
+   * cajas, mas marcada que la cuadricula de texeles normal.
+   */
+  useEffect(() => {
+    const canvas = regionCanvasRef.current;
+    if (!canvas || !namedRegions) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.strokeStyle = REGION_BORDER_COLOR;
+    ctx.lineWidth = 2;
+    for (const region of namedRegions) {
+      const { x0, y0, x1, y1 } = region.rect;
+      // +0.5/-0.5 (via lineWidth par) alinea el trazo con el limite de
+      // texel, mismo criterio que el canvas de grid -- lineWidth=2 en
+      // vez de 1 es justamente lo que lo hace "mas marcado".
+      ctx.strokeRect(x0 * zoom, y0 * zoom, (x1 - x0) * zoom, (y1 - y0) * zoom);
+    }
+  }, [namedRegions, zoom, displayWidth, displayHeight]);
+
   function cellFromEvent(e: ReactPointerEvent<HTMLCanvasElement>): PixelPoint | null {
     const canvas = canvasRef.current;
     if (!canvas) return null;
@@ -156,8 +212,13 @@ export function TextureEditor({
   }
 
   function handlePointerMove(e: ReactPointerEvent<HTMLCanvasElement>) {
-    if (!isPaintingRef.current) return;
     const cell = cellFromEvent(e);
+    // Etiqueta de region bajo el cursor (ticket 011) -- independiente de
+    // si se esta pintando o no, por eso vive fuera del `if
+    // (!isPaintingRef.current) return` de abajo.
+    onHoverPixel?.(cell);
+
+    if (!isPaintingRef.current) return;
     if (!cell) return;
     const last = lastCellRef.current;
     if (last && last.x === cell.x && last.y === cell.y) return;
@@ -168,6 +229,11 @@ export function TextureEditor({
       onSetPixel(cell.x, cell.y, hexToRgba(color));
     }
     lastCellRef.current = cell;
+  }
+
+  /** Limpia la etiqueta de region al salir del canvas (ticket 011) -- no interfiere con el pintado (`stopPainting` sigue atado a pointerup/pointercancel). */
+  function handlePointerLeave() {
+    onHoverPixel?.(null);
   }
 
   function stopPainting(e: ReactPointerEvent<HTMLCanvasElement>) {
@@ -233,11 +299,28 @@ export function TextureEditor({
         onPointerMove={handlePointerMove}
         onPointerUp={stopPainting}
         onPointerCancel={stopPainting}
+        onPointerLeave={handlePointerLeave}
         onWheel={handleWheel}
       />
       {showGrid && (
         <canvas
           ref={gridCanvasRef}
+          width={displayWidth}
+          height={displayHeight}
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: displayWidth,
+            height: displayHeight,
+            pointerEvents: 'none',
+          }}
+        />
+      )}
+      {namedRegions && (
+        <canvas
+          ref={regionCanvasRef}
           width={displayWidth}
           height={displayHeight}
           aria-hidden="true"

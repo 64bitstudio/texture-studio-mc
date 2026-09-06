@@ -17,6 +17,7 @@ import { useCanvasTexture } from '../hooks/useCanvasTexture';
 import { bresenhamLine, TextureBuffer, type PixelPoint, type PixelSource, type RGBA } from '../textureBuffer';
 import { PaintHistory, type Stroke } from '../history';
 import { computeUVBoxRects, mirrorPointHorizontal } from '../symmetry';
+import { computeNamedRegions, findRegionAt, type NamedUVRegion } from '../regionLabels';
 import { ZOOM_DEFAULT } from '../zoom';
 import { RESOLUTION_DEFAULT, clampResolutionMultiplier, resamplePixelSource } from '../resolution';
 import { canvasOverflowsAvailableWidth, computeCanvasDisplaySize } from '../canvasSize';
@@ -101,6 +102,20 @@ export function Editor({ data }: EditorProps) {
   // `findTargetUVBox`/`clampRectToBox` en `importImage.ts`) consumen
   // `uvBoxes` ya escalado, sin ningun cambio propio.
   const uvBoxes = useMemo(() => computeUVBoxRects(geometry, resolution), [geometry, resolution]);
+
+  // Catalogo de regiones UV nombradas (ticket 011) -- mismo criterio de
+  // `scale = resolution` que `uvBoxes` arriba (la geometria del backend
+  // describe el UV en pixeles nativos x1, ver `regionLabels.ts`).
+  // Reusado directamente por el ticket 012 (aislar parte para pintar)
+  // sin redefinir el catalogo, tal como pide el alcance de este ticket.
+  const namedRegions = useMemo(() => computeNamedRegions(geometry, resolution), [geometry, resolution]);
+  const [hoveredRegion, setHoveredRegion] = useState<NamedUVRegion | null>(null);
+  const handleHoverPixel = useCallback(
+    (point: PixelPoint | null) => {
+      setHoveredRegion(point ? findRegionAt(point, namedRegions) : null);
+    },
+    [namedRegions],
+  );
 
   // Zoom y cuadricula del editor de textura (ticket 004, HU-7). Estado
   // subido aca (no local a `TextureEditor`) porque los controles
@@ -275,6 +290,12 @@ export function Editor({ data }: EditorProps) {
       setHistoryTick((t) => t + 1);
       setPendingPaste(null);
       setPasteError(null);
+      // `namedRegions` se recalcula con el nuevo `resolution` (ver
+      // `useMemo` de arriba) -- el `hoveredRegion` guardado apunta a un
+      // rectangulo de la escala ANTERIOR, se limpia para no mostrar un
+      // nombre de region potencialmente desalineado hasta el proximo
+      // `pointermove` (ticket 011).
+      setHoveredRegion(null);
 
       setBuffer(newBuffer);
       setResolutionState(clamped);
@@ -660,6 +681,23 @@ export function Editor({ data }: EditorProps) {
           <h2 style={{ fontSize: 13, fontWeight: 600, margin: '0 0 8px', color: 'var(--text-dim)' }}>
             Textura ({buffer.width}×{buffer.height})
           </h2>
+          {/* Etiqueta fija de region (ticket 011, alternativa elegida sobre
+              un tooltip flotante -- ver docs/ARQUITECTURA.md): se actualiza
+              en vivo con cada `pointermove` sobre el canvas de textura
+              (`onHoverPixel`, `TextureEditor.tsx`) y vuelve a "--" al salir
+              del canvas o cuando el pixel cae en una zona de relleno sin
+              region UV conocida (ver `regionLabels.ts`). */}
+          <p
+            aria-live="polite"
+            style={{
+              margin: '0 0 8px',
+              fontSize: 12,
+              color: 'var(--text-dim)',
+              minHeight: 16,
+            }}
+          >
+            Región: <strong style={{ color: 'var(--text)' }}>{hoveredRegion?.label ?? '—'}</strong>
+          </p>
           {/* Contenedor con scroll horizontal (ticket 010): si el canvas
               (textureWidth*zoom, ver `canvasSize.ts`) no cabe en el
               ancho disponible del panel, este `<div>` scrollea en X en
@@ -684,6 +722,8 @@ export function Editor({ data }: EditorProps) {
                 onPaintLine={paintLine}
                 onStrokeStart={onStrokeStart}
                 onStrokeEnd={onStrokeEnd}
+                namedRegions={namedRegions}
+                onHoverPixel={handleHoverPixel}
               />
               {pendingPaste && (
                 <PasteImageOverlay
