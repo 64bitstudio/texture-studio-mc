@@ -8,7 +8,7 @@ import { fetchMobs } from './api/mobs';
 import type { MobBaseAssetsResponse, MobGeometry } from './types/baseAssets';
 import type { MobSummary } from './types/mobs';
 import { TextureBuffer } from './textureBuffer';
-import { Button, Menu } from './ui';
+import { Button, LoadingOverlay, Menu } from './ui';
 
 /** Ticket 027, HU-1: pantalla de inicio en vez de cargar directo al editor. Estado interno, sin router (ver docs/definiciones/rediseno-ux-ui-y-navegacion.md, "Diseño técnico"). */
 type View = 'home' | 'editor';
@@ -212,16 +212,17 @@ function App() {
   // inicio y elegir el mismo mob de nuevo no pierde nada ya pintado.
   if (view === 'home') {
     return (
-      <main style={{ width: '100vw', height: '100vh', overflow: 'auto' }}>
+      // `position: relative` (ticket 033, HU-8): ancla `LoadingOverlay`
+      // (`inset: 0`, ver `ui/LoadingOverlay.tsx`) a este contenedor en
+      // vez de a toda la ventana -- ya mide 100vw/100vh, asi que en la
+      // practica cubre lo mismo, pero deja el mecanismo correcto si
+      // algun dia este `<main>` deja de ser pantalla completa.
+      <main style={{ width: '100vw', height: '100vh', overflow: 'auto', position: 'relative' }}>
         <header style={{ padding: '10px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <h1 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>Texture Studio MC</h1>
         </header>
 
-        {mobsState.status === 'loading' && (
-          <div style={{ display: 'grid', placeItems: 'center', padding: 48 }}>
-            <p>Cargando catálogo de mobs…</p>
-          </div>
-        )}
+        {mobsState.status === 'loading' && <LoadingOverlay message="Cargando catálogo de mobs…" />}
 
         {mobsState.status === 'error' && (
           <div style={{ display: 'grid', placeItems: 'center', padding: 48, gap: 12 }}>
@@ -331,11 +332,15 @@ function App() {
           se llega a `view === 'editor'` desde `HomeScreen`/`MobSelector`,
           y ambos solo renderizan con `mobsState.status === 'ready'`. Esos
           dos estados se manejan en la vista 'home' de arriba. */}
-      <div style={{ flex: 1, minHeight: 0 }}>
+      {/* `position: relative` (ticket 033, HU-8): ancla `LoadingOverlay`
+          a esta area (el editor), no a toda la ventana -- cubre el
+          cambio de mob (`assetState` vuelve a `loading` en
+          `handleSelectMob`/`handleProjectOpenedFromHome`) y la carga
+          inicial (arranca en `loading` por default, ver `useState`
+          arriba). */}
+      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         {mobsState.status === 'ready' && selectedMobId && assetState.status === 'loading' && (
-          <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%' }}>
-            <p>Cargando modelo…</p>
-          </div>
+          <LoadingOverlay message="Cargando modelo…" />
         )}
 
         {mobsState.status === 'ready' && selectedMobId && assetState.status === 'error' && (

@@ -191,3 +191,8 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`components/Editor.tsx`**/**`App.tsx`** — íconos 📁/💾 en los `label` de los menús "Archivo"/"Proyecto"; contenedor raíz de `Editor` gana `.ts-fade-in` (fundido al cambiar de mob).
 - **`components/TextureEditor.tsx`** — el canvas de "aislar parte" gana `.ts-fade-in` (fundido al activarse).
 - **`App.tsx`** — "Volver al inicio" gana texto visible junto al ícono (antes ícono-solo); pierde `aria-label` (redundante, el texto real es ahora el nombre accesible).
+
+### Ticket 033 -- Estados de carga (primer consumidor real de `LoadingOverlay`)
+
+- **`App.tsx`** — reemplaza los textos planos de "Cargando catálogo de mobs…"/"Cargando modelo…" por `<LoadingOverlay message="..." />` (ticket 025); ambos contenedores padre ganan `position: relative` (`LoadingOverlay` usa `inset: 0`). Cubre carga inicial, reintento tras error y cambio de mob -- sin lógica nueva, solo qué se renderiza para los estados `loading` ya existentes.
+- La carga de un proyecto guardado (`ProjectControls.tsx`/`HomeScreen.tsx`) conserva su indicador por-botón existente ("Cargando…"/"Abriendo…", tickets 019/027) -- decisión real de NO migrarlo a `LoadingOverlay`, ver `docs/ARQUITECTURA.md`, "Ticket 033".
