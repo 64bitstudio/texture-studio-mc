@@ -362,3 +362,8 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`projectStorage.ts`** — nueva función `removeMobFromProject(name, mobId)`.
 - **`components/Proyecto.tsx`** — pasa `onRemoveMob` a cada tarjeta; nueva tarjeta "Agregar mob".
 - **`components/App.tsx`** — nuevo `handleMobRemoved`/prop `onMobRemoved`: sincroniza `activeProject.mobIds` tras quitar un mob (bug real de datos desactualizados encontrado en vivo).
+
+### Ticket 059 -- Íconos en la info + layout imagen-izquierda/detalle-derecha
+
+- **`ui/icons.tsx`** — nuevos íconos: `IconDocument`, `IconMaximize`, `IconScale`, `IconModel`.
+- **`components/MobEntryCard.tsx`** — la lista de info (archivo/dimensiones/escala/modelo) gana un ícono por línea; layout en modo grid invertido a miniatura izquierda + detalle derecha (modo lista ya tenía este orden).
