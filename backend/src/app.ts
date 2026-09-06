@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'node:path';
 import { healthRouter } from './routes/health.js';
 import { baseAssetsRouter } from './routes/baseAssets.js';
+import { mobsRouter } from './routes/mobs.js';
 
 // Directorio del build estatico del frontend (ver Dockerfile: el stage
 // runtime copia frontend/dist aqui). Configurable via env var solo para
@@ -11,14 +12,16 @@ const FRONTEND_DIST_DIR = process.env.FRONTEND_DIST_DIR ?? path.resolve(process.
 
 /**
  * Backend deliberadamente minimo (ver docs/ARQUITECTURA.md): sin auth,
- * sin persistencia, sin logica de negocio real. Solo expone el asset
- * base del Esqueleto y sirve el build estatico del frontend.
+ * sin persistencia, sin logica de negocio real. Expone el catalogo y el
+ * asset base de los mobs del registro (`MOB_REGISTRY`, ticket 016 --
+ * solo el Esqueleto por ahora) y sirve el build estatico del frontend.
  */
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
 
   app.use(healthRouter);
+  app.use(mobsRouter);
   app.use(baseAssetsRouter);
 
   // En dev local esta carpeta normalmente no existe (el frontend corre

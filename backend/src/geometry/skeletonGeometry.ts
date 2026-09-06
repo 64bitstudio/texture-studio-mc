@@ -1,4 +1,4 @@
-import type { SkeletonGeometry } from '../types/baseAssets.js';
+import type { MobGeometry } from '../types/baseAssets.js';
 
 // Geometria por cajas + UV clasico 64x32 del modelo biped vanilla del
 // Esqueleto, tal como pide el ticket 001 y especifica
@@ -101,7 +101,7 @@ const LEG_FACE_LABELS = {
   right: 'Pierna — Lateral',
 };
 
-export const SKELETON_GEOMETRY: SkeletonGeometry = {
+export const SKELETON_GEOMETRY: MobGeometry = {
   textureWidth: 64,
   textureHeight: 32,
   parts: {

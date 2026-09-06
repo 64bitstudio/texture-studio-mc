@@ -22,7 +22,7 @@ npm install
 npm run dev      # tsx watch, recarga en caliente -- escucha en :3000
 ```
 
-Endpoints disponibles de inmediato: `GET /health` y `GET /api/base-assets/skeleton` (sirve un placeholder procedural mientras no exista `backend/vanilla-assets/skeleton.png` -- ver `docs/ARQUITECTURA.md`).
+Endpoints disponibles de inmediato: `GET /health`, `GET /api/mobs` (catálogo de mobs soportados, ticket 016) y `GET /api/base-assets/:mobId` (ej. `/api/base-assets/skeleton` -- sirve un placeholder procedural mientras no exista `backend/vanilla-assets/skeleton.png` -- ver `docs/ARQUITECTURA.md`).
 
 ### Frontend
 

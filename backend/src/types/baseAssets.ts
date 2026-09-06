@@ -1,13 +1,30 @@
-// Contrato de `GET /api/base-assets/skeleton` (ticket 001). Ver
-// docs/API.md y docs/ARQUITECTURA.md para el detalle completo.
+// Contrato de `GET /api/base-assets/:mobId` (ticket 001, generalizado en
+// el ticket 016 -- ver docs/API.md y docs/ARQUITECTURA.md para el detalle
+// completo).
 //
 // Diseño: un solo endpoint devuelve tanto la textura (como data URL
 // base64, para no necesitar una segunda request/endpoint de imagen
 // estática) como la definición de geometria/UV -- decisión tomada en
-// este ticket porque el documento de definición no especificaba la
+// el ticket 001 porque el documento de definición no especificaba la
 // forma exacta del contrato, solo que "devuelve la textura base + la
 // definición de geometría/UV" en un único endpoint (ver postman
 // collection, ya listaba un solo endpoint).
+//
+// TICKET 016 -- generalización a registro de mobs: los tipos que antes
+// se llamaban `Skeleton*` (`SkeletonGeometry`, `SkeletonBoxPart`,
+// `SkeletonTexture`, `SkeletonBaseAssetsResponse`) se renombran a
+// `Mob*` -- la FORMA de estos tipos ya era 100% genérica (cajas +
+// UV cross, sin nada hardcodeado al Esqueleto), solo el nombre asumía
+// un único mob. `SKELETON_GEOMETRY` (en `geometry/skeletonGeometry.ts`)
+// sigue siendo la única instancia de `MobGeometry` que existe hasta que
+// los tickets 017/020/021 agreguen la suya. `MobGeometry` es un alias
+// (no una unión todavía) porque el ticket 016 no agrega ningún mob con
+// anatomía distinta -- ver `docs/ARQUITECTURA.md`, "Ticket 016", sobre
+// por qué NO se generaliza también la forma de `parts` (fija a
+// head/body/armRight/armLeft/legRight/legLeft) en este ticket: Araña y
+// Creeper tienen anatomías distintas y su propio ticket de geometría
+// decidirá cómo tipar eso, sin necesidad de tocar este archivo de nuevo
+// para el caso del Zombie (mismas 6 cajas que el Esqueleto).
 
 /** Origen (esquina superior izquierda) del "cross" de UV de una caja, en pixeles de textura. */
 export interface BoxUvOrigin {
@@ -63,7 +80,7 @@ export interface FaceLabels {
  * catalogo completo y las decisiones no cubiertas literalmente por el
  * ticket (labels de brazo/pierna sin lateralidad, top/bottom de body).
  */
-export interface SkeletonBoxPart {
+export interface MobBoxPart {
   size: [number, number, number];
   position: [number, number, number];
   uv: BoxUvOrigin;
@@ -71,29 +88,35 @@ export interface SkeletonBoxPart {
   faceLabels: FaceLabels;
 }
 
-export interface SkeletonGeometry {
+/**
+ * Geometría completa de un mob biped de 6 cajas (Esqueleto, y el
+ * Zombie del ticket 017 -- misma anatomía, ver el documento de
+ * definición). Mobs con anatomía distinta (Araña, Creeper) definirán
+ * su propia forma en su propio ticket -- no se asume de antemano.
+ */
+export interface MobGeometry {
   textureWidth: number;
   textureHeight: number;
   parts: {
-    head: SkeletonBoxPart;
-    body: SkeletonBoxPart;
-    armRight: SkeletonBoxPart;
-    armLeft: SkeletonBoxPart;
-    legRight: SkeletonBoxPart;
-    legLeft: SkeletonBoxPart;
+    head: MobBoxPart;
+    body: MobBoxPart;
+    armRight: MobBoxPart;
+    armLeft: MobBoxPart;
+    legRight: MobBoxPart;
+    legLeft: MobBoxPart;
   };
 }
 
-export interface SkeletonTexture {
-  /** `data:image/png;base64,...` -- 64x32 PNG, real o placeholder. */
+export interface MobTexture {
+  /** `data:image/png;base64,...` -- PNG del tamaño de `geometry.textureWidth/Height`, real o placeholder. */
   dataUrl: string;
   width: number;
   height: number;
-  /** true cuando `vanilla-assets/skeleton.png` no existe todavía (ver ticket 007) y se sirvió el placeholder procedural. */
+  /** true cuando `vanilla-assets/<mobId>.png` no existe todavía (ver ticket 007) y se sirvió el placeholder procedural. */
   isPlaceholder: boolean;
 }
 
-export interface SkeletonBaseAssetsResponse {
-  texture: SkeletonTexture;
-  geometry: SkeletonGeometry;
+export interface MobBaseAssetsResponse {
+  texture: MobTexture;
+  geometry: MobGeometry;
 }
