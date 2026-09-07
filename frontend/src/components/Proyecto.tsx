@@ -224,13 +224,15 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
 
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverFileChange} className="sr-only" aria-label="Subir imagen de portada del proyecto" />
+        {/* Ticket 063 (pedido de Marco, con imagen de referencia): portada
+            más grande (88px -> 120px) para que se note más en el header. */}
         <button
           type="button"
           onClick={handleCoverButtonClick}
           title="Cambiar portada del proyecto"
           style={{
-            width: 88,
-            height: 88,
+            width: 120,
+            height: 120,
             flexShrink: 0,
             borderRadius: 'var(--radius-lg)',
             border: '1px solid var(--border-strong)',
@@ -242,7 +244,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
             placeItems: 'center',
           }}
         >
-          {!record.coverImageDataUrl && <IconFolder size={28} style={{ color: 'var(--text-dim)' }} />}
+          {!record.coverImageDataUrl && <IconFolder size={38} style={{ color: 'var(--text-dim)' }} />}
         </button>
 
         <div style={{ flex: 1, minWidth: 240, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -265,6 +267,14 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
               </Button>
             </div>
           )}
+
+          {/* Ticket 063 (pedido de Marco, con imagen de referencia): línea
+              compacta de "N mobs · Última modificación: fecha" debajo del
+              título -- mismo formato ya usado por `ProjectCard.tsx` en
+              "Mis proyectos" (singular/plural + separador "·"). */}
+          <p style={{ margin: 0, fontSize: 'var(--font-xs)', color: 'var(--text-dim)' }}>
+            {mobIds.length} {mobIds.length === 1 ? 'mob' : 'mobs'} · Última modificación: {new Date(record.updatedAt).toLocaleString()}
+          </p>
 
           {editingDescription ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 480 }}>
@@ -310,12 +320,20 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
         </div>
       </div>
 
+      {/* Ticket 063 (pedido de Marco, con imagen de referencia): la zona
+          de mobs ya NO es una "card" (antes envuelta en `<Section>`, con
+          borde/fondo propio) -- el buscador + el toggle grid/lista salen
+          de esa caja, y el grid/lista de tarjetas de mob queda "suelto"
+          directamente sobre el fondo de la pantalla. Las ÚNICAS cards
+          reales que quedan son "Información del proyecto" y "Acciones"
+          (columna derecha, sin cambios). */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 260px', gap: 20, alignItems: 'start' }}>
-        <Section title={`Mobs de este proyecto (${mobIds.length})`}>
-          {mobIds.length === 0 ? (
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-dim)' }}>Este proyecto todavía no tiene mobs -- usa "Agregar mob".</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <h3 className="ui-section__title" style={{ margin: 0 }}>
+              Mobs de este proyecto ({mobIds.length})
+            </h3>
+            {mobIds.length > 0 && (
               <SearchSortToggleBar
                 searchValue={mobSearchText}
                 onSearchChange={setMobSearchText}
@@ -324,7 +342,13 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
                 layout={mobLayout}
                 onLayoutChange={setMobLayout}
               />
+            )}
+          </div>
 
+          {mobIds.length === 0 ? (
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-dim)' }}>Este proyecto todavía no tiene mobs -- usa "Agregar mob".</p>
+          ) : (
+            <>
               {visibleMobIds.length === 0 ? (
                 <p style={{ margin: 0, fontSize: 13, color: 'var(--text-dim)' }}>Ningún mob coincide con la búsqueda.</p>
               ) : (
@@ -369,9 +393,9 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
                   </li>
                 </ul>
               )}
-            </div>
+            </>
           )}
-        </Section>
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Section title="Información del proyecto">

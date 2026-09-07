@@ -388,3 +388,8 @@ Reemplaza el motor de miniaturas del ticket 055 -- ver `docs/ARQUITECTURA.md`, "
 - **`renderMobSnapshot3D.ts`** (nuevo, reemplaza a `renderMobFrontSprite2D.ts` + `geometry/mobFrontSprite.ts`, ambos retirados) — Three.js puro, misma geometría/UV que `Viewer3D.tsx`, mismo ángulo de cámara que el editor, `WebGLRenderer` compartido entre llamadas, devuelve una foto fija (data URL) con perspectiva de 3/4 en vez de la vista de frente plana anterior.
 - **`hooks/useMobSnapshot3D.ts`** (nuevo, reemplaza a `useMobFrontSprite2D.ts`, retirado) — mismo patrón de memoización, sin el parámetro `resolution`.
 - **`components/MobEntryCard.tsx`** — consume el nuevo hook; `spriteUrl` renombrado a `snapshotUrl` en todo el archivo.
+
+### Ticket 063 -- Portada más grande, resumen de mobs/fecha bajo el título, zona de mobs sin card envolvente
+
+- **`components/Proyecto.tsx`** — portada de 88px a 120px; nueva línea "N mobs · Última modificación: fecha" debajo del título (mismo formato que `ProjectCard.tsx`); la zona de mobs deja de estar envuelta en un `<Section>` -- el buscador + el toggle grid/lista comparten fila con el encabezado "Mobs de este proyecto (N)", sin caja/borde propio; el grid/lista de tarjetas de mob queda suelto sobre el fondo. Las únicas cards reales que quedan son "Información del proyecto", "Acciones", y cada tarjeta de mob individual.
+- Explícitamente NO incluido: pestañas "Mobs y texturas" / "Configuración del proyecto" que aparecían en una de las imágenes de referencia -- "Configuración del proyecto" sigue descartada desde la definición del ticket 056 (sin contenido real todavía).
