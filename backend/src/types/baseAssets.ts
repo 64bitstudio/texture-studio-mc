@@ -88,12 +88,24 @@ export interface FaceLabels {
  * region UV propia (cabeza, torso). Ver `frontend/src/regionLabels.ts`
  * (`computeNamedRegions`) para donde se usa: dedupe de regiones
  * identicas y agrupacion del selector "Aislar parte".
+ *
+ * `swapFrontBack` (ticket 077 -- bug real de renderizado encontrado por
+ * Marco viendo el visor 3D de la Araña, cara/nuca invertidas; ver el
+ * comentario de `spiderGeometry.ts` para la correccion explicita de
+ * Marco sobre como describir esto): intercambia a que cara 3D
+ * (`pz`/`nz`) se asigna cada region UV `front`/`back` -- analogo a
+ * `mirrorX` (que intercambia `right`/`left`), y con el mismo alcance:
+ * SOLO cambia el render 3D (`applyBoxUV.ts`), nunca el mapa de pixeles
+ * 2D ni los `faceLabels` (la region de pixeles que dice "Cara" en el
+ * editor sigue siendo la misma region, solo cambia sobre cual cara del
+ * cubo 3D se pinta).
  */
 export interface MobBoxPart {
   size: [number, number, number];
   position: [number, number, number];
   uv: BoxUvOrigin;
   mirrorX?: boolean;
+  swapFrontBack?: boolean;
   faceLabels: FaceLabels;
   group?: string;
   /**

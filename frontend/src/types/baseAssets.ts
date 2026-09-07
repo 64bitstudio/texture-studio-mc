@@ -41,6 +41,8 @@ export interface MobBoxPart {
   position: [number, number, number];
   uv: BoxUvOrigin;
   mirrorX?: boolean;
+  /** Ticket 077 -- ver `backend/src/types/baseAssets.ts` para la justificacion completa (espejo exacto). */
+  swapFrontBack?: boolean;
   faceLabels: FaceLabels;
   group?: string;
   /** Ticket 024 -- ver `backend/src/types/baseAssets.ts` para la justificacion completa (espejo exacto). */

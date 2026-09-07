@@ -1,5 +1,5 @@
 import type { ComponentType, ReactNode } from 'react';
-import { IconFolder, IconPlus, type IconProps } from '../ui/icons';
+import { IconChevronLeft, IconFolder, IconPlus, type IconProps } from '../ui/icons';
 import logoUrl from '../assets/brand/logo.png';
 
 /**
@@ -26,7 +26,25 @@ export interface SidebarProps {
    * (ninguna otra pantalla pasa este prop todavía).
    */
   extraContent?: ReactNode;
+  /**
+   * Franja de solo iconos (pedido de Marco: "que el sidebar pueda
+   * hacerse pequeno"). Colapsado: ancho angosto, SOLO los iconos de
+   * navegación (con `title`/`aria-label` para el nombre accesible --
+   * la etiqueta visible se oculta con `.sr-only`, no se quita del DOM,
+   * mismo criterio que `.ui-button--icon-square`) y `extraContent` NO
+   * se renderiza (la tarjeta "Proyecto actual"/lista de mobs no tiene
+   * una versión de solo-icono razonable -- confirmado con Marco vía
+   * `AskUserQuestion`). El estado en sí vive en `App.tsx`
+   * (`sidebarCollapse.ts`, persistido en `localStorage`) -- este
+   * componente solo renderiza según el valor recibido, no lo posee.
+   */
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }
+
+/** Ancho expandido (sin cambios, ticket 037/046) vs. colapsado (franja de solo iconos). */
+const SIDEBAR_WIDTH_EXPANDED = 272;
+const SIDEBAR_WIDTH_COLLAPSED = 76;
 
 const NAV_ITEMS: Array<{ id: NavView; label: string; Icon: ComponentType<IconProps> }> = [
   { id: 'nuevo-proyecto', label: 'Nuevo proyecto', Icon: IconPlus },
@@ -81,46 +99,85 @@ export const SIDEBAR_TEXT_DIM = 'var(--text-dim)';
  * arriba -- vive DEBAJO de la topbar, dentro de un contenedor flex que
  * le da el alto restante.
  */
-export function Sidebar({ activeNav, onNavigate, extraContent }: SidebarProps) {
+export function Sidebar({ activeNav, onNavigate, extraContent, collapsed, onToggleCollapsed }: SidebarProps) {
+  const collapseToggleLabel = collapsed ? 'Expandir sidebar' : 'Colapsar sidebar';
+
   return (
-    <nav
-      aria-label="Navegación principal"
+    // Wrapper NO scrolleable, ancla real del botón de colapsar/expandir
+    // (mas abajo) -- hallazgo real de Marco ("el boton genera un scroll
+    // en el sidebar, ademas se corta el boton"): el botón vivía DENTRO
+    // del propio `<nav>` (que sí scrollea, `overflowY: 'auto'`),
+    // posicionado con `right: -12` para asomar la mitad afuera del
+    // borde -- pero la spec de CSS Overflow dice que si UN eje tiene un
+    // valor de scroll (`auto`, este caso `overflow-y`) y el otro es
+    // `visible`, el navegador computa TAMBIÉN el otro eje (`overflow-x`)
+    // como `auto` (mismo mecanismo ya documentado en el comentario de
+    // `textureSectionWrapperRef` en `Editor.tsx`, aplicado aca al revés:
+    // fijar solo `overflow-y` fuerza `overflow-x` a `auto` tambien) --
+    // el fragmento del botón que sobresalía quedaba entonces DENTRO del
+    // area de scroll horizontal recien generada, en vez de simplemente
+    // visible: aparecía una barra de scroll y el botón se veía cortado
+    // (o solo visible arrastrando ese scroll). Sacar el botón del `<nav>`
+    // que scrollea -- este wrapper (sin `overflow` propio, `visible` por
+    // default) es la posición real del botón, `<nav>` solo scrollea SU
+    // contenido interno, sin que nada dentro de el necesite asomarse
+    // fuera de su propio borde.
+    <div
       style={{
-        width: 272,
+        position: 'relative',
+        width: collapsed ? SIDEBAR_WIDTH_COLLAPSED : SIDEBAR_WIDTH_EXPANDED,
         flexShrink: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        padding: 20,
-        gap: 4,
-        // Pedido de Marco ("corrige el tema claro para la sidebar"):
-        // mismo token que la topbar compartida (`AppShell.tsx`), en vez
-        // del color sólido fijo que quedó tras retirar la imagen de
-        // fondo (ver comentario de `SIDEBAR_TEXT` arriba).
-        background: 'var(--panel-bg)',
-        borderRight: '1px solid var(--border)',
         height: '100%',
-        overflowY: 'auto',
-        color: SIDEBAR_TEXT,
+        // Transición suave del ancho (pedido de Marco, "animaciones y
+        // transiciones a todo", sutiles -- mismo criterio ya aplicado en
+        // `index.css` a los botones/hover de este mismo componente).
+        transition: 'width var(--transition-fast)',
       }}
     >
-      {NAV_ITEMS.map(({ id, label, Icon }) => {
+      <nav
+        aria-label="Navegación principal"
+        style={{
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          // Hallazgo real de Marco ("se ve muy amontonado cuando esta
+          // pequeno", con captura): colapsado, el primer ícono quedaba
+          // pegado en diagonal al botón de colapsar/expandir (que vive
+          // en el mismo rincón superior, ver mas abajo) y los 2 íconos
+          // de navegación entre sí -- mismo `padding-top`/`gap` que el
+          // estado expandido, sin aire extra para lo angosto que es la
+          // franja colapsada. Colapsado: mas padding arriba (despeja el
+          // botón flotante, que ya no cae encima del primer ícono) y mas
+          // separación entre íconos.
+          padding: collapsed ? '52px 12px 20px' : 20,
+          gap: collapsed ? 10 : 4,
+          // Pedido de Marco ("corrige el tema claro para la sidebar"):
+          // mismo token que la topbar compartida (`AppShell.tsx`), en vez
+          // del color sólido fijo que quedó tras retirar la imagen de
+          // fondo (ver comentario de `SIDEBAR_TEXT` arriba).
+          background: 'var(--panel-bg)',
+          borderRight: '1px solid var(--border)',
+          overflowY: 'auto',
+          color: SIDEBAR_TEXT,
+          boxSizing: 'border-box',
+        }}
+      >
+        {NAV_ITEMS.map(({ id, label, Icon }) => {
         const isActive = activeNav === id;
+        // Handler nombrado, definido AFUERA del JSX (no
+        // `onClick={() => onNavigate(id)}` inline) -- el hook
+        // `ui-accessibility-guard.sh` escanea el texto del tag con una
+        // regex que corta la "etiqueta de apertura" en el primer `>`
+        // literal que encuentra, y una flecha `=>` inline adentro del
+        // tag produce ese `>` antes de tiempo (mismo gotcha ya
+        // documentado para `onPointerDown={(e) => ...}` en
+        // `SelectionOverlay.tsx`/`PasteImageOverlay.tsx`) -- con el
+        // handler ya resuelto a una referencia simple, el tag no
+        // contiene ningún `=>` que lo confunda.
+        const handleClick = () => onNavigate(id);
         return (
-          <button
-            key={id}
-            type="button"
-            className={`ui-button ts-nav-item${isActive ? ' ts-nav-item--active' : ''}`}
-            aria-current={isActive ? 'page' : undefined}
-            onClick={() => onNavigate(id)}
-            style={{
-              width: '100%',
-              justifyContent: 'flex-start',
-              gap: 12,
-              padding: '10px 12px',
-              borderRadius: 'var(--radius-lg)',
-              fontWeight: isActive ? 600 : 500,
-            }}
-          >
+          <button key={id} type="button" className={`ui-button ts-nav-item${isActive ? ' ts-nav-item--active' : ''}`} aria-current={isActive ? 'page' : undefined} title={label} onClick={handleClick} style={{ width: '100%', justifyContent: collapsed ? 'center' : 'flex-start', gap: 12, padding: collapsed ? '10px 0' : '10px 12px', borderRadius: 'var(--radius-md)', fontWeight: isActive ? 600 : 500 }}>
             {isActive ? (
               <span
                 aria-hidden="true"
@@ -148,20 +205,27 @@ export function Sidebar({ activeNav, onNavigate, extraContent }: SidebarProps) {
                 <Icon size={19} />
               </span>
             )}
-            {label}
+            {/* Colapsado: la etiqueta se oculta VISUALMENTE (`.sr-only`,
+                `index.css`) pero sigue en el DOM -- el botón conserva su
+                nombre accesible real (regla de accesibilidad del
+                equipo, mismo criterio que `.ui-button--icon-square`), y
+                `title` (arriba en el tag de apertura) da el tooltip
+                nativo al pasar el mouse mientras está colapsado. */}
+            {collapsed ? <span className="sr-only">{label}</span> : label}
           </button>
         );
       })}
 
-      {extraContent && <div style={{ marginTop: 8 }}>{extraContent}</div>}
+      {!collapsed && extraContent && <div style={{ marginTop: 8 }}>{extraContent}</div>}
 
       <div style={{ marginTop: 'auto', paddingTop: 40 }}>
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
+            justifyContent: collapsed ? 'center' : 'flex-start',
             gap: 10,
-            padding: 12,
+            padding: collapsed ? 8 : 12,
             borderRadius: 'var(--radius-lg)',
             border: '1px solid var(--border-strong)',
             // Pedido de Marco ("corrige el tema claro para la sidebar"):
@@ -172,12 +236,36 @@ export function Sidebar({ activeNav, onNavigate, extraContent }: SidebarProps) {
           }}
         >
           <img src={logoUrl} alt="" width={28} height={28} style={{ flexShrink: 0 }} />
-          <div>
-            <div style={{ fontSize: 'var(--font-sm)', fontWeight: 700 }}>Texture Studio</div>
-            <div style={{ fontSize: 'var(--font-xs)', color: SIDEBAR_TEXT_DIM }}>Crea. Modifica. Comparte.</div>
-          </div>
+          {/* Colapsado: solo el logo -- el nombre/tagline no entra en
+              una franja de 64px sin partirse en varias líneas, y ya
+              está disponible en texto completo en la topbar compartida
+              (`AppShell.tsx`) sin importar el estado de este sidebar. */}
+          {!collapsed && (
+            <div>
+              <div style={{ fontSize: 'var(--font-sm)', fontWeight: 700 }}>Texture Studio</div>
+              <div style={{ fontSize: 'var(--font-xs)', color: SIDEBAR_TEXT_DIM }}>Crea. Modifica. Comparte.</div>
+            </div>
+          )}
         </div>
       </div>
-    </nav>
+      </nav>
+      {/* Colapsar/expandir (pedido de Marco: "que el sidebar pueda
+          hacerse pequeno") -- flotante sobre el borde derecho del
+          sidebar, mismo patrón visual (círculo pequeño, `--panel-bg` +
+          borde) ya usado por los botones flotantes de
+          `PasteImageOverlay.tsx`/`SelectionOverlay.tsx`, en vez de
+          `.ui-button--icon-square` (esa variante es una caja de 40px
+          pensada para la topbar, demasiado grande para este handle).
+          Vive FUERA del `<nav>` que scrollea (ver comentario del
+          wrapper de arriba) -- hallazgo real de Marco.
+          TODO en una sola línea (apertura + ícono + cierre) -- gotcha
+          real del hook `ui-accessibility-guard.sh`: extrae el match
+          completo con newlines y lo divide línea por línea antes de
+          buscar `aria-label`, así que un match multilínea reporta un
+          falso positivo por cada línea sin el atributo aunque el tag
+          de apertura sí lo tenga (ver memoria del equipo, gotcha
+          `ui-accessibility-guard-gotchas.md`). */}
+      <button type="button" title={collapseToggleLabel} aria-label={collapseToggleLabel} onClick={onToggleCollapsed} style={{ position: 'absolute', top: 16, right: -12, width: 24, height: 24, borderRadius: '50%', border: '1px solid var(--border-strong)', background: 'var(--panel-bg)', color: 'var(--text)', cursor: 'pointer', padding: 0, display: 'grid', placeItems: 'center', boxShadow: 'var(--shadow-sm)', flexShrink: 0 }}><IconChevronLeft size={14} style={{ transform: collapsed ? 'rotate(180deg)' : undefined }} /></button>
+    </div>
   );
 }

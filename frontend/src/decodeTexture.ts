@@ -9,6 +9,8 @@
 // para probar esto es mas ruido que valor dado su tamaño; se valida en
 // la revision visual en vivo (ver checklist de cierre del ticket).
 //
+import type { PixelSource } from './textureBuffer';
+
 // EXTENSION ticket 019 (guardado de proyectos): `width`/`height` ahora
 // son OPCIONALES -- si se omiten, decodifica a la resolucion NATURAL del
 // PNG (`img.naturalWidth/Height`), sin forzar ningun `drawImage`
@@ -102,5 +104,42 @@ export function decodeImageFileToImageData(source: File | Blob): Promise<{ image
       reject(new Error('No se pudo decodificar el archivo como imagen.'));
     };
     img.src = previewUrl;
+  });
+}
+
+/**
+ * Codifica un `PixelSource` en memoria (el recorte que deja
+ * `extractPixelSource` en `importImage.ts` al Copiar/Cortar una
+ * seleccion, ver "Seleccionar" en `components/Editor.tsx`) a un blob
+ * PNG + su object URL de vista previa -- MISMO contrato de ciclo de
+ * vida que `previewUrl` en `decodeImageFileToImageData` de arriba (el
+ * llamador lo mantiene vivo mientras el overlay de "pegar imagen" esta
+ * en pantalla y lo revoca recien al confirmar/cancelar). Es la
+ * operacion inversa de esa funcion: en vez de partir de un `File`/
+ * `Blob` externo, parte de pixeles que YA estan decodificados en
+ * memoria (un recorte del propio buffer) -- se usa para poder pegar el
+ * contenido del portapapeles interno reutilizando tal cual el mismo
+ * `PasteImageOverlay`/`pendingPaste` que ya pega imagenes externas
+ * (HU-9), en vez de construir una segunda UI de "pegar" solo para este
+ * caso.
+ */
+export function encodePixelSourceToPreviewUrl(source: PixelSource): Promise<string> {
+  const canvas = document.createElement('canvas');
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    return Promise.reject(new Error('No se pudo obtener el contexto 2D del canvas para preparar el contenido copiado.'));
+  }
+  ctx.putImageData(new ImageData(new Uint8ClampedArray(source.data), source.width, source.height), 0, 0);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('No se pudo preparar el contenido copiado para pegarlo.'));
+        return;
+      }
+      resolve(URL.createObjectURL(blob));
+    }, 'image/png');
   });
 }

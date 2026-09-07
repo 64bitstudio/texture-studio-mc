@@ -10,6 +10,7 @@ import { Settings } from './components/Settings';
 import { NuevoProyecto } from './components/NuevoProyecto';
 import { getUserPrefs } from './userPrefs';
 import { getTheme, type Theme } from './theme';
+import { getSidebarCollapsed, setSidebarCollapsed } from './sidebarCollapse';
 import { fetchMobBaseAssets } from './api/baseAssets';
 import { fetchMobs } from './api/mobs';
 import type { MobBaseAssetsResponse } from './types/baseAssets';
@@ -66,6 +67,21 @@ function App() {
   // cambiar el tema desde Configuración no actualizaba el texto del
   // toggle rapido, que tenia su propio `useState` desincronizado).
   const [theme, setTheme] = useState<Theme>(() => getTheme());
+
+  // Pedido de Marco ("que el sidebar pueda hacerse pequeno") -- mismo
+  // patron exacto que `theme` de arriba: estado levantado aca (no local
+  // a `Sidebar.tsx`) para que sobreviva remounts de `Sidebar` (ninguno
+  // hoy, pero mismo criterio preventivo) y persista via
+  // `sidebarCollapse.ts` (localStorage), leido una sola vez al montar
+  // (lazy initial state).
+  const [sidebarCollapsed, setSidebarCollapsedState] = useState<boolean>(() => getSidebarCollapsed());
+  function handleToggleSidebarCollapsed() {
+    setSidebarCollapsedState((prev) => {
+      const next = !prev;
+      setSidebarCollapsed(next);
+      return next;
+    });
+  }
 
   // Ticket 038: cual proyecto esta activo ahora mismo -- poblado al
   // crearlo (`handleProjectCreated`), abrirlo (`handleProjectActivated`)
@@ -206,8 +222,15 @@ function App() {
     setView('proyecto');
   }
 
-  function handleProjectCreated(projectName: string, mobId: string) {
-    handleProjectActivated(projectName, [mobId]);
+  // Ticket 078 (pedido de Marco: "Nuevo proyecto" debe permitir elegir
+  // MAS de un mob al crear, no solo uno) -- `mobIds` ahora es la lista
+  // completa elegida en `NuevoProyecto.tsx` (antes siempre un array de 1
+  // elemento). `handleProjectActivated` ya aceptaba `mobIds: string[]`
+  // desde el ticket 038/039 (pensado para `MisProyectos.tsx`), asi que
+  // no hizo falta tocarlo -- este wrapper solo documenta el punto de
+  // entrada especifico de "crear".
+  function handleProjectCreated(projectName: string, mobIds: string[]) {
+    handleProjectActivated(projectName, mobIds);
   }
 
   // Ticket 053: acción "Editar" de una tarjeta de "Mis proyectos" --
@@ -346,6 +369,8 @@ function App() {
         onThemeChange={setTheme}
         onOpenSettings={handleOpenSettings}
         sidebarExtra={editorSidebarExtra}
+        sidebarCollapsed={sidebarCollapsed}
+        onToggleSidebarCollapsed={handleToggleSidebarCollapsed}
       >
         {view === 'configuracion' && (
           <Settings displayName={displayName} onDisplayNameSaved={setDisplayName} theme={theme} onThemeChange={setTheme} />

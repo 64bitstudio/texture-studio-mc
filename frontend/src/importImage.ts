@@ -270,3 +270,35 @@ export function computeBurnPixels(source: PixelSource, rect: OverlayRect, boxes:
   }
   return writes;
 }
+
+/**
+ * Recorta un `PixelSource` a la region `clamped` (rectangulo semi-abierto
+ * `[x0,x1) x [y0,y1)`, mismo shape que devuelve `clampRectToBox` --
+ * pensado para llamarse como `extractPixelSource(source, clampRectToBox(rect, fullBufferBox)!)`)
+ * -- HU de "Seleccionar" + Copiar/Cortar. Es la operacion INVERSA de
+ * `computeBurnPixels`: en vez de escribir los pixeles de una fuente
+ * sobre el buffer, LEE una porcion del buffer (ya envuelto como
+ * `PixelSource` por el llamador, mismo patron que `currentSnapshot` en
+ * `handleImportFile`/`Editor.tsx`) y devuelve una copia independiente,
+ * del tamaño exacto de la region -- lista para guardar en el
+ * portapapeles interno (`Editor.tsx`) o, mas adelante, volver a pegarse
+ * via el mismo `pendingPaste`/`PasteImageOverlay` que ya usa "pegar
+ * imagen" externa. Sin resampling -- copia pixel a pixel 1:1, a
+ * diferencia de `sampleSourceForDestPixel` (que SI reescala).
+ */
+export function extractPixelSource(source: PixelSource, clamped: UVBoxRect): PixelSource {
+  const width = clamped.x1 - clamped.x0;
+  const height = clamped.y1 - clamped.y0;
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const srcIndex = ((clamped.y0 + y) * source.width + (clamped.x0 + x)) * 4;
+      const destIndex = (y * width + x) * 4;
+      data[destIndex] = source.data[srcIndex];
+      data[destIndex + 1] = source.data[srcIndex + 1];
+      data[destIndex + 2] = source.data[srcIndex + 2];
+      data[destIndex + 3] = source.data[srcIndex + 3];
+    }
+  }
+  return { width, height, data };
+}
