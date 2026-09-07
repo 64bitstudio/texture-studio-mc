@@ -1,5 +1,6 @@
 import { useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import type { OverlayRect } from '../importImage';
+import { IconCheck, IconX } from '../ui/icons';
 
 export interface PasteImageOverlayProps {
   rect: OverlayRect;
@@ -25,6 +26,16 @@ export interface PasteImageOverlayProps {
   /** Object URL de la imagen a insertar (ver contrato de ciclo de vida en `decodeTexture.ts`). */
   previewUrl: string;
   onRectChange: (rect: OverlayRect) => void;
+  /**
+   * Confirmar/descartar la imagen pendiente (pedido de Marco, revisión
+   * en vivo del ticket 072) -- antes vivían como botones "Confirmar"/
+   * "Cancelar" en `PasteImageControls.tsx`, un panel aparte de la
+   * barra de herramientas. Ahora son los botones ✓/✗ flotantes sobre
+   * este mismo overlay, más cerca de la imagen que se está
+   * posicionando.
+   */
+  onConfirm: () => void;
+  onCancel: () => void;
 }
 
 /**
@@ -70,7 +81,7 @@ interface DragState {
  * confirmar (`computeBurnPixels` en `importImage.ts`), no durante la
  * interaccion (criterio explicito del ticket, HU-9).
  */
-export function PasteImageOverlay({ rect, scaleX, scaleY, previewUrl, onRectChange }: PasteImageOverlayProps) {
+export function PasteImageOverlay({ rect, scaleX, scaleY, previewUrl, onRectChange, onConfirm, onCancel }: PasteImageOverlayProps) {
   const dragRef = useRef<DragState | null>(null);
   const resizeRef = useRef<DragState | null>(null);
 
@@ -163,6 +174,25 @@ export function PasteImageOverlay({ rect, scaleX, scaleY, previewUrl, onRectChan
           touchAction: 'none',
         }}
       />
+      {/* Confirmar/cancelar (pedido de Marco) -- flotan DENTRO de la
+          esquina superior derecha del overlay (no arriba, fuera de la
+          caja: hallazgo real en vivo -- el contenedor con scroll de la
+          textura, `textureSectionWrapperRef` en `Editor.tsx`, fija
+          `overflowX: 'auto'` pero el navegador computa `overflowY` como
+          `auto` tambien cuando el otro eje no es `visible` (regla real
+          de CSS Overflow, no una fuga) -- cualquier cosa posicionada
+          POR ENCIMA del borde superior de ese contenedor queda
+          recortada, invisible aunque el DOM la tenga). `stopPropagation`
+          en `onPointerDown` (mismo criterio que el handle de
+          redimensionar de arriba): sin esto, el `onPointerDown` del
+          `<div>` contenedor arrancaría un arrastre antes de que el click
+          llegara a completarse. Botones en una sola línea -- ver gotcha
+          ya documentado del hook de accesibilidad con tags multilínea
+          (aplica también al check de icono sin texto, no solo a inputs). */}
+      <div role="group" aria-label="Confirmar o descartar la imagen a insertar" onPointerDown={(e) => e.stopPropagation()} style={{ position: 'absolute', top: 4, right: 4, display: 'flex', gap: 4 }}>
+        <button type="button" aria-label="Confirmar imagen a insertar" title="Confirmar" onClick={onConfirm} style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'var(--accent)', color: '#0f171d', cursor: 'pointer', padding: 0, display: 'grid', placeItems: 'center', boxShadow: 'var(--shadow-sm)' }}><IconCheck size={14} /></button>
+        <button type="button" aria-label="Cancelar y descartar la imagen a insertar" title="Cancelar" onClick={onCancel} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid var(--border-strong)', background: 'var(--panel-bg)', color: 'var(--text)', cursor: 'pointer', padding: 0, display: 'grid', placeItems: 'center', boxShadow: 'var(--shadow-sm)' }}><IconX size={14} /></button>
+      </div>
     </div>
   );
 }

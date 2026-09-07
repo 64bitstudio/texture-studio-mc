@@ -463,6 +463,35 @@ export function IconSymmetry(props: IconProps) {
 }
 
 /**
+ * "Importar" (barra de herramientas del editor) -- marco de foto
+ * clásico (montaña + sol). Reemplaza a `IconImport` (flecha hacia una
+ * bandeja, espejo conceptual de `IconExport`) -- retirado, sin
+ * consumidores: pedido de Marco, "Importar" pasa a usar este ícono en
+ * vez de aquel.
+ */
+export function IconImage(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="8.5" cy="9.5" r="1.5" />
+      <path d="m4 17 5-5 4 4 3-3 4 4" />
+    </LineIcon>
+  );
+}
+
+/** "Mano" (herramienta de la barra del editor, pedido de Marco) -- arrastra el lienzo de textura para desplazar el scroll sin usar la barra del navegador. 4 dedos + palma clásicos de un ícono de herramienta "mano"/"pan". */
+export function IconHand(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="M9 12.5V5a1.3 1.3 0 0 1 2.6 0v6" />
+      <path d="M11.6 10.5V4a1.3 1.3 0 0 1 2.6 0v6.5" />
+      <path d="M14.2 10.5V5a1.3 1.3 0 0 1 2.6 0v6" />
+      <path d="M16.8 11V8.5a1.3 1.3 0 0 1 2.6 0V15c0 3.3-2.2 6.5-6.5 6.5h-1c-2.7 0-4.3-1-5.7-2.9l-2.3-3.1a1.4 1.4 0 0 1 2.2-1.7L9 15" />
+    </LineIcon>
+  );
+}
+
+/**
  * Logo pixel-art de bloque de pasto -- REEMPLAZADO en la revisión 2 de
  * este ticket por el PNG real que mandó Marco (`assets/brand/logo.png`,
  * ver `Sidebar.tsx`) -- este componente queda sin uso, se elimina en el

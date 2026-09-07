@@ -44,9 +44,13 @@ export const PACK_MCMETA_PATH = 'pack.mcmeta';
  * Descripcion por defecto si no se especifica otra (ticket 006).
  * Generalizada en el ticket 044 -- ya no menciona "Esqueleto": un
  * mismo pack ahora puede traer varios mobs del proyecto, no solo el
- * que estaba activo en el editor.
+ * que estaba activo en el editor. Pedido de Marco: el nombre del
+ * proyecto pasa de "Texture Studio MC" a "Texture Studio" en todos
+ * lados, incluida esta descripcion (queda dentro del pack.mcmeta
+ * exportado, visible para quien instale el resource pack en
+ * Minecraft).
  */
-export const DEFAULT_PACK_DESCRIPTION = 'Texture Studio MC';
+export const DEFAULT_PACK_DESCRIPTION = 'Texture Studio';
 
 export interface PackMcmeta {
   pack: {

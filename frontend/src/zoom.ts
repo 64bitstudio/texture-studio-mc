@@ -11,14 +11,30 @@
 // cualquier nivel de zoom -- ver decision completa en
 // docs/ARQUITECTURA.md, "Ticket 004".
 
-/** Zoom minimo: 4 pixeles CSS por texel (400%). */
-export const ZOOM_MIN = 4;
+/**
+ * Zoom minimo: 0.5 pixeles CSS por texel (50%). Bajado desde 4 (400%,
+ * el piso original del ticket 004) a pedido de Marco -- en resoluciones
+ * de trabajo altas (x4-x10) el buffer completo no cabia en el panel ni
+ * al zoom minimo anterior, sin forma de alejar mas para ver el conjunto.
+ */
+export const ZOOM_MIN = 0.5;
 
 /** Zoom maximo: 40 pixeles CSS por texel (4000%) -- suficiente para precision fina sin backing stores de grid excesivos. */
 export const ZOOM_MAX = 40;
 
-/** Incremento por click de +/- o por "muesca" de rueda del mouse. */
+/** Incremento por "muesca" de rueda del mouse (Ctrl/Cmd + scroll sobre el canvas, `TextureEditor.tsx`) -- el selector de la barra de herramientas (`ZoomControls.tsx`) ya no usa este paso, ver `ZOOM_PRESETS`. */
 export const ZOOM_STEP = 2;
+
+/**
+ * Niveles de zoom del `<select>` de la barra de herramientas (pedido de
+ * Marco: "faltan las opciones 300, 200, 100 y 50" -- reemplaza los
+ * botones +/- por una lista de paradas fijas, mismo patron visual que
+ * "Resolución" en la misma barra). Cubre el rango completo
+ * [ZOOM_MIN, ZOOM_MAX] con paradas redondas en porcentaje; el zoom
+ * continuo (rueda del mouse) sigue funcionando igual, sin depender de
+ * esta lista.
+ */
+export const ZOOM_PRESETS: number[] = [0.5, 1, 2, 3, 4, 6, 8, 10, 20, 30, 40];
 
 /** Zoom inicial al abrir el editor -- igual al `DISPLAY_SCALE` fijo que tenia el ticket 002, para no cambiar la apariencia por default. */
 export const ZOOM_DEFAULT = 10;

@@ -33,23 +33,25 @@ const NAV_ITEMS: Array<{ id: NavView; label: string; Icon: ComponentType<IconPro
   { id: 'mis-proyectos', label: 'Mis proyectos', Icon: IconFolder },
 ];
 
-// Bug real encontrado en vivo (ticket 046, revisión 2, cuando el fondo
-// era `sidebar-bg.png` -- imagen retirada a pedido de Marco, ver
-// comentario en el `<nav>` mas abajo): la superficie del sidebar es
-// SIEMPRE oscura (`#0f171d` fijo) sin importar el tema activo -- usar
-// `var(--text)`/`var(--text-dim)` para el texto del sidebar (que SÍ
-// cambia con el tema) lo volvía ilegible en tema claro (texto oscuro
-// sobre el fondo oscuro del sidebar). Texto del sidebar FIJO en tonos
-// claros, igual que el ícono sobre `--accent` (mismo criterio ya
-// aplicado más abajo): este componente deliberadamente NO sigue el
-// tema de la app, es una superficie permanentemente oscura por diseño.
-// Exportados (ticket 072) para que `EditorProjectSidebar.tsx` (contenido
-// de `extraContent`) use exactamente los mismos tonos fijos -- ese
-// contenido vive DENTRO de este mismo `<nav>` de fondo oscuro
-// permanente, así que necesita el mismo criterio de texto fijo (no
-// tokens de tema) que el resto de este componente.
-export const SIDEBAR_TEXT = '#eef1f5';
-export const SIDEBAR_TEXT_DIM = 'rgba(238, 241, 245, 0.62)';
+// Pedido de Marco: corrige el sidebar en tema claro -- hasta este
+// cambio, el fondo era SIEMPRE `#0f171d` fijo (texto SIEMPRE claro a
+// juego) sin importar el tema activo. Esa decisión venía del ticket 046
+// (`sidebar-bg.png`, un degradado de píxeles verdes SIEMPRE oscuro,
+// sin variante clara -- el texto fijo era la única forma de que fuera
+// legible sobre esa imagen) -- pero la imagen ya se retiró (pedido de
+// Marco, ronda anterior) y el color sólido que quedó en su lugar nunca
+// se volvió a evaluar contra el tema claro, dejando el sidebar como un
+// bloque oscuro fijo dentro de una app ya clara alrededor. Se retira el
+// fijo por completo: el sidebar ahora usa los mismos tokens de tema que
+// el resto de la app (`--panel-bg`/`--text`/`--text-dim`/`--border`),
+// igual que la topbar compartida (`AppShell.tsx`).
+//
+// Exportados (ya no como colores fijos, sino como los tokens de tema
+// correspondientes) para que `EditorProjectSidebar.tsx` (contenido de
+// `extraContent`, vive DENTRO de este mismo `<nav>`) siga los mismos
+// criterios sin tener que reimportar los tokens por su cuenta.
+export const SIDEBAR_TEXT = 'var(--text)';
+export const SIDEBAR_TEXT_DIM = 'var(--text-dim)';
 
 /**
  * Sidebar de navegación (ticket 037, HU-5) -- rediseño visual del
@@ -59,9 +61,10 @@ export const SIDEBAR_TEXT_DIM = 'rgba(238, 241, 245, 0.62)';
  * el resultado en vivo):
  * - El fondo del sidebar ya NO es un gradiente CSS aproximado -- pasó a
  *   ser el PNG que Marco proveyó (`assets/brand/sidebar-bg.png`), y
- *   MAS TARDE (pedido de Marco, retirar el fondo) vuelve a ser un color
- *   sólido fijo -- ver el `<nav>` mas abajo, la imagen ya no se usa ni
- *   se importa.
+ *   MAS TARDE (pedido de Marco, retirar el fondo) un color sólido, y
+ *   MAS TARDE AUN (pedido de Marco, "corrige el tema claro para la
+ *   sidebar") pasó a seguir los tokens de tema como el resto de la app
+ *   -- ver el `<nav>` mas abajo, la imagen ya no se usa ni se importa.
  * - El logo ya NO es el ícono SVG dibujado a mano (`IconGrassBlockLogo`,
  *   eliminado -- ver `ui/icons.tsx`) -- es el PNG real que mandó Marco
  *   (`assets/brand/logo.png`, con transparencia real).
@@ -89,13 +92,12 @@ export function Sidebar({ activeNav, onNavigate, extraContent }: SidebarProps) {
         flexDirection: 'column',
         padding: 20,
         gap: 4,
-        // Pedido de Marco: se quita la imagen de fondo (antes
-        // `sidebar-bg.png`, degradado de píxeles verdes) -- queda el
-        // mismo color sólido fijo que ya tenía como base debajo de la
-        // imagen, sin variante clara (mismo criterio "superficie
-        // siempre oscura" documentado arriba).
-        background: '#0f171d',
-        borderRight: '1px solid rgba(255, 255, 255, 0.08)',
+        // Pedido de Marco ("corrige el tema claro para la sidebar"):
+        // mismo token que la topbar compartida (`AppShell.tsx`), en vez
+        // del color sólido fijo que quedó tras retirar la imagen de
+        // fondo (ver comentario de `SIDEBAR_TEXT` arriba).
+        background: 'var(--panel-bg)',
+        borderRight: '1px solid var(--border)',
         height: '100%',
         overflowY: 'auto',
         color: SIDEBAR_TEXT,
@@ -161,17 +163,17 @@ export function Sidebar({ activeNav, onNavigate, extraContent }: SidebarProps) {
             gap: 10,
             padding: 12,
             borderRadius: 'var(--radius-lg)',
-            border: '1px solid rgba(255, 255, 255, 0.16)',
-            // Casi opaca (no solo un leve blur, ver revisión anterior) --
-            // se conserva igual tras retirar el fondo con imagen del
-            // `<nav>` (pedido de Marco): sigue viéndose como una
-            // tarjeta propia, ligeramente elevada sobre el fondo sólido.
-            background: 'rgba(10, 16, 20, 0.88)',
+            border: '1px solid var(--border-strong)',
+            // Pedido de Marco ("corrige el tema claro para la sidebar"):
+            // mismo token de "superficie elevada" que el resto de la
+            // app (antes un fijo oscuro semi-opaco, pensado para
+            // destacar sobre la imagen de fondo ya retirada).
+            background: 'var(--surface-raised)',
           }}
         >
           <img src={logoUrl} alt="" width={28} height={28} style={{ flexShrink: 0 }} />
           <div>
-            <div style={{ fontSize: 'var(--font-sm)', fontWeight: 700 }}>Texture Studio MC</div>
+            <div style={{ fontSize: 'var(--font-sm)', fontWeight: 700 }}>Texture Studio</div>
             <div style={{ fontSize: 'var(--font-xs)', color: SIDEBAR_TEXT_DIM }}>Crea. Modifica. Comparte.</div>
           </div>
         </div>
