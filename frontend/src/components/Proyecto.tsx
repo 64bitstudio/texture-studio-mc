@@ -247,7 +247,9 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
           {!record.coverImageDataUrl && <IconFolder size={38} style={{ color: 'var(--text-dim)' }} />}
         </button>
 
-        <div style={{ flex: 1, minWidth: 240, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {/* Ticket 064 (pedido de Marco): más espacio vertical entre los 3
+            textos (título/resumen/descripción) -- 6px se veía apretado. */}
+        <div style={{ flex: 1, minWidth: 240, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {editingTitle ? (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <FormField label="Nombre del proyecto">
@@ -294,7 +296,13 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
               </div>
             </div>
           ) : (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            // Ticket 064 (pedido de Marco: "el texto del ultimo alinealo
+            // con su boton de edicion") -- `alignItems: 'center'` en vez
+            // de `'flex-start'`: con una sola línea de texto, "arriba"
+            // dejaba el ícono (centrado dentro de su propia caja de 28px)
+            // visualmente más abajo que el texto. Mismo criterio que la
+            // fila del título, que ya usaba `'center'`.
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <p style={{ margin: 0, fontSize: 'var(--font-sm)', color: 'var(--text-dim)', maxWidth: 480 }}>
                 {record.description ?? 'Sin descripción todavía.'}
               </p>

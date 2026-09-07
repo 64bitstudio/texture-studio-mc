@@ -393,3 +393,7 @@ Reemplaza el motor de miniaturas del ticket 055 -- ver `docs/ARQUITECTURA.md`, "
 
 - **`components/Proyecto.tsx`** — portada de 88px a 120px; nueva línea "N mobs · Última modificación: fecha" debajo del título (mismo formato que `ProjectCard.tsx`); la zona de mobs deja de estar envuelta en un `<Section>` -- el buscador + el toggle grid/lista comparten fila con el encabezado "Mobs de este proyecto (N)", sin caja/borde propio; el grid/lista de tarjetas de mob queda suelto sobre el fondo. Las únicas cards reales que quedan son "Información del proyecto", "Acciones", y cada tarjeta de mob individual.
 - Explícitamente NO incluido: pestañas "Mobs y texturas" / "Configuración del proyecto" que aparecían en una de las imágenes de referencia -- "Configuración del proyecto" sigue descartada desde la definición del ticket 056 (sin contenido real todavía).
+
+### Ticket 064 -- Más espacio entre los 3 textos del header, ícono de descripción alineado con su texto
+
+- **`components/Proyecto.tsx`** — `gap` del contenedor de título/resumen/descripción de 6px a 12px; fila de la descripción cambiada de `alignItems: 'flex-start'` a `'center'` para que el ícono de editar quede alineado con el texto de una sola línea (mismo criterio que ya usaba la fila del título).
