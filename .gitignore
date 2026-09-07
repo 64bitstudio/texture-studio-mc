@@ -31,3 +31,12 @@ vanilla-assets/
 
 # macOS
 .DS_Store
+
+# Servidor Minecraft local de prueba (ticket 080, spike de FreeMinecraftModels):
+# jar de Paper, jar del plugin, mundo generado y datos de runtime -- son
+# binarios de terceros y estado desechable, nunca se versionan. El
+# hallazgo del spike se documenta en el propio ticket, no el server en sí.
+# (Aplica tanto si el ticket sigue en in-process/ como ya movido a done/.)
+in-process/*/test-server/
+done/*/test-server/
+
