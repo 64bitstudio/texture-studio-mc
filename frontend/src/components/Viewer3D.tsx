@@ -157,6 +157,19 @@ export interface Viewer3DProps {
    * realmente se ve, no un valor fijo de un ticket anterior).
    */
   mobLabel: string;
+  /**
+   * Acerca la cámara INICIAL hacia `target` (nunca hacia el origen del
+   * mundo) por este factor, `1` = posición fija de siempre (sin
+   * cambios). Pedido de Marco (revisión en vivo del ticket 072): el
+   * panel "Vista previa 3D" del Editor se veía chico al abrir -- mismo
+   * criterio/fórmula que `CAMERA_ZOOM` en `renderMobSnapshot3D.ts`
+   * (ticket 065), aplicado aca al `<Canvas camera>` inicial en vez de a
+   * una foto fija. Solo afecta el encuadre AL MONTAR -- `OrbitControls`
+   * sigue permitiendo alejar/acercar libremente después, sin límite
+   * artificial. Opcional (default `1`) para no afectar a `NuevoProyecto.tsx`,
+   * el otro consumidor de este componente, que no pidió este cambio.
+   */
+  cameraZoom?: number;
 }
 
 /**
@@ -164,7 +177,7 @@ export interface Viewer3DProps {
  * clasico, controles de camara orbit/zoom/pan via drei `OrbitControls`.
  * Ver docs/COMPONENTES.md.
  */
-export function Viewer3D({ texture, geometry, mobLabel }: Viewer3DProps) {
+export function Viewer3D({ texture, geometry, mobLabel, cameraZoom = 1 }: Viewer3DProps) {
   // Ticket 020 (hallazgo durante la Araña): el `target` de OrbitControls
   // era un valor fijo `[0, 16, 0]` -- correcto SOLO por coincidencia
   // para el biped clasico (ver `geometryBounds.ts`). Se calcula ahora
@@ -173,13 +186,27 @@ export function Viewer3D({ texture, geometry, mobLabel }: Viewer3DProps) {
   // tener que ajustar este componente de nuevo.
   const target = useMemo(() => computeGeometryCenter(geometry), [geometry]);
 
+  // Posición inicial de cámara, acercada hacia `target` por `cameraZoom`
+  // (ver comentario de la prop) -- misma fórmula que `CAMERA_ZOOM` en
+  // `renderMobSnapshot3D.ts`: escala el offset cámara-target, nunca
+  // cámara-origen (para que funcione igual con la Araña, cuyo bounding
+  // box no está centrado en el origen).
+  const cameraPosition = useMemo((): [number, number, number] => {
+    const fixed: [number, number, number] = [45, 40, 65];
+    return [
+      target[0] + (fixed[0] - target[0]) * cameraZoom,
+      target[1] + (fixed[1] - target[1]) * cameraZoom,
+      target[2] + (fixed[2] - target[2]) * cameraZoom,
+    ];
+  }, [target, cameraZoom]);
+
   return (
     <div
       role="img"
       aria-label={`Vista 3D del modelo del ${mobLabel} de Minecraft, con controles de camara orbitales`}
       style={{ width: '100%', height: '100%' }}
     >
-      <Canvas camera={{ position: [45, 40, 65], fov: 40, near: 0.1, far: 1000 }}>
+      <Canvas camera={{ position: cameraPosition, fov: 40, near: 0.1, far: 1000 }}>
         {/* Ticket 049 había puesto un fondo verde oscuro (pedido
             explícito de Marco en ese momento). Ticket 052 lo revierte:
             Marco mandó captura + imagen de referencia lado a lado

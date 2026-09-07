@@ -254,7 +254,7 @@ export interface PixelWrite {
  * Devuelve `null` cuando el overlay no se superpone con ninguna caja UV
  * conocida -- "nada que quemar", el llamador (`Editor.tsx`) lo trata
  * como un error de UI explicito, no como un no-op silencioso (ver
- * `components/PasteImageControls.tsx`).
+ * `pasteError` en `Editor.tsx`).
  */
 export function computeBurnPixels(source: PixelSource, rect: OverlayRect, boxes: UVBoxRect[]): PixelWrite[] | null {
   const targetBox = findTargetUVBox(rect, boxes);

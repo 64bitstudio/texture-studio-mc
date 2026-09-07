@@ -1848,3 +1848,75 @@ Hover del sidebar principal y del sidebar del editor (confirmado que ahora sí r
 ### Nota sobre el empaquetado en un único PR (tickets 071-073)
 
 Los 3 tickets de esta sección se implementaron en una misma sesión continua de iteración en vivo con Marco, con cambios entrelazados en varios archivos compartidos (`App.tsx`, `index.css`, `Sidebar.tsx`, `EditorProjectSidebar.tsx`) -- separarlos en ramas/PRs limpios de verdad habría significado rehacer manualmente los mismos cambios 2-3 veces (el entorno no soporta `git add -i`/`git add -p` para staging interactivo por hunks). Marco confirmó explícitamente vía `AskUserQuestion` empaquetar los 3 en un único PR bajo el mismo VoBo, en vez del "un PR por ticket" habitual de este proyecto -- decisión puntual de este caso, no un cambio de convención general.
+
+## Ticket 074 -- Editor: rango de zoom, preview 3D, toolbar de importar/pegar, herramienta Mano, y scroll interno del lienzo
+
+Ronda de correcciones puntuales de Marco tras revisar el Editor rediseñado (ticket 072) en vivo, sobre su proyecto real "Galgoth" (Zombie x6/384×384) -- cada punto llegó como su propia captura/mensaje en la misma sesión de iteración.
+
+### Zoom: rango completo 50%-4000%
+
+`zoom.ts`: `ZOOM_MIN` de `4` a `0.5` (el zoom mínimo real era 400%, faltaban 300/200/100/50%). `ZOOM_STEP` se conserva pero queda acotado a un solo consumidor: el zoom continuo por rueda del mouse dentro de `TextureEditor.tsx` -- la barra de herramientas ya no lo usa. `ZoomControls.tsx` se reescribe de un stepper +/- a un `<Select>` de presets fijos (`ZOOM_PRESETS = [0.5, 1, 2, 3, 4, 6, 8, 10, 20, 30, 40]`), mismo patrón visual que el `<Select>` de "Resolución" ya existente en la misma barra.
+
+### Vista previa 3D más acercada
+
+`Viewer3D.tsx` gana un prop opcional `cameraZoom` (default `1`, no rompe el uso existente en `NuevoProyecto.tsx`) que acerca la posición de la cámara hacia el objetivo (nunca hacia el origen) con la misma fórmula que ya usaba `renderMobSnapshot3D.ts` para las miniaturas: `cameraPosition[i] = target[i] + (fixed[i] - target[i]) * cameraZoom`. El panel "Vista previa 3D" del Editor pasa `cameraZoom={0.65}`, afinado en vivo con Marco (pasó por 0.75 y 0.45 antes de converger en 0.65).
+
+### Toolbar: "Importar" un solo botón junto a Pincel/Borrador/Mano
+
+El slot de importar/pegar pasó por 3 iteraciones en vivo: primero un `Menu` desplegable con dos entradas ("Importar archivo"/"Pegar imagen"), luego dos botones separados, hasta quedar en UN solo botón "Importar" (ícono `IconImage`) que dispara directo el input de archivo oculto (`ImportTextureControl.tsx`, ahora un `forwardRef` que envuelve solo el `<input type="file">`, sin su propio mensaje de error -- ese se centralizó en `Editor.tsx`). Pegar desde portapapeles (Ctrl/Cmd+V) sigue siendo el único disparador para "insertar imagen pegada" -- `PasteImageControls.tsx` quedó sin ningún consumidor y se eliminó del repo.
+
+### Confirmar/cancelar el pegado sobre la propia imagen
+
+`PasteImageOverlay.tsx` gana `onConfirm`/`onCancel` y un grupo de dos botones (✓ `IconCheck` / ✗ `IconX`) dentro del recuadro de redimensionar (`top: 4, right: 4`). Un primer intento los flotaba ARRIBA del recuadro (`top: -34`) y quedaban recortados -- ver el hallazgo de CSS más abajo, compartido con el punto del scroll interno.
+
+### Herramienta "Mano" para mover el scroll sin bajar hasta la barra del navegador
+
+`paintMode` (`Editor.tsx`) se extiende de `'paint' | 'erase'` a `'paint' | 'erase' | 'pan'`. Al activar "Mano", un `<div>` transparente se superpone al lienzo e intercepta los eventos de puntero (`handlePanPointerDown/Move/End`) para mover `scrollLeft`/`scrollTop` del contenedor con scroll directamente, en vez de dejar que el evento llegue a `TextureEditor` y pinte -- `TextureEditor.tsx` no sabe que este modo existe. Decisión de layout importante: el overlay vive como HERMANO del contenedor con scroll (`textureSectionWrapperRef`), no como hijo -- un hijo absolutamente posicionado DENTRO de un contenedor con scroll se desplazaría junto con el contenido en vez de quedarse anclado al área visible.
+
+### Scroll interno del lienzo (no de toda la app)
+
+A resolución/zoom altos (ej. x6 a 400%, el caso real de Marco) el lienzo podía exceder la altura visible del panel y forzaba scroll de TODA la página -- topbar, breadcrumb, columna derecha, todo se iba con el scroll. `textureSectionWrapperRef` (que ya tenía `overflowX: 'auto'` desde el ticket 010) gana `maxHeight: '70vh'` + `overflowY: 'auto'` explícito. El overlay de "Mano" (arriba) automáticamente queda acotado a la misma altura -- su `position: absolute; inset: 0` se mide contra el wrapper `position: relative` que envuelve a ambos, y ese wrapper ya no puede crecer más de 70vh porque su único hijo con scroll está topado.
+
+**Hallazgo real de CSS (afecta tanto a este punto como al de confirmar/cancelar pegado, arriba)**: fijar SOLO `overflow-x: auto` en un elemento hace que el navegador calcule `overflow-y` como `auto` de todas formas (spec de CSS Overflow: si un eje no es `visible`, el otro se computa como `auto` si se había dejado en `visible`). Esto fue lo que originalmente recortaba los botones ✓/✗ al posicionarlos arriba del recuadro de pegado -- el `overflow-y: auto` implícito ya estaba ahí, solo que sin límite de alto no se notaba hasta que algo se posicionaba fuera del borde superior. Se corrigió declarando `overflow-y` de forma explícita en vez de depender del cómputo implícito, en ambos lugares.
+
+### Verificación en vivo (Claude in Chrome, local, proyecto real "Galgoth" → Zombie de Marco, x6/384×384)
+
+Zoom desde 50% hasta 1000%+, vista previa 3D visiblemente más grande, un solo botón "Importar" que abre el selector de archivo (verificado interceptando `HTMLInputElement.prototype.click` para no bloquear la automatización con el diálogo nativo del SO), pegado simulado vía evento `paste` sintético con botones ✓/✗ visibles y funcionales, arrastre con "Mano" activa (Deshacer se mantuvo deshabilitado, confirmando que no pintó nada) y vuelta a "Pincel" para confirmar que pintar sigue igual, scroll interno del lienzo a 400%/x6 (inspección de `scrollTop`/`maxHeight` computado y `window.scrollY` en `0` vía consola). Oscuro y claro. `npx tsc --noEmit`, `npx oxlint`, `npx vitest run` (215), `npm run build` en verde.
+
+## Ticket 075 -- Branding: logo/favicon nuevos, logo de topbar más grande, y nombre "Texture Studio"
+
+Marco mandó una serie de imágenes nuevas para el logo/favicon (reemplazando el del ticket 073) hasta quedar conforme, pidió agrandar el logo de la topbar, y el nombre de la app pasó de "Texture Studio MC" a "Texture Studio" en todos los lugares donde aparece.
+
+### Logo/favicon, tercera ronda desde el ticket 073
+
+Primera imagen de esta ronda: `assets/brand/logo.png`/`public/favicon.png` reemplazados con `sips -Z 256`/`sips -Z 64` -- traía alfa real, uso directo. Marco pidió agrandar el logo de la topbar de inmediato después (`AppShell.tsx`, `width`/`height` de `34` a `44`).
+
+Segunda imagen: NO traía canal alfa real -- fondo "blanco" horneado como RGB opaco, con ruido de bajo contraste (~186-255, no un color plano). Un primer intento de quitar el fondo con flood-fill desde las esquinas (umbral fijo) dejó un halo/checker visible al componer sobre el fondo oscuro real de la app -- bug reportado explícitamente por Marco ("haz transparente el logo se ve blanco el fondo"). Causa: el ruido del "blanco" horneado rompe la conectividad de color que el flood-fill necesita, así que quedan parches sin tocar. Se corrigió con un umbral GLOBAL por pixel que exige a la vez bajo *spread* de color (neutro/gris) Y alto brillo -- deja intactos tanto los colores saturados del arte (aunque sean claros) como las zonas oscuras/neutras (sombras). Ver memoria del equipo `chatgpt-image-fake-transparency` para la técnica completa, ya generalizada más allá de este proyecto.
+
+Tercera imagen: ya traía alfa real y limpio, uso directo.
+
+### Nombre "Texture Studio" (sin "MC")
+
+`index.html` (`<title>`), `exportPack.ts` (`DEFAULT_PACK_DESCRIPTION`, texto que queda dentro del `pack.mcmeta` de cualquier resource pack exportado -- visible para quien lo instale en Minecraft).
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Logo en topbar sin halo, compuesto contra el fondo real de la app en ambos temas; favicon de la pestaña; tamaño más grande visible. La verificación de transparencia NO se apoyó en la vista previa del visor `Read` (mostró checkerboard incluso sobre un archivo ya confirmado opaco por `PIL.Image.getpixel` -- falsa alarma del propio visor, no del archivo), sino en composición manual contra el color real de fondo de la app y en el render real del navegador. `npx tsc --noEmit`, `npx oxlint`, `npx vitest run` (215), `npm run build` en verde.
+
+## Ticket 076 -- Corrige el tema claro del sidebar
+
+El sidebar (`Sidebar.tsx`, reusado por `EditorProjectSidebar.tsx` vía `SIDEBAR_TEXT`/`SIDEBAR_TEXT_DIM`) quedó con colores fijos oscuros desde el ticket 046, cuando tenía una imagen de fondo siempre oscura (`sidebar-bg.png`) -- esa razón dejó de existir desde que el ticket 073 quitó esa imagen (fondo sólido `#0f171d`), pero nadie volvió a tematizarlo. Marco lo pidió explícitamente (mensaje inicial decía "tema oscuro", corregido a mitad de mensaje a "tema claro" -- el que de verdad se veía roto).
+
+### Cambios
+
+`Sidebar.tsx`: `SIDEBAR_TEXT`/`SIDEBAR_TEXT_DIM` de strings fijos a `var(--text)`/`var(--text-dim)` -- al ser exportados y reusados por `EditorProjectSidebar.tsx`, el cambio se propaga ahí sin tocar ese archivo. `background`/`borderRight` del `<nav>` de `'#0f171d'`/fijo a `var(--panel-bg)`/`1px solid var(--border)`. `border`/`background` de la tarjeta de marca inferior a `var(--border-strong)`/`var(--surface-raised)`. El color fijo del ícono del item de navegación ACTIVO (`#0f171d`, sobre `--accent`) se deja SIN cambiar a propósito -- mismo criterio ya usado por `.ui-button--primary`: el acento es claro en ambos temas, así que el ícono necesita un color oscuro fijo para tener contraste sin importar el tema.
+
+`index.css`: `.ts-nav-item`/`.ts-nav-item--active` (hover), `.ts-sidebar-project-card` (+hover), `.ts-sidebar-mob-item` (+hover+active), `.ts-sidebar-add-mob` (+hover) -- todas agregadas en el ticket 073 para poder tener `:hover` real (ver ese ticket) -- convertidas de rgba/hex fijos a los mismos tokens de tema de arriba, preservando estructura/transiciones existentes.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Sidebar principal y del editor en tema claro y oscuro, hover de items visible en ambos, ícono del item activo legible sobre el acento en ambos temas. `npx tsc --noEmit`, `npx oxlint`, `npx vitest run` (215), `npm run build` en verde.
+
+### Nota sobre el empaquetado en un único PR (tickets 074-076)
+
+Mismo criterio que 071-073: los 3 tickets se implementaron en una misma sesión continua de iteración en vivo con Marco, con cambios entrelazados en `Editor.tsx`/`index.css`/`Sidebar.tsx` -- separarlos en PRs limpios habría significado rehacer los cambios varias veces. Empaquetados en un único PR bajo un único VoBo explícito de Marco ("doy vobo"), siguiendo el mismo precedente ya establecido y confirmado con él en la ronda anterior.

@@ -1,15 +1,14 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Viewer3D } from './Viewer3D';
 import { TextureEditor } from './TextureEditor';
 import { HsvColorPicker } from './HsvColorPicker';
 import { ZoomControls } from './ZoomControls';
 import { ImportTextureControl } from './ImportTextureControl';
-import { PasteImageControls } from './PasteImageControls';
 import { PasteImageOverlay } from './PasteImageOverlay';
 import { ExportControls } from './ExportControls';
 import { PartIsolationControls } from './PartIsolationControls';
 import { ERASE_BRUSH_SIZE_MAX, ERASE_BRUSH_SIZE_MIN } from './EraseControls';
-import { Button, InlineError, Menu, Section, Select } from '../ui';
+import { Button, InlineError, Section, Select } from '../ui';
 import {
   IconBrush,
   IconCheck,
@@ -17,6 +16,8 @@ import {
   IconEraser,
   IconExpand,
   IconGridView,
+  IconHand,
+  IconImage,
   IconLightbulb,
   IconMaximize,
   IconModel,
@@ -202,7 +203,15 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
   // (1-5, ver `EraseControls.tsx`) solo aplica en modo borrado -- el
   // pincel de pintar normal sigue siendo de un pixel, sin cambios (ver
   // docs/definiciones/rediseno-ux-ui-y-navegacion.md, "No incluye").
-  const [paintMode, setPaintMode] = useState<'paint' | 'erase'>('paint');
+  //
+  // `'pan'` (pedido de Marco): tercer modo, mutuamente excluyente con
+  // pintar/borrar -- mientras está activo, un overlay transparente sobre
+  // el lienzo (ver el `return` mas abajo) intercepta el arrastre para
+  // mover el scroll del contenedor en vez de pintar, así que ningún
+  // handler de pintura necesita saber de este modo (`forcedRgba`/
+  // `setPixel`/`paintLine` solo distinguen 'erase' de cualquier otra
+  // cosa, sin cambios).
+  const [paintMode, setPaintMode] = useState<'paint' | 'erase' | 'pan'>('paint');
   const [eraseBrushSize, setEraseBrushSize] = useState(1);
   const ERASE_RGBA: RGBA = { r: 0, g: 0, b: 0, a: 0 };
 
@@ -350,6 +359,43 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
     return () => observer.disconnect();
   }, []);
 
+  // Herramienta "Mano" (pedido de Marco): arrastra el lienzo de textura
+  // para mover el scroll del contenedor (`textureSectionWrapperRef`,
+  // arriba) sin tener que bajar hasta la barra de scroll del navegador
+  // y moverla a mano. El overlay que dispara estos handlers (ver el
+  // `return` mas abajo) solo se monta mientras `paintMode === 'pan'`,
+  // así que no hace falta comprobar el modo aca adentro.
+  const panRef = useRef<{ pointerId: number; startClientX: number; startClientY: number; startScrollLeft: number; startScrollTop: number } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
+
+  const handlePanPointerDown = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    const container = textureSectionWrapperRef.current;
+    if (!container) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    panRef.current = {
+      pointerId: e.pointerId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startScrollLeft: container.scrollLeft,
+      startScrollTop: container.scrollTop,
+    };
+    setIsPanning(true);
+  }, []);
+
+  const handlePanPointerMove = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    const pan = panRef.current;
+    const container = textureSectionWrapperRef.current;
+    if (!pan || !container || pan.pointerId !== e.pointerId) return;
+    container.scrollLeft = pan.startScrollLeft - (e.clientX - pan.startClientX);
+    container.scrollTop = pan.startScrollTop - (e.clientY - pan.startClientY);
+  }, []);
+
+  const handlePanPointerEnd = useCallback((e: ReactPointerEvent<HTMLDivElement>) => {
+    panRef.current = null;
+    setIsPanning(false);
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+  }, []);
+
   const canvasDisplaySize = computeCanvasDisplaySize(buffer.width, buffer.height, zoom);
   const textureOverflowsPanel = canvasOverflowsAvailableWidth(canvasDisplaySize.width, availableTextureWidth);
 
@@ -357,11 +403,19 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
   // UV (ticket 005, HU-8/HU-9). `importError`/`pasteError` son mensajes
   // de UI inline (nunca un aviso nativo del navegador -- criterio
   // explicito del ticket), independientes entre si porque son dos
-  // flujos separados con su propio control en la barra lateral (ver
-  // `ImportTextureControl`/`PasteImageControls`).
+  // flujos separados. "Importar" (reemplazo completo) tiene su propio
+  // input de archivo OCULTO (`ImportTextureControl`, ver el ref de
+  // abajo) disparado por el boton "Importar" de la barra de
+  // herramientas -- pedido de Marco (revision en vivo del ticket 072):
+  // un click debe abrir el explorador de archivos DIRECTAMENTE, sin
+  // menu/panel intermedio. "Insertar imagen" (pegar sobre una region UV)
+  // ya NO tiene un boton propio (retirado, otra correccion de Marco) --
+  // solo se alcanza via Ctrl/Cmd+V (`handleWindowPaste` mas abajo, sin
+  // cambios).
   const [importError, setImportError] = useState<string | null>(null);
   const [pendingPaste, setPendingPaste] = useState<PendingPasteImage | null>(null);
   const [pasteError, setPasteError] = useState<string | null>(null);
+  const importFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Carga inicial: decodifica el PNG (real o placeholder) que ya vino
   // en la respuesta de `GET /api/base-assets/:mobId` (ver App.tsx) y lo
@@ -695,11 +749,13 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
   );
 
   // Pegar/insertar imagen sobre una region UV (ticket 005, HU-9).
-  // `startPendingPaste` es el punto de entrada COMUN a los dos
-  // disparadores que pide el ticket: el evento `paste` del portapapeles
-  // (listener a nivel de `window` mas abajo, mismo patron que los
-  // atajos de Ctrl/Cmd+Z) y el campo de archivo de `PasteImageControls`.
-  // Solo se admite una imagen pendiente a la vez (alcance explicito del
+  // `startPendingPaste` es el punto de entrada -- el evento `paste` del
+  // portapapeles (listener a nivel de `window` mas abajo, mismo patron
+  // que los atajos de Ctrl/Cmd+Z) es hoy el UNICO disparador (el campo
+  // de archivo alterno de `PasteImageControls` perdio su boton en la
+  // barra de herramientas, pedido de Marco -- ver el comentario junto a
+  // `importFileInputRef` mas arriba). Solo se admite una imagen
+  // pendiente a la vez (alcance explicito del
   // ticket, "se confirma o se descarta antes de pegar otra") -- un
   // segundo intento mientras ya hay una pendiente se ignora con un
   // mensaje, en vez de reemplazarla en silencio (perderia el trabajo de
@@ -974,12 +1030,20 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
           no hagan nada) -- decision a confirmar con Marco al presentar
           este ticket. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '10px 14px', background: 'var(--panel-bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-        <div role="group" aria-label="Herramienta de pintura" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div role="group" aria-label="Herramienta activa" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Button variant={paintMode === 'paint' ? 'primary' : 'secondary'} aria-pressed={paintMode === 'paint'} title="Pincel" onClick={() => setPaintMode('paint')}>
             <IconBrush size={16} /> Pincel
           </Button>
           <Button variant={paintMode === 'erase' ? 'primary' : 'secondary'} aria-pressed={paintMode === 'erase'} title="Borrador" onClick={() => setPaintMode('erase')}>
             <IconEraser size={16} /> Borrador
+          </Button>
+          {/* "Mano" (pedido de Marco): arrastra el lienzo para mover el
+              scroll sin bajar hasta la barra del navegador. Tercer modo
+              de `paintMode`, mutuamente excluyente con Pincel/Borrador --
+              ver el overlay condicional sobre el lienzo, mas abajo, y
+              `handlePanPointerDown`/`Move`/`End`. */}
+          <Button variant={paintMode === 'pan' ? 'primary' : 'secondary'} aria-pressed={paintMode === 'pan'} title="Mano -- arrastra para mover el scroll" onClick={() => setPaintMode('pan')}>
+            <IconHand size={16} /> Mano
           </Button>
           {/* Tamaño de pincel del borrador (ticket 030) -- reubicado aca
               (era un slot fijo "Tamaño" de la barra, corregido por
@@ -997,6 +1061,29 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
             </div>
           )}
         </div>
+
+        <div aria-hidden="true" style={{ width: 1, alignSelf: 'stretch', background: 'var(--border)' }} />
+
+        {/* "Importar" (pedido de Marco, revisión en vivo del ticket 072):
+            reubicado desde el panel "Archivo" de la columna derecha
+            (retirado, ver comentario mas abajo) a este slot, junto a
+            Pincel/Borrador. Dispara su input de archivo OCULTO
+            directamente (`ref.current.click()`), sin menú desplegable
+            intermedio (`ImportTextureControl` es solo el input escondido,
+            ver ese archivo). Corrección de Marco sobre la ronda
+            anterior: el botón aparte "Insertar imagen" se retira -- esa
+            vía (elegir un archivo para insertar sobre una región UV) se
+            deja SOLO accesible por Ctrl/Cmd+V (el listener a nivel de
+            `window` mas abajo sigue intacto, no depende de este botón)
+            -- "Importar" pasa a usar el ícono de imagen (`IconImage`)
+            en vez del ícono de bandeja (`IconImport`, que queda sin
+            consumidores y se retira de `ui/icons.tsx`). Confirmar/
+            cancelar el pegado vive sobre el propio overlay arrastrable
+            (`PasteImageOverlay.tsx`, corrección de una ronda anterior). */}
+        <Button onClick={() => importFileInputRef.current?.click()} title="Importar textura PNG completa">
+          <IconImage size={16} /> Importar
+        </Button>
+        <ImportTextureControl ref={importFileInputRef} expectedWidth={buffer.width} expectedHeight={buffer.height} onFileSelected={(file) => void handleImportFile(file)} />
 
         <div aria-hidden="true" style={{ width: 1, alignSelf: 'stretch', background: 'var(--border)' }} />
 
@@ -1055,6 +1142,12 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
         </div>
       </div>
 
+      {/* Errores de "Importar"/"Insertar imagen" (pedido de Marco: ya no
+          viven dentro de un menú desplegable propio, ver la barra de
+          herramientas de arriba) -- fila compacta bajo la barra,
+          visible solo si hay algo que reportar. */}
+      {(importError || pasteError) && <InlineError message={(importError ?? pasteError)!} />}
+
       {/* Cuerpo en 3 columnas (ticket 072): selector de color / textura
           (SIN CAMBIOS, ver comentario de arriba) / visor 3D + paneles de
           info. `flexWrap` para ventanas angostas -- mismo criterio
@@ -1110,45 +1203,88 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
               Pintura bloqueada: ese pixel esta fuera de la parte aislada ({isolatedRegion.label}).
             </p>
           )}
-          {/* Contenedor con scroll horizontal (ticket 010): si el canvas
-              (textureWidth*zoom, ver `canvasSize.ts`) no cabe en el
-              ancho disponible del panel, este `<div>` scrollea en X en
-              vez de dejar que el canvas se comprima/deforme -- nunca se
-              usa `max-width`/`width: 100%` sobre el canvas en si (ver
-              `TextureEditor.tsx`). */}
-          <div ref={textureSectionWrapperRef} style={{ maxWidth: '100%', overflowX: 'auto' }}>
-            {/* Wrapper HERMANO de TextureEditor (no anidado dentro): asi el
-                overlay de "pegar imagen" no queda recortado por el
-                `overflow: hidden` propio de TextureEditor mientras se
-                arrastra/redimensiona mas alla de su borde -- ver
-                `PasteImageOverlay.tsx`. */}
-            <div ref={textureCanvasWrapperRef} style={{ position: 'relative', display: 'inline-block' }}>
-              <TextureEditor
-                buffer={buffer}
-                version={version}
-                color={color}
-                zoom={zoom}
-                onZoomChange={setZoom}
-                showGrid={showGrid}
-                onSetPixel={setPixel}
-                onPaintLine={paintLine}
-                onStrokeStart={onStrokeStart}
-                onStrokeEnd={onStrokeEnd}
-                namedRegions={namedRegions}
-                onHoverPixel={handleHoverPixel}
-                isolatedRegion={isolatedRegion}
-                forcedRgba={paintMode === 'erase' ? ERASE_RGBA : undefined}
-              />
-              {pendingPaste && (
-                <PasteImageOverlay
-                  rect={pendingPaste.rect}
-                  scaleX={canvasDisplayScale.scaleX}
-                  scaleY={canvasDisplayScale.scaleY}
-                  previewUrl={pendingPaste.previewUrl}
-                  onRectChange={handlePendingRectChange}
+          {/* `position: relative` (pedido de Marco): ancla el overlay de
+              la herramienta "Mano" de mas abajo -- necesita cubrir el
+              AREA VISIBLE del panel con scroll (no desplazarse junto con
+              su contenido), asi que vive FUERA del contenedor que
+              scrollea, como hermano, no como hijo (un hijo absolutamente
+              posicionado DENTRO de un contenedor con scroll se
+              desplazaria junto con el resto del contenido). */}
+          <div style={{ position: 'relative' }}>
+            {/* Contenedor con scroll horizontal (ticket 010): si el canvas
+                (textureWidth*zoom, ver `canvasSize.ts`) no cabe en el
+                ancho disponible del panel, este `<div>` scrollea en X en
+                vez de dejar que el canvas se comprima/deforme -- nunca se
+                usa `max-width`/`width: 100%` sobre el canvas en si (ver
+                `TextureEditor.tsx`).
+
+                `maxHeight`/scroll interno en Y (pedido de Marco: a zoom
+                alto el canvas se salia del panel y forzaba scroll de TODA
+                la app): se limita el alto de este contenedor a 70vh y el
+                excedente scrollea solo aqui adentro -- el resto de la
+                pantalla (topbar, breadcrumb, titulo, barra de
+                herramientas, columna derecha) se queda fijo/visible.
+                `overflowY` se deja explicito (no implicito) a proposito
+                -- ver memoria del equipo sobre el gotcha de CSS donde
+                fijar solo `overflow-x` hace que `overflow-y` se calcule
+                como `auto` de todas formas; aqui se quiere ese `auto` de
+                verdad, asi que se declara sin depender del computo
+                implicito. */}
+            <div
+              ref={textureSectionWrapperRef}
+              style={{ maxWidth: '100%', maxHeight: '70vh', overflowX: 'auto', overflowY: 'auto' }}
+            >
+              {/* Wrapper HERMANO de TextureEditor (no anidado dentro): asi el
+                  overlay de "pegar imagen" no queda recortado por el
+                  `overflow: hidden` propio de TextureEditor mientras se
+                  arrastra/redimensiona mas alla de su borde -- ver
+                  `PasteImageOverlay.tsx`. */}
+              <div ref={textureCanvasWrapperRef} style={{ position: 'relative', display: 'inline-block' }}>
+                <TextureEditor
+                  buffer={buffer}
+                  version={version}
+                  color={color}
+                  zoom={zoom}
+                  onZoomChange={setZoom}
+                  showGrid={showGrid}
+                  onSetPixel={setPixel}
+                  onPaintLine={paintLine}
+                  onStrokeStart={onStrokeStart}
+                  onStrokeEnd={onStrokeEnd}
+                  namedRegions={namedRegions}
+                  onHoverPixel={handleHoverPixel}
+                  isolatedRegion={isolatedRegion}
+                  forcedRgba={paintMode === 'erase' ? ERASE_RGBA : undefined}
                 />
-              )}
+                {pendingPaste && (
+                  <PasteImageOverlay
+                    rect={pendingPaste.rect}
+                    scaleX={canvasDisplayScale.scaleX}
+                    scaleY={canvasDisplayScale.scaleY}
+                    previewUrl={pendingPaste.previewUrl}
+                    onRectChange={handlePendingRectChange}
+                    onConfirm={handleConfirmPaste}
+                    onCancel={handleCancelPaste}
+                  />
+                )}
+              </div>
             </div>
+            {/* Overlay de la herramienta "Mano" (pedido de Marco): mientras
+                está activa, intercepta el arrastre para mover el scroll
+                del contenedor (`handlePanPointerDown`/`Move`/`End`, mas
+                arriba) en vez de dejar que llegue a `TextureEditor` y
+                pinte -- no hace falta que `TextureEditor` sepa de este
+                modo, el overlay ya bloquea sus eventos de puntero. */}
+            {paintMode === 'pan' && (
+              <div
+                aria-hidden="true"
+                onPointerDown={handlePanPointerDown}
+                onPointerMove={handlePanPointerMove}
+                onPointerUp={handlePanPointerEnd}
+                onPointerCancel={handlePanPointerEnd}
+                style={{ position: 'absolute', inset: 0, cursor: isPanning ? 'grabbing' : 'grab', touchAction: 'none' }}
+              />
+            )}
           </div>
           {textureOverflowsPanel && (
             <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-dim)' }}>
@@ -1160,12 +1296,11 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
         {/* Columna derecha (ticket 072): visor 3D reducido a "Vista
             previa" + "Parte enfocada" (mismo `PartIsolationControls`,
             re-etiquetado) + "Información de la textura" (nueva, datos ya
-            derivados sin storage nuevo) + "Archivo" (Importar/Pegar --
-            NO estaba en la imagen de referencia de Marco, pero se
-            conserva aca para no quitar funcionalidad existente en
-            silencio, ver regla 8 de CLAUDE.md) + "Consejo". La
-            resolución de trabajo vive ahora en la barra de herramientas
-            (corrección de Marco), no en esta columna. */}
+            derivados sin storage nuevo) + "Consejo". La resolución de
+            trabajo vive en la barra de herramientas (corrección de
+            Marco); "Importar"/"Pegar" también se movieron a la barra de
+            herramientas, junto a Pincel/Borrador (otra corrección de
+            Marco) -- ver el botón "Importar" mas arriba. */}
         <div style={{ width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
           <Section title="Vista previa 3D">
             <div
@@ -1179,7 +1314,13 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
                 background: 'var(--bg)',
               }}
             >
-              <Viewer3D key={viewerKey} texture={texture} geometry={geometry} mobLabel={mobLabel} />
+              {/* `cameraZoom` (pedido de Marco: el modelo se veía chico al
+                  abrir el editor) -- `0.75` (mismo valor de las
+                  miniaturas 3D, ticket 065) seguía viéndose "muy
+                  alejado"; `0.45` quedó "muy cerca" -- afinado a `0.65`,
+                  punto medio verificado en vivo contra los 4 mobs
+                  reales. */}
+              <Viewer3D key={viewerKey} texture={texture} geometry={geometry} mobLabel={mobLabel} cameraZoom={0.65} />
               {initError && (
                 <p
                   role="alert"
@@ -1245,41 +1386,6 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
                 <IconModel size={14} /> {mobLabel}
               </span>
             </div>
-          </Section>
-
-          {/* Corrección de Marco (revisión en vivo del ticket 072): la
-              resolución de trabajo ya NO vive aca -- se movió al slot
-              "Resolución" de la barra de herramientas (ver mas arriba).
-              Este panel queda solo con "Importar"/"Pegar" (ticket 031,
-              HU-6) -- "Exportar PNG" se promovió a la fila de título
-              (`ExportControls` de arriba). No estaba en la imagen de
-              referencia de Marco, pero se conserva para no quitar esta
-              funcionalidad existente en silencio (regla 8 de CLAUDE.md). */}
-          <Section title="Archivo">
-            <Menu
-              label={
-                <>
-                  <span aria-hidden="true">📁</span> Importar / pegar imagen
-                </>
-              }
-              items={[]}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 8, minWidth: 220 }}>
-                <ImportTextureControl
-                  expectedWidth={buffer.width}
-                  expectedHeight={buffer.height}
-                  error={importError}
-                  onFileSelected={(file) => void handleImportFile(file)}
-                />
-                <PasteImageControls
-                  hasPending={!!pendingPaste}
-                  error={pasteError}
-                  onFileSelected={(file) => void startPendingPaste(file)}
-                  onConfirm={handleConfirmPaste}
-                  onCancel={handleCancelPaste}
-                />
-              </div>
-            </Menu>
           </Section>
 
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: 12, borderRadius: 'var(--radius-lg)', background: 'var(--accent-soft)', border: '1px solid var(--accent-soft-strong)' }}>

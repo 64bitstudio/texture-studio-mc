@@ -1,23 +1,36 @@
-import type { ChangeEvent } from 'react';
-import { FormField, InlineError } from '../ui';
+import { forwardRef, type ChangeEvent } from 'react';
 
 export interface ImportTextureControlProps {
   expectedWidth: number;
   expectedHeight: number;
-  error: string | null;
   onFileSelected: (file: File) => void;
 }
 
 /**
- * Control de UI para importar un PNG existente como punto de partida
- * (ticket 005, HU-8). Campo de archivo simple (no drag&drop -- ver
- * docs/ARQUITECTURA.md, "Ticket 005", para la justificación completa).
- * El mensaje de error se muestra inline con `role="alert"` -- nunca un
- * aviso nativo del navegador.
+ * Control de "importar un PNG existente como punto de partida" (ticket
+ * 005, HU-8). Es SOLO el input de archivo, oculto -- pedido de Marco
+ * (revisión en vivo del ticket 072): un click en "Importar" (el botón
+ * visible de la barra de herramientas, `Editor.tsx`) debe abrir el
+ * explorador de archivos DIRECTAMENTE, sin un paso intermedio de menú/
+ * formulario. Antes de este cambio este componente renderizaba su
+ * propio input de archivo visible dentro de un `FormField` -- ahora ese
+ * input vive oculto (`display: none`) y se dispara con
+ * `ref.current.click()` desde el botón visible (`forwardRef` para
+ * exponer el nodo del input sin que `Editor.tsx` tenga que conocer su
+ * implementación).
  *
- * Ticket 026: migrado a `FormField`+`InlineError` (`ui/`).
+ * `error` (antes mostrado inline aca via `InlineError`) se retira de
+ * este componente -- `Editor.tsx` lo muestra en una fila compartida
+ * bajo la barra de herramientas (mismo criterio que `pasteError`).
+ *
+ * Ticket 026: migrado a `FormField`+`InlineError` (`ui/`) -- retirado
+ * en este cambio, ver arriba. El input va en una sola línea -- ver
+ * gotcha ya documentado del hook de accesibilidad con tags multilínea.
  */
-export function ImportTextureControl({ expectedWidth, expectedHeight, error, onFileSelected }: ImportTextureControlProps) {
+export const ImportTextureControl = forwardRef<HTMLInputElement, ImportTextureControlProps>(function ImportTextureControl(
+  { expectedWidth, expectedHeight, onFileSelected },
+  ref,
+) {
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     // Resetea el campo para que seleccionar el MISMO archivo dos veces
@@ -28,12 +41,7 @@ export function ImportTextureControl({ expectedWidth, expectedHeight, error, onF
     if (file) onFileSelected(file);
   }
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <FormField label={`Importar textura (PNG ${expectedWidth}×${expectedHeight})`}>
-        <input type="file" accept="image/png" aria-label="Importar textura PNG como punto de partida" onChange={handleChange} style={{ fontSize: 12 }} />
-      </FormField>
-      {error && <InlineError message={error} />}
-    </div>
-  );
-}
+  const label = `Importar textura PNG (${expectedWidth}×${expectedHeight}) como punto de partida`;
+
+  return <input ref={ref} type="file" accept="image/png" aria-label={label} onChange={handleChange} style={{ display: 'none' }} />;
+});

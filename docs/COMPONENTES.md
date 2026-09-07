@@ -457,3 +457,26 @@ Reemplaza el motor de miniaturas del ticket 055 -- ver `docs/ARQUITECTURA.md`, "
 - **`assets/brand/sidebar-bg.png`** — **eliminado**, fondo del `<nav>` ahora `#0f171d` sólido.
 - **`assets/brand/logo.png`** — reemplazado (logo nuevo de Marco, reescalado a 256×256).
 - **`public/favicon.png`** (nuevo, reemplaza a `favicon.svg`, eliminado) — mismo logo, 64×64, referenciado desde `index.html`.
+
+### Ticket 074 -- Editor: rango de zoom, preview 3D, toolbar de importar/pegar, herramienta Mano, y scroll interno del lienzo
+
+- **`zoom.ts`** — `ZOOM_MIN` de `4` a `0.5`; nuevo `ZOOM_PRESETS` (50%-4000%) para el `<Select>` de zoom; `ZOOM_STEP` acotado a solo el zoom continuo por rueda del mouse.
+- **`components/ZoomControls.tsx`** — reescrito de stepper +/- a `<Select>` de presets.
+- **`components/Viewer3D.tsx`** — nuevo prop opcional `cameraZoom` (default `1`), acerca la cámara hacia el objetivo. Editor lo usa con `0.65`.
+- **`components/Editor.tsx`** — `paintMode` gana `'pan'` (herramienta Mano, overlay hermano del contenedor con scroll); toolbar de "Importar" reducida a un solo botón (ícono `IconImage`); `textureSectionWrapperRef` gana `maxHeight: '70vh'` + `overflowY: 'auto'` explícito (scroll interno del lienzo, ya no arrastra a toda la app).
+- **`components/ImportTextureControl.tsx`** — reescrito como `forwardRef` que envuelve solo el `<input type="file">` oculto (sin mensaje de error propio).
+- **`components/PasteImageControls.tsx`** — **eliminado**, sin consumidores tras simplificar la toolbar.
+- **`components/PasteImageOverlay.tsx`** — nuevos `onConfirm`/`onCancel` + botones ✓/✗ dentro del recuadro de redimensionar.
+- **`ui/icons.tsx`** — nuevo `IconHand` (herramienta Mano); `IconImage` reusado para "Importar".
+
+### Ticket 075 -- Branding: logo/favicon nuevos, logo de topbar más grande, y nombre "Texture Studio"
+
+- **`assets/brand/logo.png`** / **`public/favicon.png`** — reemplazados (tercera ronda desde el ticket 073); la segunda imagen recibida requirió remoción de fondo por umbral global (spread+brillo), no flood-fill — ver `docs/ARQUITECTURA.md` y memoria `chatgpt-image-fake-transparency`.
+- **`components/AppShell.tsx`** — logo de topbar de `34` a `44`px.
+- **`index.html`** — `<title>` de "Texture Studio MC" a "Texture Studio".
+- **`exportPack.ts`** — `DEFAULT_PACK_DESCRIPTION` de "Texture Studio MC" a "Texture Studio" (queda en el `pack.mcmeta` exportado).
+
+### Ticket 076 -- Corrige el tema claro del sidebar
+
+- **`components/Sidebar.tsx`** — `SIDEBAR_TEXT`/`SIDEBAR_TEXT_DIM` (reusados por `EditorProjectSidebar.tsx`) de strings fijos a tokens de tema (`var(--text)`/`var(--text-dim)`); `<nav>` y tarjeta de marca de colores fijos a `var(--panel-bg)`/`var(--border)`/`var(--surface-raised)`/`var(--border-strong)`. Ícono del item activo se deja fijo a propósito (contraste sobre `--accent`).
+- **`index.css`** — `.ts-nav-item*`/`.ts-sidebar-*` (agregadas en el ticket 073) de rgba/hex fijos a tokens de tema.

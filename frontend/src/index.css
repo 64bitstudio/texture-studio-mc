@@ -208,21 +208,23 @@
   animation: ts-modal-panel-in var(--transition-fast);
 }
 
-/* Items de navegación del sidebar principal (`Sidebar.tsx`) -- mismo
-   motivo que `.ts-sidebar-*` de abajo: `border`/`background`/`color`
-   pasan de estilo inline condicional a estas 2 clases para que
-   `:hover` (heredado de `.ui-button`, que ya lleva estas 3 propiedades
-   en su `transition`) pueda aplicar. Valores de reposo/activo
-   idénticos a los que tenía inline. */
+/* Items de navegación del sidebar principal (`Sidebar.tsx`) --
+   `border`/`background`/`color` pasan de estilo inline condicional a
+   estas 2 clases para que `:hover` (heredado de `.ui-button`, que ya
+   lleva estas 3 propiedades en su `transition`) pueda aplicar (un valor
+   inline siempre gana sobre una regla de hoja de estilos, incluida
+   `:hover`). Pedido de Marco ("corrige el tema claro para la sidebar"):
+   usan tokens de tema (antes colores fijos pensados para una superficie
+   SIEMPRE oscura, ver `Sidebar.tsx` para el porqué de ese cambio). */
 .ts-nav-item {
   border: 1px solid transparent;
   background: transparent;
-  color: #eef1f5;
+  color: var(--text);
 }
 
 .ts-nav-item:hover {
-  border-color: rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-strong);
+  background: var(--hover-overlay);
 }
 
 .ts-nav-item--active,
@@ -232,34 +234,30 @@
   color: var(--accent);
 }
 
-/* `EditorProjectSidebar.tsx` -- superficie SIEMPRE oscura (mismo
-   criterio fijo de colores que `Sidebar.tsx`, ver ese archivo), por eso
-   estas 3 clases (no tokens de tema). Pedido de Marco: hover con
-   transicion en vez del estado estatico de antes. Los colores de
-   reposo/activo NO cambian (mismos valores que ya tenian como estilo
-   inline) -- solo se mueven a CSS para que `:hover` pueda aplicar sin
-   que un `style` inline lo pise (un valor inline siempre gana sobre
-   una regla de hoja de estilos, incluida `:hover`). */
+/* `EditorProjectSidebar.tsx` -- mismo criterio de tokens de tema que
+   `.ts-nav-item` de arriba (antes colores fijos, ver `Sidebar.tsx`).
+   Los valores de reposo/activo siguen movidos a CSS (no estilo inline)
+   por el mismo motivo: un `:hover` de hoja de estilos no puede ganarle
+   a un `background`/`border`/`color` puesto inline. */
 .ts-sidebar-project-card {
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(10, 16, 20, 0.5);
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  transition: border-color var(--transition-fast);
 }
 
 .ts-sidebar-project-card:hover {
-  background: rgba(10, 16, 20, 0.7);
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: var(--border-strong);
 }
 
 .ts-sidebar-mob-item {
   border: 1px solid transparent;
   background: transparent;
-  color: #eef1f5;
+  color: var(--text);
   transition: background-color var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
 }
 
 .ts-sidebar-mob-item:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--hover-overlay);
 }
 
 .ts-sidebar-mob-item--active,
@@ -270,15 +268,15 @@
 }
 
 .ts-sidebar-add-mob {
-  border: 1px dashed rgba(255, 255, 255, 0.24);
+  border: 1px dashed var(--border-strong);
   background: transparent;
-  color: rgba(238, 241, 245, 0.62);
-  transition: border-color var(--transition-fast), color var(--transition-fast);
+  color: var(--text-dim);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .ts-sidebar-add-mob:hover {
-  border-color: rgba(255, 255, 255, 0.42);
-  color: #eef1f5;
+  background: var(--hover-overlay);
+  color: var(--text);
 }
 
 /* Swatches de color (`HsvColorPicker.tsx`, paleta + colores recientes)

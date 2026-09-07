@@ -59,9 +59,10 @@ export function AppShell({ activeNav, onNavigate, displayName, theme, onThemeCha
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <img src={logoUrl} alt="" width={34} height={34} style={{ flexShrink: 0 }} />
+          {/* Pedido de Marco: logo de la topbar un poco más grande (34px -> 44px) -- la topbar mide 68px de alto, sigue con margen de sobra. */}
+          <img src={logoUrl} alt="" width={44} height={44} style={{ flexShrink: 0 }} />
           <div>
-            <div style={{ fontSize: 'var(--font-md)', fontWeight: 700, lineHeight: 1.15, whiteSpace: 'nowrap' }}>Texture Studio MC</div>
+            <div style={{ fontSize: 'var(--font-md)', fontWeight: 700, lineHeight: 1.15, whiteSpace: 'nowrap' }}>Texture Studio</div>
             <div style={{ fontSize: 'var(--font-xs)', color: 'var(--text-dim)', whiteSpace: 'nowrap' }}>Editor de texturas para Minecraft</div>
           </div>
         </div>
