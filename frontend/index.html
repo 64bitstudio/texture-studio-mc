@@ -2,7 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!-- Pedido de Marco: el favicon usa el mismo logo del branding (ver
+         `assets/brand/logo.png`, consumido por `Sidebar.tsx`/
+         `AppShell.tsx`) -- copiado a `public/favicon.png` (64x64,
+         reescalado con `sips`) en vez de importarlo desde `src/`: un
+         favicon referenciado en `index.html` necesita una URL estática
+         servida tal cual, no un asset procesado/hasheado por Vite. -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Texture Studio MC</title>
     <!-- Ticket 034 (HU-5): aplica el tema guardado ANTES de cualquier

@@ -48,8 +48,9 @@ function mobLabelFor(mobId: string, mobs: MobSummary[]): string {
 function ProjectMobThumb({ mobId, label, pngDataUrl, geometryCache, style }: { mobId: string; label: string; pngDataUrl: string; geometryCache: Map<string, MobGeometry>; style: CSSProperties }) {
   const geometry = useMobGeometry(mobId, geometryCache);
   const snapshotUrl = useMobSnapshot3D(geometry, pngDataUrl);
+  // Pedido de Marco: animación de carga (`.ts-render-loading`, `index.css`) mientras `snapshotUrl` sigue `null` -- mismo criterio que `MobEntryCard.tsx`.
   // Una sola línea -- ver `MobEntryCard.tsx`/ticket 053 para el hallazgo real de por qué (bug de `ui-accessibility-guard.sh` con tags multilínea, reportado via `SendFeedback`).
-  return <img src={snapshotUrl ?? pngDataUrl} alt={label} title={label} style={style} />;
+  return <img src={snapshotUrl ?? pngDataUrl} alt={label} title={label} className={`ts-render-thumb${snapshotUrl ? '' : ' ts-render-loading'}`} style={style} />;
 }
 
 type MenuMode = 'default' | 'rename' | 'delete';

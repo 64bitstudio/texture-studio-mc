@@ -3,6 +3,7 @@ import type { TextureBuffer } from '../textureBuffer';
 import { exportTexturePng } from '../export';
 import type { UVBoxRect } from '../symmetry';
 import { Button, InlineError } from '../ui';
+import { IconExport } from '../ui/icons';
 
 export interface ExportControlsProps {
   buffer: TextureBuffer;
@@ -23,6 +24,11 @@ export interface ExportControlsProps {
  * descarga con un doble click.
  *
  * Ticket 026: migrado a `Button`+`InlineError` (`ui/`).
+ *
+ * Ticket 072 (pedido de Marco, revisión en vivo del editor rediseñado):
+ * `variant="primary"` + ícono (`IconExport`, mismo que ya usa
+ * "Exportar proyecto" en `Proyecto.tsx`) -- antes era el botón
+ * secundario por default, sin ícono.
  *
  * Ticket 044 (HU-4): se retiro el boton "Exportar pack (.zip)" que
  * vivia aca (exportaba SOLO el mob activo del editor,
@@ -52,8 +58,8 @@ export function ExportControls({ buffer, uvBoxes }: ExportControlsProps) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <Button onClick={() => void handleExportPng()} disabled={pending}>
-        {pending ? 'Exportando PNG…' : 'Exportar PNG'}
+      <Button variant="primary" onClick={() => void handleExportPng()} disabled={pending}>
+        <IconExport size={16} /> {pending ? 'Exportando PNG…' : 'Exportar PNG'}
       </Button>
       {error && <InlineError message={error} />}
     </div>

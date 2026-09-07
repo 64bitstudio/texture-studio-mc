@@ -15,6 +15,8 @@ export interface AppShellProps {
   onThemeChange: (theme: Theme) => void;
   onOpenSettings: () => void;
   children: ReactNode;
+  /** Ticket 072: contenido extra del sidebar (tarjeta "Proyecto actual" + mobs del proyecto, del editor) -- ver `Sidebar.tsx`. */
+  sidebarExtra?: ReactNode;
 }
 
 /**
@@ -40,7 +42,7 @@ export interface AppShellProps {
  * vivía escondido detrás de un click en el avatar) -- el avatar es
  * puramente decorativo (`Avatar.tsx`).
  */
-export function AppShell({ activeNav, onNavigate, displayName, theme, onThemeChange, onOpenSettings, children }: AppShellProps) {
+export function AppShell({ activeNav, onNavigate, displayName, theme, onThemeChange, onOpenSettings, children, sidebarExtra }: AppShellProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100vw', height: '100vh' }}>
       <header
@@ -75,7 +77,7 @@ export function AppShell({ activeNav, onNavigate, displayName, theme, onThemeCha
       </header>
 
       <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
-        <Sidebar activeNav={activeNav} onNavigate={onNavigate} />
+        <Sidebar activeNav={activeNav} onNavigate={onNavigate} extraContent={sidebarExtra} />
         <main style={{ flex: 1, minWidth: 0, overflow: 'auto', position: 'relative' }}>{children}</main>
       </div>
     </div>

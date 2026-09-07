@@ -1,19 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Viewer3D } from './Viewer3D';
 import { TextureEditor } from './TextureEditor';
-import { ColorPicker } from './ColorPicker';
-import { HistoryControls } from './HistoryControls';
-import { SymmetryControls } from './SymmetryControls';
+import { HsvColorPicker } from './HsvColorPicker';
 import { ZoomControls } from './ZoomControls';
-import { GridToggle } from './GridToggle';
 import { ImportTextureControl } from './ImportTextureControl';
 import { PasteImageControls } from './PasteImageControls';
 import { PasteImageOverlay } from './PasteImageOverlay';
 import { ExportControls } from './ExportControls';
-import { ResolutionControls } from './ResolutionControls';
 import { PartIsolationControls } from './PartIsolationControls';
-import { EraseControls } from './EraseControls';
-import { Menu, Section } from '../ui';
+import { ERASE_BRUSH_SIZE_MAX, ERASE_BRUSH_SIZE_MIN } from './EraseControls';
+import { Button, InlineError, Menu, Section, Select } from '../ui';
+import {
+  IconBrush,
+  IconCheck,
+  IconDocument,
+  IconEraser,
+  IconExpand,
+  IconGridView,
+  IconLightbulb,
+  IconMaximize,
+  IconModel,
+  IconRedo,
+  IconRefresh,
+  IconSave,
+  IconScale,
+  IconSymmetry,
+  IconUndo,
+} from '../ui/icons';
 import { computeBrushFootprint, computeBrushFootprintForLine } from '../brush';
 import { decodeImageFileToImageData, decodePngDataUrlToImageData } from '../decodeTexture';
 import { useCanvasTexture } from '../hooks/useCanvasTexture';
@@ -23,7 +36,7 @@ import { computeUVBoxRects, mirrorPointHorizontal } from '../symmetry';
 import { computeNamedRegions, findRegionAt, type NamedUVRegion } from '../regionLabels';
 import { isPixelInActiveRegion } from '../partIsolation';
 import { ZOOM_DEFAULT } from '../zoom';
-import { RESOLUTION_DEFAULT, clampResolutionMultiplier, resamplePixelSource } from '../resolution';
+import { RESOLUTION_DEFAULT, RESOLUTION_MAX, RESOLUTION_MIN, clampResolutionMultiplier, resamplePixelSource } from '../resolution';
 import { canvasOverflowsAvailableWidth, computeCanvasDisplaySize } from '../canvasSize';
 import {
   computeBurnPixels,
@@ -33,6 +46,8 @@ import {
   type OverlayRect,
 } from '../importImage';
 import { maskPixelsOutsideUVBoxes } from '../uvBoxCleanup';
+import { buildProjectSnapshot } from '../projectSnapshot';
+import { loadProject, saveProject } from '../projectStorage';
 import type { MobBaseAssetsResponse } from '../types/baseAssets';
 
 /** Imagen pegada/subida en espera de confirmar o descartar (ticket 005, HU-9) -- una a la vez (ver alcance del ticket). */
@@ -62,6 +77,18 @@ export interface EditorProps {
    * exige mantener "por mob visitado en la sesion".
    */
   bufferCache: Map<string, TextureBuffer>;
+  /**
+   * Nombre del proyecto activo (ticket 072, pedido de Marco con imagen
+   * de referencia) -- breadcrumb, título, y clave con la que "Guardar"
+   * llama a `saveProject`. `Editor.tsx` sigue sin saber nada de
+   * "proyecto" mas alla de este string (no lee/escribe `ProjectRecord`
+   * directamente salvo en `handleSave`, ver mas abajo).
+   */
+  projectName: string;
+  /** Ticket 072: click en "Mis proyectos" del breadcrumb -- navega a la lista completa (distinto de `onBackToProject`, que vuelve al detalle de ESTE proyecto). */
+  onBackToProjectsList: () => void;
+  /** Ticket 072: click en el nombre del proyecto (breadcrumb) o "Proyecto actual" (sidebar) -- vuelve al detalle del proyecto activo. */
+  onBackToProject: () => void;
 }
 
 /**
@@ -79,7 +106,7 @@ export interface EditorProps {
  * `setPixel`/`loadFromImageData`, no hay logica de pintado acoplada al
  * manejo de eventos de mouse.
  */
-export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
+export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBackToProjectsList, onBackToProject }: EditorProps) {
   const { texture: baseTexture, geometry } = data;
 
   // Ticket 018 (buffer por mob visitado en la sesion): si ya existe un
@@ -153,6 +180,20 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
   const [version, setVersion] = useState(0);
   const [color, setColor] = useState(DEFAULT_COLOR);
   const [initError, setInitError] = useState<string | null>(null);
+
+  // Colores recientes (ticket 072, para `HsvColorPicker.tsx`) -- estado
+  // vive ACA (no dentro del picker) para sobrevivir mientras el editor
+  // siga montado, sin importar cuantas veces el picker mismo se
+  // re-renderice. Prepend + dedup case-insensitive (mismo hex
+  // repetido no genera una segunda entrada, solo sube al frente) +
+  // tope fijo -- mismo criterio de "no acumular sin limite" que
+  // `PaintHistory` (ver `history.ts`).
+  const RECENT_COLORS_MAX = 8;
+  const [recentColors, setRecentColors] = useState<string[]>([]);
+  const handleColorChange = useCallback((hex: string) => {
+    setColor(hex);
+    setRecentColors((prev) => [hex, ...prev.filter((c) => c.toLowerCase() !== hex.toLowerCase())].slice(0, RECENT_COLORS_MAX));
+  }, []);
 
   // Herramienta de borrado (ticket 030, HU-5). `paintMode` NO vive junto
   // a `color` porque son ejes independientes -- el color seleccionado
@@ -771,7 +812,91 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
     return () => window.removeEventListener('paste', handleWindowPaste);
   }, [startPendingPaste]);
 
+  // "Restablecer" cámara del visor 3D (ticket 072). No hay API expuesta
+  // por `Viewer3D`/`OrbitControls` para resetear la cámara sin
+  // desmontar (ver `docs/ARQUITECTURA.md`, "Ticket 072") -- se fuerza un
+  // remount completo incrementando `viewerKey`, mismo patrón ya usado
+  // en `App.tsx` (`key={selectedMobId}`) para remontar `Editor`
+  // completo al cambiar de mob.
+  const [viewerKey, setViewerKey] = useState(0);
+  const handleResetViewer = useCallback(() => setViewerKey((k) => k + 1), []);
+
+  // "Pantalla completa" del visor 3D (ticket 072) -- Fullscreen API
+  // nativa sobre el `<div>` que envuelve `Viewer3D` (no todo el
+  // documento): el `fullscreenchange` a nivel de `document` es la unica
+  // forma confiable de saber si SIGUE en pantalla completa (ej. el
+  // usuario sale con Esc en vez de re-clickear el boton).
+  const viewerWrapperRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    function handleFullscreenChange() {
+      setIsFullscreen(document.fullscreenElement === viewerWrapperRef.current);
+    }
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+  const handleToggleFullscreen = useCallback(() => {
+    const el = viewerWrapperRef.current;
+    if (!el) return;
+    // `.catch` explicito con log (no solo `void`): el navegador puede
+    // rechazar `requestFullscreen`/`exitFullscreen` (ej. politica de
+    // permisos, o un gesto de click no considerado "confiable" --
+    // verificado en vivo en la revision de este ticket, ver checklist
+    // de cierre). No hay nada mas accionable que ofrecerle al usuario
+    // en ese caso (el boton simplemente no tuvo efecto, ya es evidente
+    // por si solo) -- se loguea para diagnostico en vez de mostrar un
+    // error dedicado para una funcionalidad puramente cosmetica, en vez
+    // de tragarse el rechazo en silencio.
+    if (document.fullscreenElement === el) {
+      document.exitFullscreen().catch((err: unknown) => {
+        console.warn('No se pudo salir de pantalla completa del visor 3D:', err);
+      });
+    } else {
+      el.requestFullscreen().catch((err: unknown) => {
+        console.warn('No se pudo activar pantalla completa del visor 3D:', err);
+      });
+    }
+  }, []);
+
+  // "Guardar" (ticket 072, pedido de Marco: el editor rediseñado
+  // necesita guardar de vuelta al proyecto sin pasar por "Agregar mob").
+  // Reusa `buildProjectSnapshot` (ticket 019/045, ya usado por
+  // `NuevoProyecto.tsx`/`AgregarMobModal.tsx`) con Maps de UNA sola
+  // entrada (solo el mob activo -- `Editor` no tiene visibilidad de los
+  // buffers de OTROS mobs del proyecto que el usuario no haya visitado
+  // en esta sesion, ver `bufferCache`/`geometryCache` en
+  // `projectSnapshot.ts`), y lo mergea sobre el `ProjectRecord`
+  // existente en vez de reemplazarlo entero -- mismo patron ya usado
+  // por `AgregarMobModal.tsx` para no pisar el trabajo de otros mobs ya
+  // guardados.
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedJustNow, setSavedJustNow] = useState(false);
+  const handleSave = useCallback(async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const snapshot = await buildProjectSnapshot(new Map([[mobId, buffer]]), new Map([[mobId, geometry]]));
+      const existing = loadProject(projectName);
+      saveProject(projectName, { ...(existing?.mobs ?? {}), ...snapshot }, { overwrite: true });
+      setSavedJustNow(true);
+      window.setTimeout(() => setSavedJustNow(false), 2000);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'No se pudo guardar el proyecto.');
+    } finally {
+      setSaving(false);
+    }
+  }, [mobId, buffer, geometry, projectName]);
+
   const texture = useCanvasTexture(buffer, version);
+
+  // Opciones x1-x10 del `<Select>` de "Resolución" de la barra de
+  // herramientas (ver mas abajo) -- mismo rango que `ResolutionControls.tsx`
+  // (`RESOLUTION_MIN`/`RESOLUTION_MAX`), reconstruido aca en vez de reusar
+  // ese componente porque su layout (`FormField`, label arriba del select)
+  // no encaja en una fila horizontal de una sola linea.
+  const resolutionOptions: number[] = [];
+  for (let n = RESOLUTION_MIN; n <= RESOLUTION_MAX; n++) resolutionOptions.push(n);
 
   return (
     // `ts-fade-in` (ticket 032, HU-7): transicion corta al cambiar de
@@ -779,84 +904,324 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
     // que cambia el mob activo, asi que un fundido de entrada por
     // MONTAJE (no una `transition` sobre una propiedad que cambia con
     // el componente ya en pantalla) es lo que corresponde aqui.
-    <div className="ts-fade-in" style={{ display: 'flex', width: '100%', height: '100%', minHeight: 0 }}>
-      {/* Ticket 029 (HU-3): visor acotado a 400px maximo -- `flexBasis:
-          400` + `flexGrow: 0` (nunca crece mas alla, sin importar cuanto
-          espacio sobre) + `flexShrink: 1` (SI puede encogerse en
-          ventanas angostas, en vez de desbordar). Antes de este ticket
-          el visor era `flex: 1` (ilimitado) y el panel tenia ancho FIJO
-          redimensionable a mano (`PanelResizeHandle`, ticket 010) -- ver
-          docs/ARQUITECTURA.md, "Ticket 029", para por que ese control ya
-          no hace falta con este layout. */}
-      <div style={{ flexBasis: 400, flexGrow: 0, flexShrink: 1, minWidth: 0, maxWidth: 400, position: 'relative' }}>
-        <Viewer3D texture={texture} geometry={geometry} mobLabel={mobLabel} />
-        {initError && (
-          <p
-            role="alert"
-            style={{
-              position: 'absolute',
-              bottom: 12,
-              left: 12,
-              margin: 0,
-              padding: '6px 10px',
-              fontSize: 12,
-              background: 'var(--panel-bg)',
-              color: 'var(--text)',
-              borderRadius: 4,
-            }}
-          >
-            No se pudo cargar la textura inicial en el editor: {initError}
-          </p>
-        )}
+    //
+    // Ticket 072 (pedido de Marco, con imagen de referencia): rediseño
+    // completo de este layout -- breadcrumb + título/badge/acciones +
+    // barra de herramientas horizontal + cuerpo en 3 columnas (color /
+    // textura / visor+info), reemplazando el visor fijo a la izquierda +
+    // grid de `Section` sueltas de los tickets 025-031. La ÚNICA parte
+    // que NO cambia (instrucción explícita de Marco: "la parte de la
+    // textura en si... mantenlo como lo tenemos nosotros") es el propio
+    // `Section` "Textura" de más abajo -- mismo JSX, mismos props, solo
+    // reubicado a la columna central.
+    <div className="ts-fade-in" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Corrección de Marco (revisión en vivo del ticket 072):
+          "Guardar"/"Exportar PNG" suben a la altura del breadcrumb (no
+          de la fila de título) -- mismo `justifyContent: 'space-between'`
+          que antes tenía la fila de título, ahora en esta fila. */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <nav aria-label="Ruta" style={{ fontSize: 'var(--font-sm)', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button type="button" onClick={onBackToProjectsList} style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', cursor: 'pointer', textDecoration: 'underline' }}>
+            Mis proyectos
+          </button>
+          <span aria-hidden="true">›</span>
+          <button type="button" onClick={onBackToProject} style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', cursor: 'pointer', textDecoration: 'underline' }}>
+            {projectName}
+          </button>
+          <span aria-hidden="true">›</span>
+          <span style={{ color: 'var(--text)' }}>{mobLabel}</span>
+        </nav>
+
+        {/* "Guardar" (nuevo, ticket 072) + "Exportar" (promovido desde el
+            menú "Archivo", mismo `ExportControls` sin cambios de lógica). */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {saveError && <InlineError message={saveError} />}
+          {savedJustNow && (
+            <span role="status" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--font-xs)', color: 'var(--accent)' }}>
+              <IconCheck size={14} /> Guardado
+            </span>
+          )}
+          <Button onClick={() => void handleSave()} disabled={saving}>
+            <IconSave size={16} /> {saving ? 'Guardando…' : 'Guardar'}
+          </Button>
+          <ExportControls buffer={buffer} uvBoxes={uvBoxes} />
+        </div>
       </div>
 
-      {/* Panel de ancho flexible (ticket 029) -- ocupa TODO el resto del
-          ancho disponible (ya no un valor fijo/redimensionable a mano).
-          Las secciones (`Section` de `ui/`, ticket 025) se acomodan en
-          un grid `auto-fit` -- el numero real de columnas depende del
-          ancho disponible, sin media queries manuales por breakpoint
-          (mismo criterio de "resiliente al ancho real de la ventana"
-          que ya aplicaba el panel redimensionable del ticket 010). */}
-      <aside style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: 16, background: 'var(--panel-bg)' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-          <Section title="Historial">
-            <HistoryControls canUndo={history.canUndo} canRedo={history.canRedo} onUndo={handleUndo} onRedo={handleRedo} />
-          </Section>
+      <div style={{ height: 1, background: 'var(--border)' }} />
 
-          <Section title="Simetria">
-            <SymmetryControls enabled={symmetryEnabled} onToggle={setSymmetryEnabled} />
-          </Section>
+      {/* Fila de título (ticket 072): nombre REAL del mob (sin apodo
+          propio -- confirmado con Marco vía AskUserQuestion, ver
+          `EditorProjectSidebar.tsx`) + badge fijo "Minecraft Java
+          Edition" (mismo estilo que `Proyecto.tsx`/`NuevoProyecto.tsx`). */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <IconModel size={22} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+        <h2 style={{ margin: 0, fontSize: 'var(--font-xl)' }}>{mobLabel}</h2>
+        <span style={{ fontSize: 'var(--font-xs)', color: 'var(--text)', background: 'var(--chip-bg)', borderRadius: 10, padding: '6px 12px', whiteSpace: 'nowrap' }}>
+          Minecraft Java Edition
+        </span>
+      </div>
 
-          <Section title="Color">
-            <ColorPicker color={color} onChange={setColor} />
-          </Section>
+      {/* Barra de herramientas (ticket 072, pedido de Marco con imagen
+          de referencia): reemplaza los `Section` sueltos "Historial"/
+          "Simetria"/"Borrar"/"Vista" por una unica fila horizontal --
+          MISMOS handlers/estado que antes (`handleUndo`/`handleRedo`/
+          `paintMode`/`symmetryEnabled`/`showGrid`/`eraseBrushSize`), sin
+          logica nueva. "Selector"/"Copiar"/"Recortar" de la imagen de
+          referencia se OMITEN a proposito -- no tienen un equivalente
+          funcional real hoy en la app (regla 8 de CLAUDE.md, "sin
+          parches silenciosos": no se construyen botones decorativos que
+          no hagan nada) -- decision a confirmar con Marco al presentar
+          este ticket. */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '10px 14px', background: 'var(--panel-bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
+        <div role="group" aria-label="Herramienta de pintura" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <Button variant={paintMode === 'paint' ? 'primary' : 'secondary'} aria-pressed={paintMode === 'paint'} title="Pincel" onClick={() => setPaintMode('paint')}>
+            <IconBrush size={16} /> Pincel
+          </Button>
+          <Button variant={paintMode === 'erase' ? 'primary' : 'secondary'} aria-pressed={paintMode === 'erase'} title="Borrador" onClick={() => setPaintMode('erase')}>
+            <IconEraser size={16} /> Borrador
+          </Button>
+          {/* Tamaño de pincel del borrador (ticket 030) -- reubicado aca
+              (era un slot fijo "Tamaño" de la barra, corregido por
+              Marco: ese slot es para "Resolución", ver mas abajo). Solo
+              visible con "Borrador" activo, mismo criterio que
+              `EraseControls.tsx` original (no aplica al modo Pincel).
+              El input va en una sola linea -- ver gotcha ya documentado
+              de `ui-accessibility-guard.sh` con tags multilinea. */}
+          {paintMode === 'erase' && (
+            <div className="ts-fade-in" style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 4 }}>
+              <input id="editor-erase-brush-size" type="range" min={ERASE_BRUSH_SIZE_MIN} max={ERASE_BRUSH_SIZE_MAX} value={eraseBrushSize} onChange={(e) => setEraseBrushSize(Number(e.target.value))} aria-label="Tamaño del pincel de borrado" title="Tamaño del pincel de borrado" style={{ width: 80 }} />
+              <span aria-hidden="true" style={{ fontSize: 'var(--font-xs)', color: 'var(--text-dim)', minWidth: 28 }}>
+                {eraseBrushSize}×{eraseBrushSize}
+              </span>
+            </div>
+          )}
+        </div>
 
-          <Section title="Borrar">
-            <EraseControls
-              active={paintMode === 'erase'}
-              onToggle={(active) => setPaintMode(active ? 'erase' : 'paint')}
-              brushSize={eraseBrushSize}
-              onBrushSizeChange={setEraseBrushSize}
-            />
-          </Section>
+        <div aria-hidden="true" style={{ width: 1, alignSelf: 'stretch', background: 'var(--border)' }} />
 
-          <Section title="Resolucion">
-            <ResolutionControls
-              resolution={resolution}
-              nativeWidth={baseTexture.width}
-              nativeHeight={baseTexture.height}
-              onChange={handleResolutionChange}
-            />
-          </Section>
+        <div role="group" aria-label="Deshacer y rehacer" style={{ display: 'flex', gap: 6 }}>
+          <Button variant="icon-square" title="Deshacer (Ctrl/Cmd+Z)" onClick={handleUndo} disabled={!history.canUndo}>
+            <IconUndo size={16} />
+          </Button>
+          <Button variant="icon-square" title="Rehacer (Ctrl/Cmd+Shift+Z o Ctrl+Y)" onClick={handleRedo} disabled={!history.canRedo}>
+            <IconRedo size={16} />
+          </Button>
+        </div>
 
-          <Section title="Vista">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <ZoomControls zoom={zoom} onChange={setZoom} />
-              <GridToggle visible={showGrid} onToggle={setShowGrid} />
+        <div aria-hidden="true" style={{ width: 1, alignSelf: 'stretch', background: 'var(--border)' }} />
+
+        {/* Corrección de Marco (revisión en vivo del ticket 072): el
+            slot "Tamaño" de la barra de herramientas confundía con el
+            tamaño de pincel del borrador -- lo que va aca es la
+            RESOLUCIÓN de trabajo (x1-x10, `ResolutionControls`,
+            reubicada desde "Herramientas adicionales" a este slot).
+            `<Select>` inline (no `ResolutionControls`/`FormField`
+            completo, cuyo layout es label-arriba-select -- no encaja en
+            esta fila horizontal de una sola línea, mismo patrón que el
+            resto de grupos de la barra). */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label htmlFor="editor-resolution" style={{ fontSize: 'var(--font-xs)', color: 'var(--text-dim)' }}>
+            Resolución
+          </label>
+          <Select
+            id="editor-resolution"
+            value={resolution}
+            onChange={(e) => handleResolutionChange(Number(e.target.value))}
+            aria-label="Resolución de trabajo del editor de textura"
+            style={{ minWidth: 130 }}
+          >
+            {resolutionOptions.map((n) => (
+              <option key={n} value={n}>
+                ×{n} ({baseTexture.width * n}×{baseTexture.height * n})
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div aria-hidden="true" style={{ width: 1, alignSelf: 'stretch', background: 'var(--border)' }} />
+
+        <div role="group" aria-label="Simetría y cuadrícula" style={{ display: 'flex', gap: 6 }}>
+          <Button variant={symmetryEnabled ? 'primary' : 'secondary'} aria-pressed={symmetryEnabled} title="Simetría horizontal" onClick={() => setSymmetryEnabled((v) => !v)}>
+            <IconSymmetry size={16} /> Simetría
+          </Button>
+          <Button variant={showGrid ? 'primary' : 'secondary'} aria-pressed={showGrid} title="Mostrar cuadrícula" onClick={() => setShowGrid((v) => !v)}>
+            <IconGridView size={16} /> Cuadrícula
+          </Button>
+        </div>
+
+        <div style={{ marginLeft: 'auto' }}>
+          <ZoomControls zoom={zoom} onChange={setZoom} />
+        </div>
+      </div>
+
+      {/* Cuerpo en 3 columnas (ticket 072): selector de color / textura
+          (SIN CAMBIOS, ver comentario de arriba) / visor 3D + paneles de
+          info. `flexWrap` para ventanas angostas -- mismo criterio
+          "resiliente al ancho real" que ya usaba el grid `auto-fit`
+          anterior. */}
+      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <Section title="Selector de color" style={{ width: 260, flexShrink: 0 }}>
+          <HsvColorPicker color={color} onChange={handleColorChange} recentColors={recentColors} />
+        </Section>
+
+        {/* Ocupa TODAS las columnas del grid (`gridColumn: '1 / -1'`) --
+            a diferencia del resto de secciones (controles compactos),
+            el editor de pixeles se beneficia de todo el ancho
+            disponible, sobre todo a resoluciones/zoom altos. */}
+        <Section title={`Textura (${buffer.width}×${buffer.height})`} style={{ flex: '1 1 420px', minWidth: 320 }}>
+          {/* Etiqueta fija de region (ticket 011, alternativa elegida sobre
+              un tooltip flotante -- ver docs/ARQUITECTURA.md): se actualiza
+              en vivo con cada `pointermove` sobre el canvas de textura
+              (`onHoverPixel`, `TextureEditor.tsx`) y vuelve a "--" al salir
+              del canvas o cuando el pixel cae en una zona de relleno sin
+              region UV conocida (ver `regionLabels.ts`). */}
+          <p
+            aria-live="polite"
+            style={{
+              margin: '0 0 8px',
+              fontSize: 12,
+              color: 'var(--text-dim)',
+              minHeight: 16,
+            }}
+          >
+            Región: <strong style={{ color: 'var(--text)' }}>{hoveredRegion?.label ?? '—'}</strong>
+          </p>
+          {/* Aviso de bloqueo de pintado (ticket 012, criterio "nunca
+              fallo silencioso"): aparece cuando el ultimo intento de
+              pintado (click/brocha) toco al menos un pixel fuera de la
+              parte aislada activa -- ver `applyPixelsWithSymmetry`. Se
+              suma a la señal visual continua (atenuado + cursor
+              `not-allowed`, `TextureEditor.tsx`), no la reemplaza. */}
+          {isolatedRegion && paintBlockedByIsolation && (
+            <p
+              role="status"
+              aria-live="polite"
+              style={{
+                margin: '0 0 8px',
+                fontSize: 12,
+                color: 'var(--text)',
+                background: 'rgba(255, 214, 89, 0.15)',
+                border: '1px solid rgba(255, 214, 89, 0.5)',
+                borderRadius: 4,
+                padding: '4px 8px',
+              }}
+            >
+              Pintura bloqueada: ese pixel esta fuera de la parte aislada ({isolatedRegion.label}).
+            </p>
+          )}
+          {/* Contenedor con scroll horizontal (ticket 010): si el canvas
+              (textureWidth*zoom, ver `canvasSize.ts`) no cabe en el
+              ancho disponible del panel, este `<div>` scrollea en X en
+              vez de dejar que el canvas se comprima/deforme -- nunca se
+              usa `max-width`/`width: 100%` sobre el canvas en si (ver
+              `TextureEditor.tsx`). */}
+          <div ref={textureSectionWrapperRef} style={{ maxWidth: '100%', overflowX: 'auto' }}>
+            {/* Wrapper HERMANO de TextureEditor (no anidado dentro): asi el
+                overlay de "pegar imagen" no queda recortado por el
+                `overflow: hidden` propio de TextureEditor mientras se
+                arrastra/redimensiona mas alla de su borde -- ver
+                `PasteImageOverlay.tsx`. */}
+            <div ref={textureCanvasWrapperRef} style={{ position: 'relative', display: 'inline-block' }}>
+              <TextureEditor
+                buffer={buffer}
+                version={version}
+                color={color}
+                zoom={zoom}
+                onZoomChange={setZoom}
+                showGrid={showGrid}
+                onSetPixel={setPixel}
+                onPaintLine={paintLine}
+                onStrokeStart={onStrokeStart}
+                onStrokeEnd={onStrokeEnd}
+                namedRegions={namedRegions}
+                onHoverPixel={handleHoverPixel}
+                isolatedRegion={isolatedRegion}
+                forcedRgba={paintMode === 'erase' ? ERASE_RGBA : undefined}
+              />
+              {pendingPaste && (
+                <PasteImageOverlay
+                  rect={pendingPaste.rect}
+                  scaleX={canvasDisplayScale.scaleX}
+                  scaleY={canvasDisplayScale.scaleY}
+                  previewUrl={pendingPaste.previewUrl}
+                  onRectChange={handlePendingRectChange}
+                />
+              )}
+            </div>
+          </div>
+          {textureOverflowsPanel && (
+            <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-dim)' }}>
+              El editor no cabe en el ancho actual del panel -- desplázate horizontalmente para ver el resto.
+            </p>
+          )}
+        </Section>
+
+        {/* Columna derecha (ticket 072): visor 3D reducido a "Vista
+            previa" + "Parte enfocada" (mismo `PartIsolationControls`,
+            re-etiquetado) + "Información de la textura" (nueva, datos ya
+            derivados sin storage nuevo) + "Archivo" (Importar/Pegar --
+            NO estaba en la imagen de referencia de Marco, pero se
+            conserva aca para no quitar funcionalidad existente en
+            silencio, ver regla 8 de CLAUDE.md) + "Consejo". La
+            resolución de trabajo vive ahora en la barra de herramientas
+            (corrección de Marco), no en esta columna. */}
+        <div style={{ width: 300, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <Section title="Vista previa 3D">
+            <div
+              ref={viewerWrapperRef}
+              style={{
+                position: 'relative',
+                width: isFullscreen ? '100vw' : '100%',
+                height: isFullscreen ? '100vh' : 220,
+                borderRadius: 'var(--radius-md)',
+                overflow: 'hidden',
+                background: 'var(--bg)',
+              }}
+            >
+              <Viewer3D key={viewerKey} texture={texture} geometry={geometry} mobLabel={mobLabel} />
+              {initError && (
+                <p
+                  role="alert"
+                  style={{
+                    position: 'absolute',
+                    bottom: 8,
+                    left: 8,
+                    right: 8,
+                    margin: 0,
+                    padding: '6px 10px',
+                    fontSize: 12,
+                    background: 'var(--panel-bg)',
+                    color: 'var(--text)',
+                    borderRadius: 4,
+                  }}
+                >
+                  No se pudo cargar la textura inicial en el editor: {initError}
+                </p>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, gap: 8 }}>
+              {/* "Rotar"/"Zoom"/"Mover" de la imagen de referencia son
+                  gestos del mouse que `OrbitControls` (drei) ya maneja
+                  nativamente sobre el visor -- se muestran como texto
+                  informativo, NO como botones (no hay una acción
+                  discreta que disparar para "rotar", es un arrastre
+                  continuo) -- decisión a disclosear a Marco. */}
+              <p title="Arrastra para rotar, rueda del mouse para zoom, click derecho + arrastrar para mover la cámara" style={{ margin: 0, fontSize: 'var(--font-xs)', color: 'var(--text-dim)' }}>
+                Rotar · Zoom · Mover — con el mouse
+              </p>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <Button variant="icon-square" title="Restablecer cámara" onClick={handleResetViewer}>
+                  <IconRefresh size={16} />
+                </Button>
+                <Button variant="icon-square" title={isFullscreen ? 'Salir de pantalla completa' : 'Pantalla completa'} onClick={handleToggleFullscreen}>
+                  <IconExpand size={16} />
+                </Button>
+              </div>
             </div>
           </Section>
 
-          <Section title="Aislar parte">
+          <Section title="Parte enfocada">
             {/* Selector de partes (ticket 012) -- reusa `namedRegions`
                 (catalogo del ticket 011) tal cual, sin redefinirlo. Ver
                 `PartIsolationControls.tsx`/`partIsolation.ts` para la
@@ -865,23 +1230,36 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
             <PartIsolationControls regions={namedRegions} activeRegionId={isolatedRegionId} onSelect={handleSelectIsolatedPart} />
           </Section>
 
+          <Section title="Información de la textura">
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-xs)', color: 'var(--text)', background: 'var(--chip-bg)', borderRadius: 10, padding: '6px 10px' }}>
+                <IconMaximize size={14} /> {buffer.width}×{buffer.height} px
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-xs)', color: 'var(--text)', background: 'var(--chip-bg)', borderRadius: 10, padding: '6px 10px' }}>
+                <IconScale size={14} /> Escala: x{resolution}
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-xs)', color: 'var(--text)', background: 'var(--chip-bg)', borderRadius: 10, padding: '6px 10px' }}>
+                <IconDocument size={14} /> {mobId}.png
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-xs)', color: 'var(--text)', background: 'var(--chip-bg)', borderRadius: 10, padding: '6px 10px' }}>
+                <IconModel size={14} /> {mobLabel}
+              </span>
+            </div>
+          </Section>
+
+          {/* Corrección de Marco (revisión en vivo del ticket 072): la
+              resolución de trabajo ya NO vive aca -- se movió al slot
+              "Resolución" de la barra de herramientas (ver mas arriba).
+              Este panel queda solo con "Importar"/"Pegar" (ticket 031,
+              HU-6) -- "Exportar PNG" se promovió a la fila de título
+              (`ExportControls` de arriba). No estaba en la imagen de
+              referencia de Marco, pero se conserva para no quitar esta
+              funcionalidad existente en silencio (regla 8 de CLAUDE.md). */}
           <Section title="Archivo">
-            {/* Ticket 031 (HU-6): "Importar / pegar imagen" y "Exportar"
-                dejan de ser secciones fijas del panel -- se agrupan bajo
-                un unico menu "Archivo" (`Menu` de `ui/`, ticket 025,
-                primer consumidor real). Los 3 componentes de abajo NO
-                cambian de logica (mismos props, mismos handlers,
-                mismo estado interno de error/pendiente) -- solo cambia
-                DONDE se montan: dentro del desplegable en vez de en
-                `Section` propias. Van como `children` del `Menu` (no
-                como `items`) porque cada uno ya tiene su propia UI rica
-                (campo de archivo, mensajes de error, confirmar/cancelar
-                de "pegar") que no encaja en el patron ARIA "menu" de
-                items planos -- ver docs/ARQUITECTURA.md, "Ticket 031". */}
             <Menu
               label={
                 <>
-                  <span aria-hidden="true">📁</span> Archivo
+                  <span aria-hidden="true">📁</span> Importar / pegar imagen
                 </>
               }
               items={[]}
@@ -900,104 +1278,18 @@ export function Editor({ data, mobId, mobLabel, bufferCache }: EditorProps) {
                   onConfirm={handleConfirmPaste}
                   onCancel={handleCancelPaste}
                 />
-                <ExportControls buffer={buffer} uvBoxes={uvBoxes} />
               </div>
             </Menu>
           </Section>
 
-          {/* Ocupa TODAS las columnas del grid (`gridColumn: '1 / -1'`) --
-              a diferencia del resto de secciones (controles compactos),
-              el editor de pixeles se beneficia de todo el ancho
-              disponible, sobre todo a resoluciones/zoom altos. */}
-          <Section title={`Textura (${buffer.width}×${buffer.height})`} style={{ gridColumn: '1 / -1' }}>
-            {/* Etiqueta fija de region (ticket 011, alternativa elegida sobre
-                un tooltip flotante -- ver docs/ARQUITECTURA.md): se actualiza
-                en vivo con cada `pointermove` sobre el canvas de textura
-                (`onHoverPixel`, `TextureEditor.tsx`) y vuelve a "--" al salir
-                del canvas o cuando el pixel cae en una zona de relleno sin
-                region UV conocida (ver `regionLabels.ts`). */}
-            <p
-              aria-live="polite"
-              style={{
-                margin: '0 0 8px',
-                fontSize: 12,
-                color: 'var(--text-dim)',
-                minHeight: 16,
-              }}
-            >
-              Región: <strong style={{ color: 'var(--text)' }}>{hoveredRegion?.label ?? '—'}</strong>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: 12, borderRadius: 'var(--radius-lg)', background: 'var(--accent-soft)', border: '1px solid var(--accent-soft-strong)' }}>
+            <IconLightbulb size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            <p style={{ margin: 0, fontSize: 'var(--font-xs)', color: 'var(--text)' }}>
+              <strong>Consejo:</strong> activa "Simetría" para pintar ambos lados de una parte a la vez, o aísla una parte en "Parte enfocada" para no salirte de sus límites mientras pintas.
             </p>
-            {/* Aviso de bloqueo de pintado (ticket 012, criterio "nunca
-                fallo silencioso"): aparece cuando el ultimo intento de
-                pintado (click/brocha) toco al menos un pixel fuera de la
-                parte aislada activa -- ver `applyPixelsWithSymmetry`. Se
-                suma a la señal visual continua (atenuado + cursor
-                `not-allowed`, `TextureEditor.tsx`), no la reemplaza. */}
-            {isolatedRegion && paintBlockedByIsolation && (
-              <p
-                role="status"
-                aria-live="polite"
-                style={{
-                  margin: '0 0 8px',
-                  fontSize: 12,
-                  color: 'var(--text)',
-                  background: 'rgba(255, 214, 89, 0.15)',
-                  border: '1px solid rgba(255, 214, 89, 0.5)',
-                  borderRadius: 4,
-                  padding: '4px 8px',
-                }}
-              >
-                Pintura bloqueada: ese pixel esta fuera de la parte aislada ({isolatedRegion.label}).
-              </p>
-            )}
-            {/* Contenedor con scroll horizontal (ticket 010): si el canvas
-                (textureWidth*zoom, ver `canvasSize.ts`) no cabe en el
-                ancho disponible del panel, este `<div>` scrollea en X en
-                vez de dejar que el canvas se comprima/deforme -- nunca se
-                usa `max-width`/`width: 100%` sobre el canvas en si (ver
-                `TextureEditor.tsx`). */}
-            <div ref={textureSectionWrapperRef} style={{ maxWidth: '100%', overflowX: 'auto' }}>
-              {/* Wrapper HERMANO de TextureEditor (no anidado dentro): asi el
-                  overlay de "pegar imagen" no queda recortado por el
-                  `overflow: hidden` propio de TextureEditor mientras se
-                  arrastra/redimensiona mas alla de su borde -- ver
-                  `PasteImageOverlay.tsx`. */}
-              <div ref={textureCanvasWrapperRef} style={{ position: 'relative', display: 'inline-block' }}>
-                <TextureEditor
-                  buffer={buffer}
-                  version={version}
-                  color={color}
-                  zoom={zoom}
-                  onZoomChange={setZoom}
-                  showGrid={showGrid}
-                  onSetPixel={setPixel}
-                  onPaintLine={paintLine}
-                  onStrokeStart={onStrokeStart}
-                  onStrokeEnd={onStrokeEnd}
-                  namedRegions={namedRegions}
-                  onHoverPixel={handleHoverPixel}
-                  isolatedRegion={isolatedRegion}
-                  forcedRgba={paintMode === 'erase' ? ERASE_RGBA : undefined}
-                />
-                {pendingPaste && (
-                  <PasteImageOverlay
-                    rect={pendingPaste.rect}
-                    scaleX={canvasDisplayScale.scaleX}
-                    scaleY={canvasDisplayScale.scaleY}
-                    previewUrl={pendingPaste.previewUrl}
-                    onRectChange={handlePendingRectChange}
-                  />
-                )}
-              </div>
-            </div>
-            {textureOverflowsPanel && (
-              <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--text-dim)' }}>
-                El editor no cabe en el ancho actual del panel -- desplázate horizontalmente para ver el resto.
-              </p>
-            )}
-          </Section>
+          </div>
         </div>
-      </aside>
+      </div>
     </div>
   );
 }

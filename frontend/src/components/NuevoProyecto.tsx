@@ -196,7 +196,7 @@ export function NuevoProyecto({ mobs, onProjectCreated }: NuevoProyectoProps) {
   const selectedMobLabel = mobs.find((m) => m.id === selectedMobId)?.label ?? '';
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(340px, 460px)', gap: 28, padding: 28, alignItems: 'start' }}>
+    <div className="ts-fade-in" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(340px, 460px)', gap: 28, padding: 28, alignItems: 'start' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
         <div>
           <h2 style={{ margin: '0 0 6px', fontSize: 'var(--font-xl)' }}>Nuevo proyecto</h2>
