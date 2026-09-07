@@ -424,36 +424,58 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
             usan las tarjetas de mob (`--surface-raised`) para que se
             vea como una card real. */}
         <Section style={{ background: 'var(--surface-raised)' }}>
-          <h3 className="ui-section__title" style={{ margin: 0 }}>
+          {/* Ticket 067 (pedido de Marco, con imagen de referencia):
+              homologa el diseño de esta card -- encabezados en texto
+              normal/negrita (no mayúsculas con tracking, ese estilo es
+              `.ui-section__title` compartido con el resto de la app,
+              ej. "Mobs de este proyecto (N)"; esta card usa un override
+              local en vez de tocar esa clase global) y cada fila con un
+              ícono más grande al lado de un bloque de 2 líneas
+              (etiqueta chica arriba, valor abajo) en vez del ícono
+              inline junto a la etiqueta. */}
+          <h3 style={{ margin: 0, fontSize: 'var(--font-md)', fontWeight: 700, color: 'var(--text)' }}>
             Información del proyecto
           </h3>
-          {/* Ticket 066 (pedido de Marco): más espacio entre las 3 filas
-              (gap 8 -> 14) + un ícono por fila (mismo criterio
-              hand-drawn ya usado en `MobEntryCard.tsx`, ticket 059). */}
           <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 14, fontSize: 'var(--font-sm)' }}>
-            <div>
-              <dt style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>
-                <IconDocument size={13} /> Nombre
-              </dt>
-              <dd style={{ margin: 0 }}>{projectName}</dd>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <IconFolder size={20} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+              <div>
+                <dt style={{ margin: 0, color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Nombre</dt>
+                <dd style={{ margin: 0 }}>{projectName}</dd>
+              </div>
             </div>
-            <div>
-              <dt style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>
-                <IconModel size={13} /> Mobs
-              </dt>
-              <dd style={{ margin: 0 }}>{mobIds.length}</dd>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <IconModel size={20} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+              <div>
+                <dt style={{ margin: 0, color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Mobs</dt>
+                <dd style={{ margin: 0 }}>{mobIds.length}</dd>
+              </div>
             </div>
-            <div>
-              <dt style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>
-                <IconClock size={13} /> Última modificación
-              </dt>
-              <dd style={{ margin: 0 }}>{new Date(record.updatedAt).toLocaleString()}</dd>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <IconClock size={20} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+              <div>
+                <dt style={{ margin: 0, color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Última modificación</dt>
+                <dd style={{ margin: 0 }}>{new Date(record.updatedAt).toLocaleString()}</dd>
+              </div>
+            </div>
+            {/* Ticket 067 (pedido de Marco, con imagen de referencia):
+                nueva fila "Descripción" -- el dato ya existía
+                (`record.description`, ticket 056), solo faltaba
+                mostrarlo también aquí (antes solo se veía/editaba en el
+                header). Mismo fallback que el header cuando no hay
+                descripción todavía. */}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <IconDocument size={20} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
+              <div>
+                <dt style={{ margin: 0, color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Descripción</dt>
+                <dd style={{ margin: 0 }}>{record.description ?? 'Sin descripción todavía.'}</dd>
+              </div>
             </div>
           </dl>
 
           <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
 
-          <h3 className="ui-section__title" style={{ margin: 0 }}>
+          <h3 style={{ margin: 0, fontSize: 'var(--font-md)', fontWeight: 700, color: 'var(--text)' }}>
             Acciones
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
