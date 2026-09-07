@@ -1707,3 +1707,23 @@ Consume el nuevo hook; variable/prop renombrada de `spriteUrl` a `snapshotUrl` e
 Confirmado contra el proyecto real "Set Nether" (Araña/Creeper/Esqueleto/Zombie): las 4 miniaturas muestran la perspectiva de 3/4 correcta con la textura real del proyecto (no la vanilla), en grid, lista (40px, siguen legibles), modal ampliado, dark y light theme. Verificado también tras navegar fuera y de vuelta a la pantalla (confirma que el `WebGLRenderer` compartido sigue funcionando en remounts, sin fugas visibles). Sin errores de consola en ningún caso.
 
 `npx tsc --noEmit`, `npx oxlint`, `npx vitest run` (215, 5 menos que antes -- los tests del módulo retirado), `npm run build` en verde.
+
+## Ticket 065 -- Card lateral unificada, buscador a todo el ancho, zoom de cámara del snapshot 3D
+
+Ronda de ajustes de Marco sobre una imagen de su proyecto real. Tres cambios independientes en el mismo ticket (todos chicos/bien entendidos, sin ambigüedad real).
+
+### `Proyecto.tsx` -- card lateral unificada + buscador a todo el ancho
+
+"Información del proyecto"/"Acciones" (antes 2 `<Section>` separadas) se fusionan en una sola, con un separador interno de 1px -- mismo patrón ya usado dentro de "Acciones" para separar "Eliminar proyecto". Gana `background: var(--surface-raised)` explícito: el fondo por defecto de `.ui-section` es `--panel-bg`, que en `index.css` está definido IGUAL a `--bg` (el fondo de toda la pantalla) tanto en dark como en light theme -- la card se veía "sin fondo", solo el borde la delataba. El buscador/toggle grid-lista, que antes vivían dentro de la fila de la columna izquierda (solo tan anchos como esa columna), pasan a su propia fila de ancho completo por encima de la grid de 2 columnas -- así terminan alineados con el borde derecho real del contenido (donde arranca la card lateral), no con el borde derecho de la columna de mobs nada más.
+
+### `renderMobSnapshot3D.ts` -- `CAMERA_ZOOM`
+
+El ángulo de cámara del ticket 062 (heredado de `Viewer3D.tsx`) deja margen de sobra pensado para un visor INTERACTIVO (rotar/hacer zoom sin que el modelo se salga de cuadro) -- para una miniatura fija ese margen deja al mob chico dentro del cuadro. Fix: escalar el offset cámara-target (nunca cámara-origen, para que funcione igual con la Araña, cuyo bounding box vive en otra posición/altura que la de un biped) por un factor `CAMERA_ZOOM < 1`, manteniendo exactamente el mismo ángulo de vista, solo acercando la cámara.
+
+**Afinado en vivo, no a ojo de la primera vez**: probado primero con `0.62` -- los mobs se veían notablemente más grandes, pero el Esqueleto (y, al límite, el Zombie) quedaban con los pies recortados fuera del cuadro cuadrado de 512px (verificado con zoom sobre la miniatura real en el navegador). Subido a `0.75` y reverificado uno por uno contra los 4 mobs reales -- sin recortes, mobs siguen notablemente más grandes que el ángulo original del ticket 062.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Confirmado contra el proyecto real "Set Nether": card lateral fusionada con fondo visible y separador, buscador/toggle alineados a la derecha de la card lateral (que ahora empieza a la misma altura que las tarjetas de mob), los 4 mobs reales (Esqueleto/Zombie/Araña/Creeper) se ven más grandes sin recortes en grid, lista y modal ampliado. Sin errores de consola.
+
+`npx tsc --noEmit`, `npx oxlint`, `npx vitest run` (215, sin tests nuevos -- ticket 100% visual/de tuning de cámara, mismo criterio del ticket 062 para no unit-testear construcción de escena 3D), `npm run build` en verde.
