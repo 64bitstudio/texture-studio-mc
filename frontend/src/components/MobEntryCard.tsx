@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Menu } from '../ui';
 import { IconDocument, IconDots, IconEye, IconMaximize, IconModel, IconPencil, IconScale, IconTrash, IconX } from '../ui/icons';
-import { fetchMobBaseAssets } from '../api/baseAssets';
+import { useMobGeometry } from '../hooks/useMobGeometry';
 import { useMobSnapshot3D } from '../hooks/useMobSnapshot3D';
 import type { MobGeometry } from '../types/baseAssets';
 import type { ToggleLayout } from '../ui';
@@ -101,27 +101,9 @@ function MobPreviewModal({ label, snapshotUrl, onClose }: { label: string; snaps
  * proyecto" (confirmación inline, ticket 058).
  */
 export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geometryCache, onEditTexture, onRemoveMob }: MobEntryCardProps) {
-  const cachedGeometry = geometryCache.get(mobId) ?? null;
-  const [fetchedGeometry, setFetchedGeometry] = useState<MobGeometry | null>(null);
-  const geometry = cachedGeometry ?? fetchedGeometry;
+  const geometry = useMobGeometry(mobId, geometryCache);
   const [showPreview, setShowPreview] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
-
-  useEffect(() => {
-    if (geometryCache.has(mobId)) return;
-    let cancelled = false;
-    fetchMobBaseAssets(mobId)
-      .then((asset) => {
-        geometryCache.set(mobId, asset.geometry);
-        if (!cancelled) setFetchedGeometry(asset.geometry);
-      })
-      .catch((err: unknown) => {
-        console.warn(`MobEntryCard: no se pudo cargar la geometría de "${mobId}".`, err);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [mobId, geometryCache]);
 
   const snapshotUrl = useMobSnapshot3D(geometry, pngDataUrl);
   const handleOpenPreview = useCallback(() => setShowPreview(true), []);
@@ -179,7 +161,7 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
   const thumb = isList ? (
     <img src={snapshotUrl ?? pngDataUrl} alt={`Miniatura de la textura guardada de ${label}`} style={{ width: 40, height: 40, objectFit: 'contain', imageRendering: 'pixelated', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', flexShrink: 0 }} />
   ) : (
-    <img src={snapshotUrl ?? pngDataUrl} alt={`Miniatura de la textura guardada de ${label}`} style={{ width: '100%', height: 200, objectFit: 'contain', imageRendering: 'pixelated', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }} />
+    <img src={snapshotUrl ?? pngDataUrl} alt={`Miniatura de la textura guardada de ${label}`} style={{ width: '100%', height: 140, objectFit: 'contain', imageRendering: 'pixelated', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }} />
   );
 
   // Ticket 059 (corrección de Marco: "te falta agregar iconos") -- cada
@@ -194,10 +176,19 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
 
   // Ticket 066 (pedido de Marco: "los textos... estan muy juntos,
   // espacialos mas") -- gap de 4 a 7 entre cada línea de info.
+  // Ticket 070 (pedido de Marco, con imagen de referencia): cada línea
+  // pasa a ser un chip -- mismo estilo que el badge "Minecraft Java
+  // Edition" del header de `Proyecto.tsx` (`background: var(--chip-bg)`,
+  // `borderRadius: 10`, padding). `width: 'fit-content'` -- el chip
+  // abraza su contenido, no estira a todo el ancho de la tarjeta.
+  // Ticket 071 (pedido de Marco): "alinealos uno al lado del otro" --
+  // de columna a fila, con `flexWrap: 'wrap'` para que los chips que no
+  // quepan en una sola línea bajen a la siguiente en vez de desbordar
+  // la tarjeta.
   const info = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: 'var(--font-xs)', color: 'var(--text-dim)' }}>
+    <div style={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', gap: 7, fontSize: 'var(--font-xs)', color: 'var(--text-dim)' }}>
       {infoRows.map(({ Icon, text }) => (
-        <span key={text} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <span key={text} style={{ display: 'flex', alignItems: 'center', gap: 6, width: 'fit-content', background: 'var(--chip-bg)', borderRadius: 10, padding: '6px 10px' }}>
           <Icon size={13} style={{ flexShrink: 0 }} />
           {text}
         </span>
@@ -243,9 +234,13 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
     // derecha, ticket 059) -- nombre a la izquierda, menú a la
     // derecha, ambos centrados verticalmente en su fila
     // (`alignItems: 'center'`). Debajo, la miniatura ocupa todo el
-    // ancho, y debajo de esa la info. `gap` de 14 a 18 -- "los textos
-    // dentro de la card deven verse mas espaciados".
-    <li style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: 20, borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', background: 'var(--surface-raised)' }}>
+    // ancho, y debajo de esa la info.
+    // Ticket 072 (pedido de Marco: "ocupan mucho espacio
+    // innecesariamente, hazlas mas pequenas") -- `padding`/`gap` del
+    // `<li>` de 20/18 a 14/12 (ver también `thumb` más arriba, que baja
+    // de 200px a 140px de alto en este mismo ticket, y el `minmax` del
+    // grid en `Proyecto.tsx`, de 320px a 240px).
+    <li style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 14, borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', background: 'var(--surface-raised)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
         <span style={{ fontWeight: 600, fontSize: 'var(--font-md)' }}>{label}</span>
         {menu}

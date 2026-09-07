@@ -419,3 +419,12 @@ Reemplaza el motor de miniaturas del ticket 055 -- ver `docs/ARQUITECTURA.md`, "
 ### Ticket 069 -- Tarjeta de mob (modo grid): nombre+menú arriba, imagen a todo el ancho debajo
 
 - **`components/MobEntryCard.tsx`** (modo grid) — el nombre + el menú "⋮" pasan a ser la fila de hasta arriba de la tarjeta (nombre izquierda, menú derecha); la miniatura pasa de un cuadro fijo de 160px junto al nombre a ocupar todo el ancho de la tarjeta debajo de esa fila; la info va debajo de la miniatura. Más espacio entre secciones (`gap` 14 -> 18). Modo lista sin cambios (ticket 068).
+
+### Ticket 070 -- Alineación de íconos, chips de info, tarjetas más chicas, miniaturas reales en "Mis proyectos"
+
+- **`components/Proyecto.tsx`** — `alignItems: 'center'` en los 4 divs de fila de "Información del proyecto"; columna mínima del grid de mobs de 320px a 240px.
+- **`components/MobEntryCard.tsx`** — info como chips en fila con wrap (mismo estilo que el badge "Minecraft Java Edition"); tarjeta (modo grid) más chica (`padding`/`gap` 20/18 -> 14/12, miniatura de 200px a 140px); geometría movida al hook compartido `useMobGeometry.ts`.
+- **`hooks/useMobGeometry.ts`** (nuevo) — fetch+cache de la geometría de un mob, extraído de `MobEntryCard.tsx` para reusarlo también en `ProjectCard.tsx`.
+- **`components/ProjectCard.tsx`** — nuevo subcomponente `ProjectMobThumb`: las miniaturas de "Mis proyectos" dejan de ser el ícono vanilla fijo -- fotografían la textura real de cada proyecto con el motor 3D del ticket 062, con fallback al ícono vanilla si el mob/registro ya no existe.
+- **`components/MisProyectos.tsx`** — nueva `geometryCache` compartida entre todas las `ProjectCard` de la pantalla, pasada por props.
+- Hallazgo señalado a Marco (aceptado, no un bug): `ProjectCard` ahora lee el proyecto completo (`loadProject`) para sus miniaturas -- `listProjects()` sigue sin decodificar PNGs, pero cada tarjeta visible sí lo hace para sus hasta 3 miniaturas.

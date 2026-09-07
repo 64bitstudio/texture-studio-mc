@@ -1727,3 +1727,23 @@ El ángulo de cámara del ticket 062 (heredado de `Viewer3D.tsx`) deja margen de
 Confirmado contra el proyecto real "Set Nether": card lateral fusionada con fondo visible y separador, buscador/toggle alineados a la derecha de la card lateral (que ahora empieza a la misma altura que las tarjetas de mob), los 4 mobs reales (Esqueleto/Zombie/Araña/Creeper) se ven más grandes sin recortes en grid, lista y modal ampliado. Sin errores de consola.
 
 `npx tsc --noEmit`, `npx oxlint`, `npx vitest run` (215, sin tests nuevos -- ticket 100% visual/de tuning de cámara, mismo criterio del ticket 062 para no unit-testear construcción de escena 3D), `npm run build` en verde.
+
+## Ticket 070 -- Miniaturas reales (motor 3D) en "Mis proyectos" + nuevo flujo de VoBo antes de PR
+
+A partir de este ticket, Marco pidió explícitamente (ver memoria del equipo `texture-studio-mc-vobo-antes-de-pr`) que cada ronda de ajustes visuales se verifique en vivo y se le presente (captura/artifact) ANTES de crear la rama/PR -- no solo antes de mergear. Este ticket agrupa 5 pedidos revisados uno por uno (alineación de íconos, chips de info, tarjetas más chicas, miniaturas reales) con VoBo explícito recibido para el conjunto antes de tocar git.
+
+### `ProjectCard.tsx`/`MisProyectos.tsx` -- miniaturas reales en vez del ícono vanilla fijo
+
+Las miniaturas de "Mis proyectos" usaban `MOB_ICONS[mobId]` (renders oficiales estáticos de la Wiki, ticket 046 -- el MISMO ícono sin importar qué textura tenga guardada cada proyecto). Marco pidió que usaran el mismo motor de snapshot 3D del ticket 062, mostrando la textura REAL de cada proyecto. Nuevo subcomponente `ProjectMobThumb` (dentro de `ProjectCard.tsx`) resuelve su propia geometría (`useMobGeometry`, ver abajo) y snapshot (`useMobSnapshot3D`) por mob, con fallback a `MOB_ICONS` solo en el caso borde de que el mob/registro ya no exista.
+
+**Decisión de arquitectura, señalada explícitamente a Marco (aceptada, no un bug):** `listProjects()` sigue siendo deliberadamente liviano -- no decodifica ningún PNG, por diseño (ver `projectStorage.ts`, comentario de `ProjectSummary`). Pero ahora cada `ProjectCard` visible SÍ hace su propia lectura completa (`loadProject(project.name)`) para tener el `pngDataUrl` real de sus hasta 3 miniaturas. Con pocos proyectos guardados no hay impacto notable; si la cantidad de proyectos crece mucho, esto podría necesitar revisión (paginación/virtualización de la lista, o diferir el snapshot hasta que la tarjeta entre en viewport) -- **no implementado aquí**, aceptado como tradeoff consciente por el Product Owner.
+
+### `hooks/useMobGeometry.ts` (nuevo)
+
+Extrae el fetch+cache de geometría (antes inline en `MobEntryCard.tsx`) a un hook compartido, para que `ProjectCard.tsx` lo reuse sin duplicar la lógica. `MisProyectos.tsx` crea su propia `geometryCache` (mismo criterio de cache-por-pantalla del ticket 055) y la pasa a cada `ProjectCard`.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Cada uno de los 5 puntos se verificó en vivo y se envió como captura a Marco (`SendUserFile`) ANTES de continuar al siguiente -- dark y light theme, grid y lista, sin errores de consola en ningún paso. VoBo explícito ("doy vobo") recibido para el conjunto antes de este commit.
+
+`npx tsc --noEmit`, `npx oxlint`, `npx vitest run` (215, sin tests nuevos -- ticket 100% visual/de datos derivados), `npm run build` en verde.
