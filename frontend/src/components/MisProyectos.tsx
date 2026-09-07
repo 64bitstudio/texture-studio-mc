@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { MobSummary } from '../types/mobs';
 import type { TextureBuffer } from '../textureBuffer';
+import type { MobGeometry } from '../types/baseAssets';
 import { listProjects, loadProject } from '../projectStorage';
 import { restoreProjectBuffers } from '../projectSnapshot';
 import { filterAndSortProjects, type ProjectSortBy } from '../projectFilter';
@@ -60,6 +61,12 @@ export function MisProyectos({ mobs, bufferCache, onProjectSelected, onProjectEd
   // siempre tuvo este componente). Este contador solo fuerza un
   // re-render cuando `ProjectCard` avisa `onChanged`.
   const [refreshTick, setRefreshTick] = useState(0);
+  // Ticket 073 (pedido de Marco): las miniaturas de cada `ProjectCard`
+  // ahora fotografían la textura real del proyecto (motor del ticket
+  // 062) en vez del ícono vanilla fijo -- comparten esta cache de
+  // geometrías entre TODAS las tarjetas de esta pantalla, mismo
+  // criterio ya usado en `Proyecto.tsx` desde el ticket 055.
+  const [geometryCache] = useState(() => new Map<string, MobGeometry>());
 
   const allProjects = listProjects();
   const projects = filterAndSortProjects(allProjects, { searchText, sortBy });
@@ -158,6 +165,7 @@ export function MisProyectos({ mobs, bufferCache, onProjectSelected, onProjectEd
                   project={project}
                   mobs={mobs}
                   layout={layout}
+                  geometryCache={geometryCache}
                   busy={pendingProject === project.name}
                   onOpen={() => handleOpenProject(project.name)}
                   onEdit={() => handleEditProject(project.name)}

@@ -369,7 +369,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
                 <ul
                   style={
                     mobLayout === 'grid'
-                      ? { listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }
+                      ? { listStyle: 'none', margin: 0, padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16 }
                       : { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 8 }
                   }
                 >
@@ -393,7 +393,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
                       onClick={onAddMobs}
                       style={
                         mobLayout === 'grid'
-                          ? { width: '100%', height: '100%', minHeight: 220, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-strong)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer' }
+                          ? { width: '100%', height: '100%', minHeight: 160, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-strong)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer' }
                           : { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 14px', borderRadius: 'var(--radius-lg)', border: '1px dashed var(--border-strong)', background: 'transparent', color: 'var(--text-dim)', cursor: 'pointer' }
                       }
                     >
@@ -437,21 +437,21 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
             Información del proyecto
           </h3>
           <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 14, fontSize: 'var(--font-sm)' }}>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <IconFolder size={20} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
               <div>
                 <dt style={{ margin: 0, color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Nombre</dt>
                 <dd style={{ margin: 0 }}>{projectName}</dd>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <IconModel size={20} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
               <div>
                 <dt style={{ margin: 0, color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Mobs</dt>
                 <dd style={{ margin: 0 }}>{mobIds.length}</dd>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <IconClock size={20} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
               <div>
                 <dt style={{ margin: 0, color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Última modificación</dt>
@@ -464,7 +464,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
                 mostrarlo también aquí (antes solo se veía/editaba en el
                 header). Mismo fallback que el header cuando no hay
                 descripción todavía. */}
-            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
               <IconDocument size={20} style={{ color: 'var(--text-dim)', flexShrink: 0 }} />
               <div>
                 <dt style={{ margin: 0, color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Descripción</dt>

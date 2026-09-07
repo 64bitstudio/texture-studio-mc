@@ -1,7 +1,10 @@
-import { useCallback, useState, type ChangeEvent } from 'react';
+import { useCallback, useState, type ChangeEvent, type CSSProperties } from 'react';
 import type { MobSummary } from '../types/mobs';
-import type { ProjectSummary } from '../projectStorage';
+import type { MobGeometry } from '../types/baseAssets';
+import { loadProject, type ProjectSummary } from '../projectStorage';
 import { useProjectActions } from '../hooks/useProjectActions';
+import { useMobGeometry } from '../hooks/useMobGeometry';
+import { useMobSnapshot3D } from '../hooks/useMobSnapshot3D';
 import { MOB_ICONS } from '../mobIcons';
 import { Button, InlineError, Menu } from '../ui';
 import { IconDots, IconDuplicate, IconExport, IconFolder, IconPencil, IconTrash } from '../ui/icons';
@@ -13,6 +16,8 @@ export interface ProjectCardProps {
   project: ProjectSummary;
   mobs: MobSummary[];
   layout: 'grid' | 'list';
+  /** Cache de geometrías COMPARTIDA entre todas las tarjetas de esta pantalla -- mismo `Map` que `MisProyectos.tsx` pasa a cada `ProjectCard` (ticket 073, mismo criterio ya usado en `Proyecto.tsx` desde el ticket 055). */
+  geometryCache: Map<string, MobGeometry>;
   /** `true` mientras ESTE proyecto se está abriendo (click en la tarjeta o "Editar") -- deshabilita sus propios controles, no los del resto de tarjetas. */
   busy: boolean;
   /** Click en la tarjeta/nombre (ticket 053: reemplaza al viejo botón "📁 Carpeta") -- abre la vista de detalle del proyecto. */
@@ -26,6 +31,25 @@ export interface ProjectCardProps {
 /** Nombre legible de un mob a partir de su id -- mismo criterio que el resto de vistas de proyecto. */
 function mobLabelFor(mobId: string, mobs: MobSummary[]): string {
   return mobs.find((m) => m.id === mobId)?.label ?? mobId;
+}
+
+/**
+ * Miniatura de UN mob dentro de una `ProjectCard` (ticket 073, pedido de
+ * Marco: "aplica la misma tecnica del render 2D con la perspectiva que
+ * tomamos anteriormente para los mobs que se visualizan" en "Mis
+ * proyectos") -- antes mostraba el ícono oficial vanilla fijo
+ * (`MOB_ICONS[mobId]`, mismo para cualquier proyecto), ahora fotografía
+ * la textura REAL guardada en ESTE proyecto con el mismo motor 3D del
+ * ticket 062 (`renderMobSnapshot3D.ts`, vía `useMobSnapshot3D`), en el
+ * mismo ángulo "estilo wiki". Mientras el snapshot no está listo, cae a
+ * `pngDataUrl` (la textura cruda sin componer) -- mismo criterio ya
+ * usado por `MobEntryCard.tsx`.
+ */
+function ProjectMobThumb({ mobId, label, pngDataUrl, geometryCache, style }: { mobId: string; label: string; pngDataUrl: string; geometryCache: Map<string, MobGeometry>; style: CSSProperties }) {
+  const geometry = useMobGeometry(mobId, geometryCache);
+  const snapshotUrl = useMobSnapshot3D(geometry, pngDataUrl);
+  // Una sola línea -- ver `MobEntryCard.tsx`/ticket 053 para el hallazgo real de por qué (bug de `ui-accessibility-guard.sh` con tags multilínea, reportado via `SendFeedback`).
+  return <img src={snapshotUrl ?? pngDataUrl} alt={label} title={label} style={style} />;
 }
 
 type MenuMode = 'default' | 'rename' | 'delete';
@@ -54,7 +78,7 @@ type MenuMode = 'default' | 'rename' | 'delete';
  * buffers y navegan, y por eso viven en el padre -- ver
  * `MisProyectos.tsx`).
  */
-export function ProjectCard({ project, mobs, layout, busy, onOpen, onEdit, onChanged }: ProjectCardProps) {
+export function ProjectCard({ project, mobs, layout, geometryCache, busy, onOpen, onEdit, onChanged }: ProjectCardProps) {
   const [menuMode, setMenuMode] = useState<MenuMode>('default');
   const [renameInput, setRenameInput] = useState(project.name);
   // Ticket 056: la lógica de las 4 acciones (qué llamar, cómo reportar
@@ -117,6 +141,13 @@ export function ProjectCard({ project, mobs, layout, busy, onOpen, onEdit, onCha
     objectFit: 'contain' as const,
     imageRendering: 'pixelated' as const,
   };
+  // Ticket 073 (pedido de Marco): las miniaturas de "Mis proyectos" ya
+  // NO son el ícono vanilla fijo -- son la foto real de la textura
+  // guardada en ESTE proyecto (mismo motor del ticket 062). Lectura
+  // síncrona de `localStorage` (mismo patrón ya usado en `Proyecto.tsx`)
+  // -- solo se necesita para las hasta 3 miniaturas visibles, no para
+  // `listProjects()` (que a propósito sigue sin decodificar ningún PNG).
+  const record = loadProject(project.name);
 
   const thumbs = (
     <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
@@ -132,9 +163,19 @@ export function ProjectCard({ project, mobs, layout, busy, onOpen, onEdit, onCha
           miniatura se deja en una sola línea mientras el hook no se
           corrija, para no perder la verificación real de accesibilidad
           detrás de un falso positivo. */}
-      {visibleMobIds.map((mobId) => (
-        <img key={mobId} src={MOB_ICONS[mobId]} alt={mobLabelFor(mobId, mobs)} title={mobLabelFor(mobId, mobs)} style={thumbStyle} />
-      ))}
+      {visibleMobIds.map((mobId) => {
+        const label = mobLabelFor(mobId, mobs);
+        const pngDataUrl = record?.mobs[mobId]?.pngDataUrl;
+        // Fallback al ícono vanilla fijo solo en el caso borde de que el
+        // registro/mob ya no exista (ej. se borró en otra pestaña justo
+        // entre el `listProjects()` del padre y este render) -- nunca
+        // debe romper la tarjeta.
+        return pngDataUrl ? (
+          <ProjectMobThumb key={mobId} mobId={mobId} label={label} pngDataUrl={pngDataUrl} geometryCache={geometryCache} style={thumbStyle} />
+        ) : (
+          <img key={mobId} src={MOB_ICONS[mobId]} alt={label} title={label} style={thumbStyle} />
+        );
+      })}
       {overflowCount > 0 && (
         <span
           style={{
