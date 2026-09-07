@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState, type ChangeEvent } from 'react';
 import { Button, FormField, InlineError, Section, SearchSortToggleBar, type ToggleLayout } from '../ui';
-import { IconDuplicate, IconExport, IconFolder, IconPencil, IconPlus, IconTrash } from '../ui/icons';
+import { IconClock, IconDocument, IconDuplicate, IconExport, IconFolder, IconModel, IconPencil, IconPlus, IconTrash } from '../ui/icons';
 import { loadProject, removeMobFromProject, updateProjectCover, updateProjectDescription } from '../projectStorage';
 import { useProjectActions } from '../hooks/useProjectActions';
 import { filterAndSortProjectMobs } from '../projectMobFilter';
@@ -222,6 +222,9 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
         <span style={{ color: 'var(--text)' }}>{projectName}</span>
       </nav>
 
+      {/* Ticket 066 (pedido de Marco): separador debajo del breadcrumb. */}
+      <div style={{ height: 1, background: 'var(--border)' }} />
+
       <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start', flexWrap: 'wrap' }}>
         <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverFileChange} className="sr-only" aria-label="Subir imagen de portada del proyecto" />
         {/* Ticket 063 (pedido de Marco, con imagen de referencia): portada
@@ -424,17 +427,26 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
           <h3 className="ui-section__title" style={{ margin: 0 }}>
             Información del proyecto
           </h3>
-          <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 'var(--font-sm)' }}>
+          {/* Ticket 066 (pedido de Marco): más espacio entre las 3 filas
+              (gap 8 -> 14) + un ícono por fila (mismo criterio
+              hand-drawn ya usado en `MobEntryCard.tsx`, ticket 059). */}
+          <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 14, fontSize: 'var(--font-sm)' }}>
             <div>
-              <dt style={{ color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Nombre</dt>
+              <dt style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>
+                <IconDocument size={13} /> Nombre
+              </dt>
               <dd style={{ margin: 0 }}>{projectName}</dd>
             </div>
             <div>
-              <dt style={{ color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Mobs</dt>
+              <dt style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>
+                <IconModel size={13} /> Mobs
+              </dt>
               <dd style={{ margin: 0 }}>{mobIds.length}</dd>
             </div>
             <div>
-              <dt style={{ color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Última modificación</dt>
+              <dt style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>
+                <IconClock size={13} /> Última modificación
+              </dt>
               <dd style={{ margin: 0 }}>{new Date(record.updatedAt).toLocaleString()}</dd>
             </div>
           </dl>
@@ -454,7 +466,8 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
             <button type="button" className="ui-menu__item" onClick={() => void exportZip()} disabled={exporting}>
               <IconExport size={16} /> {exporting ? 'Exportando…' : 'Exportar proyecto'}
             </button>
-            <div style={{ height: 1, background: 'var(--border)', margin: '4px 2px' }} />
+            {/* Ticket 066 (pedido de Marco): quitar el separador que
+                iba aquí, arriba de "Eliminar proyecto". */}
             {confirmDelete ? (
               <div role="alertdialog" aria-label={`Confirmar eliminación del proyecto «${projectName}»`} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 6px' }}>
                 <p style={{ margin: 0, fontSize: 'var(--font-sm)' }}>¿Eliminar «{projectName}»? Esta acción no se puede deshacer.</p>

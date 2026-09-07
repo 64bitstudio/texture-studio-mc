@@ -183,8 +183,10 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
     { Icon: IconModel, text: `Modelo: ${label}` },
   ];
 
+  // Ticket 066 (pedido de Marco: "los textos... estan muy juntos,
+  // espacialos mas") -- gap de 4 a 7 entre cada línea de info.
   const info = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 'var(--font-xs)', color: 'var(--text-dim)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 7, fontSize: 'var(--font-xs)', color: 'var(--text-dim)' }}>
       {infoRows.map(({ Icon, text }) => (
         <span key={text} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <Icon size={13} style={{ flexShrink: 0 }} />
@@ -233,12 +235,17 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
           (ver `thumbSize` y el padding/gap del `<li>` de arriba). */}
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         {thumb}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* Ticket 066 (pedido de Marco: "los textos... estan muy
+            juntos, espacialos mas") -- gap de 8 a 14 entre el nombre y
+            el bloque de info. */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
           {/* Ticket 061 (corrección de Marco): el nombre va pegado
               hasta arriba de la tarjeta (ya lo estaba -- primer
               elemento de la columna, `alignItems: 'flex-start'` en la
               fila de arriba) y un poco más grande (`--font-sm` ->
-              `--font-md`). */}
+              `--font-md`). Ticket 066: sigue igual -- primer elemento
+              de la columna, pegado a la izquierda del todo (sin
+              padding/margen propio). */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
             <span style={{ fontWeight: 600, fontSize: 'var(--font-md)' }}>{label}</span>
             {menu}
