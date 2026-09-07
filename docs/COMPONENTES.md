@@ -411,3 +411,7 @@ Reemplaza el motor de miniaturas del ticket 055 -- ver `docs/ARQUITECTURA.md`, "
 ### Ticket 067 -- Homologa el diseño de "Información del proyecto" con la referencia
 
 - **`components/Proyecto.tsx`** — encabezados "Información del proyecto"/"Acciones" en texto normal negrita (override local, sin tocar `.ui-section__title` compartido); cada fila del `dl` con un ícono grande (20px) al lado de un bloque de 2 líneas (etiqueta/valor) en vez del ícono inline junto a la etiqueta; nueva fila "Descripción" (dato ya existente, `record.description`, solo faltaba mostrarlo aquí); íconos reasignados: Nombre -> `IconFolder`, Mobs -> `IconModel`, Última modificación -> `IconClock`, Descripción -> `IconDocument`.
+
+### Ticket 068 -- Quita el bloque de info detallada en modo lista
+
+- **`components/MobEntryCard.tsx`** — en modo lista, ya no se muestra el bloque de info (archivo/dimensiones/escala/modelo) -- deformaba la fila angosta; solo queda el nombre. Modo grid sin cambios.

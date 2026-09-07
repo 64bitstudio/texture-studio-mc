@@ -211,12 +211,14 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
 
   if (isList) {
     return (
+      // Ticket 068 (pedido de Marco: "quita el texto que detalla la
+      // textura pues deforma el elemento... solo deja el nombre") --
+      // sin `{info}` (archivo/dimensiones/escala/modelo) en modo
+      // lista, la fila es angosta y ese bloque de 4 líneas la
+      // deformaba. En modo grid sigue igual -- ahí sí hay espacio.
       <li style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', background: 'var(--surface-raised)' }}>
         {thumb}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ fontWeight: 600, fontSize: 'var(--font-sm)', display: 'block', marginBottom: 2 }}>{label}</span>
-          {info}
-        </div>
+        <span style={{ flex: 1, minWidth: 0, fontWeight: 600, fontSize: 'var(--font-sm)' }}>{label}</span>
         {editButton}
         {eyeButton}
         {menu}
