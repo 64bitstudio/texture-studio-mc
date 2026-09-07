@@ -10,7 +10,7 @@ Validar contra la realidad (no solo contra documentación) que un `.bbmodel` con
 - Queda documentado (en este ticket al cerrarlo) si: la geometría/textura se ven correctamente, `idle` hace loop en reposo, `walk` se dispara al moverse, y rotar el hueso padre arrastra visualmente a su hijo en el juego real.
 - Cualquier discrepancia contra lo asumido en el documento de definición queda registrada explícitamente y, si aplica, dispara una actualización de ese documento ANTES de continuar con los demás tickets de este epic.
 
-## Progreso (parcial -- falta verificación visual de Marco)
+## Progreso
 
 Servidor de prueba montado y funcionando (local, en este equipo, ver `.gitignore` -- no se versiona):
 - Paper **1.21.11** build 132 (STABLE) -- corregido de 1.21.4 a la versión real del cliente de Marco (el protocolo de red de Minecraft no es compatible entre versiones, un cliente 1.21.11 no puede unirse a un servidor 1.21.4). Java 25 (Homebrew, compatible con el requisito de Java 21+).
@@ -27,8 +27,27 @@ Servidor de prueba montado y funcionando (local, en este equipo, ver `.gitignore
 6. **Comando de spawn confirmado**: `/fmm spawn static test-model`.
 7. **Hallazgo crítico de despliegue (encontrado por Marco en el juego, textura "missing" magenta/negra)**: FreeMinecraftModels **genera** el resource pack (`plugins/FreeMinecraftModels/output/`) pero **nunca lo distribuye al cliente** -- sin esto, cualquier modelo se ve como el cubo de "textura faltante" de Minecraft, sin importar que el `.bbmodel` esté perfecto. Requiere el plugin compañero **ResourcePackManager** (mismo desarrollador, Modrinth), que fusiona el pack de FreeMinecraftModels y lo hospeda automáticamente (`autoHost: true`, sube el pack a un servicio del propio desarrollador -- `https://magmaguy.com/rsp/<uuid>` -- sin necesitar exponer un puerto propio). Con `forceResourcePack: false` (default), el jugador ve el prompt nativo de "¿aceptar resource pack del servidor?" y **debe aceptarlo** para ver el modelo. **Impacto en el epic**: cualquier documentación de despliegue (y el ticket 093/spike de verificación final) debe dejar explícito que ResourcePackManager es un prerequisito, no opcional, del pipeline -- no es solo "instala FreeMinecraftModels".
 
-### Pendiente para cerrar el ticket
+### Verificación visual de Marco (completada)
 
-El archivo `.bbmodel` corregido ya se parsea sin errores y genera su pack completo (geometría + jerarquía + textura + animaciones `idle`/`walk`) -- verificado por logs y por inspección del pack generado. Lo que falta, y que **solo Marco puede confirmar** (requiere ojos humanos dentro del juego): conectar un cliente Minecraft Java a `localhost:25565`, correr `/fmm spawn static test-model`, y verificar visualmente que el modelo se ve bien, que el brazo (hijo de `body`) rota junto con el resto, y que las animaciones `idle`/`walk` se reproducen como se espera.
+Marco se conectó con su cliente Java 1.21.11 real, aceptó el resource pack, y confirmó en el juego:
+- Geometría y textura se ven correctamente (después del fix de `faces`/campos de textura/ResourcePackManager).
+- El brazo (`armRight`, hijo de `body`) se mece solo en reposo -- animación `idle` reproduciéndose en loop.
+- Con `/fmm spawn dynamic test-model`, al moverse la entidad, el brazo cambia a un swing más amplio y rápido -- animación `walk` disparándose por velocidad, tal como documenta el plugin.
+
+Los 4 criterios de aceptación quedan verificados contra el juego real.
 
 ## Hecho
+
+Spike ejecutado de punta a punta contra un entorno real (no solo contra documentación de terceros), con 7 hallazgos concretos que ya quedaron reflejados en `docs/definiciones/modelado-3d-custom-y-generacion-con-ia.md` ("Diseño técnico" y "Riesgos y preguntas abiertas") y en la sección "Progreso" de este mismo archivo:
+
+1. La fuente correcta de descarga de FreeMinecraftModels es Modrinth, no GitHub `releases/latest` (que apunta a una versión de 2024 incompatible con Minecraft 1.21+).
+2. El export `.bbmodel` (ticket 092) debe escribir las 6 caras UV explícitas por caja -- el atajo `box_uv`/`uv_offset` no es suficiente para este consumidor.
+3. El objeto de cada textura necesita un set de campos más amplio del documentado (ver plantilla verificada en `in-process/080-assets/test-model.bbmodel`).
+4. Jerarquía padre-hijo y nombres de animación (`idle`/`walk`) se preservan correctamente end-to-end.
+5. El plugin genera un paquete Bedrock adicional sin pedírselo (información para el futuro, no cambia el alcance actual).
+6. Comando de spawn: `/fmm spawn static <id>` (prop decorativo) vs `/fmm spawn dynamic <id>` (con IA/movimiento, necesario para probar `walk`).
+7. **Hallazgo crítico de despliegue**: `ResourcePackManager` es un prerequisito no-opcional junto a FreeMinecraftModels -- sin él, ningún modelo se ve (textura "missing"). Instalado y verificado (self-host automático vía `magmaguy.com/rsp/...`, sin exponer puertos propios).
+
+No se escribió código de producción de `texture-studio-mc` en este ticket (es un spike de validación de infraestructura externa) -- no aplican tests automatizados ni cambios de Postman/UI del proyecto. El servidor de prueba (Paper + plugins + mundo generado, ~260MB) vive fuera de git (`.gitignore`), es desechable y no se conserva como parte del repo.
+
+**Decisión explícita para el resto del epic**: los tickets 087 (endpoint IA), 090 (editor de animación) y especialmente 092/093 (export `.bbmodel`) deben construirse contra los hallazgos 2, 3 y 7 de arriba desde el diseño, no descubrirlos de nuevo.
