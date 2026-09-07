@@ -8,7 +8,7 @@ encontrado al investigar, no un tema de diseño -- y (2) la tarjeta de
 mob de `Proyecto.tsx` (ticket 057) todavía difiere bastante del mockup
 en varios detalles visuales concretos. Ronda de preguntas ya resuelta
 con Marco (`AskUserQuestion`): el menú "⋮" por mob solo necesita
-"Eliminar mob del proyecto"; la pestaña "Configuración del proyecto"
+"Eliminar"; la pestaña "Configuración del proyecto"
 se mantiene omitida (decisión del ticket 056 sin cambios).
 
 ## Alcance
@@ -88,7 +88,7 @@ botón.
   grande, info con archivo/dimensiones/escala/modelo, ícono de ojo
   cuadrado + botón "Editar textura", y un menú "⋮" con "Eliminar mob
   del proyecto".
-- Dado que elijo "Eliminar mob del proyecto" y confirmo, entonces ese
+- Dado que elijo "Eliminar" y confirmo, entonces ese
   mob desaparece de la lista y del `localStorage` del proyecto, sin
   afectar a los demás mobs.
 - Dado el grid/lista de mobs, cuando lo veo, entonces incluye una
@@ -108,7 +108,7 @@ con una textura real de resolución x6).
   color -- canvas de salida armado a resolución real, copia 1:1.
 - `frontend/src/components/MobEntryCard.tsx`: preview grande, campo
   "Modelo" reincorporado, ícono de ojo compacto, menú "⋮" con
-  "Eliminar mob del proyecto", fix del modal (`width`/`height` fijos en
+  "Eliminar", fix del modal (`width`/`height` fijos en
   px).
 - `frontend/src/projectStorage.ts`: nueva función
   `removeMobFromProject`.

@@ -16,7 +16,7 @@ export interface MobEntryCardProps {
   geometryCache: Map<string, MobGeometry>;
   /** "Editar textura" -- mismo `onSelectMob` que ya usa `Proyecto.tsx`, navega al editor actual SIN NINGÚN CAMBIO (confirmado explícito con Marco). */
   onEditTexture: () => void;
-  /** Menú "⋮" -> "Eliminar mob del proyecto" (ticket 058) -- confirmado con inline, sin diálogo nativo. El padre (`Proyecto.tsx`) hace la escritura real (`removeMobFromProject`) y refresca la lista. */
+  /** Menú "⋮" -> "Eliminar" (ticket 058) -- confirmado con inline, sin diálogo nativo. El padre (`Proyecto.tsx`) hace la escritura real (`removeMobFromProject`) y refresca la lista. */
   onRemoveMob: () => void;
 }
 
@@ -150,7 +150,7 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
           </div>
         ) : (
           <button type="button" className="ui-menu__item" style={{ color: 'var(--danger)' }} onClick={() => setConfirmRemove(true)}>
-            <IconTrash size={16} /> Eliminar mob del proyecto
+            <IconTrash size={16} /> Eliminar
           </button>
         )}
       </div>

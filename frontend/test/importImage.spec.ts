@@ -4,6 +4,7 @@ import {
   computeBurnPixels,
   computeFullReplaceDiff,
   computeInitialPasteRect,
+  extractPixelSource,
   findTargetUVBox,
   fitRectToBox,
   fitRectToRegionExact,
@@ -306,5 +307,48 @@ describe('computeBurnPixels', () => {
     const inHead = writes!.some((w) => w.y < 16);
     const inBody = writes!.some((w) => w.y >= 16);
     expect(inHead && inBody).toBe(false);
+  });
+});
+
+describe('extractPixelSource (HU "Seleccionar" + Copiar/Cortar)', () => {
+  it('recorta una region 1:1, sin resampling -- mismo tamaño que la region pedida', () => {
+    // Fuente 4x1: R,G,B,Y en fila.
+    const source: PixelSource = {
+      width: 4,
+      height: 1,
+      data: new Uint8ClampedArray([
+        RED.r, RED.g, RED.b, RED.a,
+        GREEN.r, GREEN.g, GREEN.b, GREEN.a,
+        BLUE.r, BLUE.g, BLUE.b, BLUE.a,
+        YELLOW.r, YELLOW.g, YELLOW.b, YELLOW.a,
+      ]),
+    };
+    const cropped = extractPixelSource(source, { x0: 1, y0: 0, x1: 3, y1: 1 });
+    expect(cropped.width).toBe(2);
+    expect(cropped.height).toBe(1);
+    expect(Array.from(cropped.data)).toEqual([GREEN.r, GREEN.g, GREEN.b, GREEN.a, BLUE.r, BLUE.g, BLUE.b, BLUE.a]);
+  });
+
+  it('preserva filas/columnas correctamente en una fuente multi-fila', () => {
+    const source = solidSource(4, 4, RED);
+    // Pinta un unico pixel distinto en (2,1) para verificar que el recorte lo ubica en la posicion relativa correcta.
+    const idx = (1 * 4 + 2) * 4;
+    source.data.set([BLUE.r, BLUE.g, BLUE.b, BLUE.a], idx);
+
+    const cropped = extractPixelSource(source, { x0: 1, y0: 1, x1: 4, y1: 3 }); // 3x2, deberia incluir (2,1) como (1,0) relativo
+    expect(cropped.width).toBe(3);
+    expect(cropped.height).toBe(2);
+    const relIdx = 1 * 4; // fila 0, columna 1
+    expect(Array.from(cropped.data.slice(relIdx, relIdx + 4))).toEqual([BLUE.r, BLUE.g, BLUE.b, BLUE.a]);
+    // El resto sigue siendo rojo (el color de fondo).
+    const otherIdx = 3 * 4; // fila 1, columna 0
+    expect(Array.from(cropped.data.slice(otherIdx, otherIdx + 4))).toEqual([RED.r, RED.g, RED.b, RED.a]);
+  });
+
+  it('devuelve una copia independiente -- mutar el resultado no afecta la fuente original', () => {
+    const source = solidSource(2, 2, RED);
+    const cropped = extractPixelSource(source, { x0: 0, y0: 0, x1: 2, y1: 2 });
+    cropped.data[0] = 0;
+    expect(source.data[0]).toBe(RED.r);
   });
 });

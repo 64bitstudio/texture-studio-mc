@@ -5,6 +5,7 @@ import { HsvColorPicker } from './HsvColorPicker';
 import { ZoomControls } from './ZoomControls';
 import { ImportTextureControl } from './ImportTextureControl';
 import { PasteImageOverlay } from './PasteImageOverlay';
+import { SelectionOverlay } from './SelectionOverlay';
 import { ExportControls } from './ExportControls';
 import { PartIsolationControls } from './PartIsolationControls';
 import { ERASE_BRUSH_SIZE_MAX, ERASE_BRUSH_SIZE_MIN } from './EraseControls';
@@ -12,6 +13,7 @@ import { Button, InlineError, Section, Select } from '../ui';
 import {
   IconBrush,
   IconCheck,
+  IconClipboardPaste,
   IconDocument,
   IconEraser,
   IconExpand,
@@ -25,11 +27,12 @@ import {
   IconRefresh,
   IconSave,
   IconScale,
+  IconSelect,
   IconSymmetry,
   IconUndo,
 } from '../ui/icons';
 import { computeBrushFootprint, computeBrushFootprintForLine } from '../brush';
-import { decodeImageFileToImageData, decodePngDataUrlToImageData } from '../decodeTexture';
+import { decodeImageFileToImageData, decodePngDataUrlToImageData, encodePixelSourceToPreviewUrl } from '../decodeTexture';
 import { useCanvasTexture } from '../hooks/useCanvasTexture';
 import { bresenhamLine, TextureBuffer, type PixelPoint, type PixelSource, type RGBA } from '../textureBuffer';
 import { PaintHistory, type Stroke } from '../history';
@@ -40,9 +43,11 @@ import { ZOOM_DEFAULT } from '../zoom';
 import { RESOLUTION_DEFAULT, RESOLUTION_MAX, RESOLUTION_MIN, clampResolutionMultiplier, resamplePixelSource } from '../resolution';
 import { canvasOverflowsAvailableWidth, computeCanvasDisplaySize } from '../canvasSize';
 import {
+  clampRectToBox,
   computeBurnPixels,
   computeFullReplaceDiff,
   computeInitialPasteRect,
+  extractPixelSource,
   validateImportDimensions,
   type OverlayRect,
 } from '../importImage';
@@ -58,8 +63,36 @@ interface PendingPasteImage {
   rect: OverlayRect;
 }
 
+/**
+ * Portapapeles INTERNO de la app (HU de "Seleccionar" + Copiar/Cortar,
+ * confirmado con Marco: interno, no el portapapeles real del sistema
+ * operativo -- ni cross-mob, se pierde al cambiar de mob igual que
+ * `pendingPaste`/`selectionRect`, ya que `Editor.tsx` se remonta
+ * completo por `key={mobId}` en `App.tsx`). Guarda solo los pixeles
+ * crudos -- el `previewUrl` para mostrarlo en `PasteImageOverlay` se
+ * genera recien al pegar (`handlePasteFromClipboard`), no al copiar/
+ * cortar, para no cargar un `<canvas>`/blob de mas mientras el
+ * portapapeles simplemente espera sin usarse.
+ */
+interface InternalClipboardEntry {
+  source: PixelSource;
+}
+
 /** Color inicial seleccionado al abrir el editor (tono "hueso" de la paleta). */
 const DEFAULT_COLOR = '#e3dcc5';
+
+/**
+ * RGBA transparente que escribe el Borrador (ticket 030) y "Cortar"
+ * (HU de "Seleccionar" + Copiar/Cortar, confirmado con Marco: los
+ * pixeles originales quedan transparentes, no rellenos del color
+ * seleccionado). Constante de MODULO (no local al componente) a
+ * proposito -- un objeto literal declarado dentro del componente se
+ * recrea en cada render, lo que forzaria a cualquier `useCallback` que
+ * lo use en sus dependencias a invalidarse en cada render tambien (ver
+ * `handleCutSelection` mas abajo); al vivir aca arriba es la MISMA
+ * referencia siempre, sin necesidad de listarla como dependencia.
+ */
+const ERASE_RGBA: RGBA = { r: 0, g: 0, b: 0, a: 0 };
 
 export interface EditorProps {
   data: MobBaseAssetsResponse;
@@ -211,9 +244,41 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
   // handler de pintura necesita saber de este modo (`forcedRgba`/
   // `setPixel`/`paintLine` solo distinguen 'erase' de cualquier otra
   // cosa, sin cambios).
-  const [paintMode, setPaintMode] = useState<'paint' | 'erase' | 'pan'>('paint');
+  //
+  // `'select'` (HU de "Seleccionar" + Copiar/Cortar, pedido de Marco):
+  // cuarto modo, mismo criterio de exclusion mutua -- mientras esta
+  // activo, `SelectionOverlay` (mas abajo) intercepta el arrastre para
+  // dibujar/ajustar un rectangulo de seleccion en vez de pintar.
+  // `TextureEditor` tampoco necesita saber de este modo, por la misma
+  // razon que no necesita saber de 'pan'.
+  const [paintMode, setPaintMode] = useState<'paint' | 'erase' | 'pan' | 'select'>('paint');
   const [eraseBrushSize, setEraseBrushSize] = useState(1);
-  const ERASE_RGBA: RGBA = { r: 0, g: 0, b: 0, a: 0 };
+
+  // Seleccion rectangular activa + portapapeles interno (HU de
+  // "Seleccionar" + Copiar/Cortar). `selectionRect` vive independiente
+  // de `pendingPaste` (son flujos distintos: uno recorta del buffer,
+  // el otro quema sobre el) pero comparten el mismo overlay-sibling de
+  // `TextureEditor` dentro de `textureCanvasWrapperRef` -- ver el
+  // `return` mas abajo, que oculta `SelectionOverlay` mientras
+  // `pendingPaste` esta activo para que nunca compitan por el mismo
+  // espacio de puntero.
+  const [selectionRect, setSelectionRect] = useState<OverlayRect | null>(null);
+  const [internalClipboard, setInternalClipboard] = useState<InternalClipboardEntry | null>(null);
+
+  /**
+   * Cambia de herramienta activa. Limpia `selectionRect` (no el
+   * portapapeles, solo el RECTANGULO) al salir del modo 'select' -- una
+   * seleccion sin la herramienta activa no tiene sentido visual ni de
+   * interaccion. Se hace aca, directo en el evento que causa el cambio
+   * (los 4 botones de la barra, mas abajo), en vez de en un `useEffect`
+   * separado que observe `paintMode` -- criterio de linting del equipo:
+   * un efecto que solo re-deriva estado de OTRO estado (sin sincronizar
+   * nada externo al render) agrega un render en cascada innecesario.
+   */
+  const handleSetPaintMode = useCallback((mode: 'paint' | 'erase' | 'pan' | 'select') => {
+    setPaintMode(mode);
+    if (mode !== 'select') setSelectionRect(null);
+  }, []);
 
   // Historial de deshacer/rehacer (ticket 003, HU-4). `PaintHistory` es
   // un objeto mutable (igual que `buffer`) -- `historyTick` no se lee
@@ -500,6 +565,13 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
       setHistoryTick((t) => t + 1);
       setPendingPaste(null);
       setPasteError(null);
+      // Coordenadas de la escala ANTERIOR -- mismo criterio que
+      // `pendingPaste` de arriba (ver ese comentario). El portapapeles
+      // interno (`internalClipboard`) NO se limpia: sus pixeles ya estan
+      // recortados a un tamaño fijo, independiente de la resolucion de
+      // trabajo del buffer (igual que una imagen externa pegada via
+      // Ctrl+V sigue funcionando sin importar la resolucion activa).
+      setSelectionRect(null);
       // `namedRegions` se recalcula con el nuevo `resolution` (ver
       // `useMemo` de arriba) -- el `hoveredRegion` guardado apunta a un
       // rectangulo de la escala ANTERIOR, se limpia para no mostrar un
@@ -845,6 +917,116 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
     setPendingPaste(null);
   }, [pendingPaste, uvBoxes, buffer, history]);
 
+  // Herramienta "Seleccionar" + Copiar/Cortar/Pegar (pedido de Marco).
+  // `handleSelectionCreated`/`handleSelectionRectChange`/
+  // `handleCancelSelection` son los 3 callbacks que `SelectionOverlay`
+  // necesita para reportar intencion -- mismo patron que
+  // `handlePendingRectChange`/`handleCancelPaste` de arriba, solo que
+  // para el rectangulo de seleccion en vez del de pegado.
+  const handleSelectionCreated = useCallback((rect: OverlayRect) => {
+    setSelectionRect(rect);
+  }, []);
+
+  const handleSelectionRectChange = useCallback((rect: OverlayRect) => {
+    setSelectionRect(rect);
+  }, []);
+
+  const handleCancelSelection = useCallback(() => {
+    setSelectionRect(null);
+  }, []);
+
+  /**
+   * Recorta el contenido ACTUAL del buffer bajo `selectionRect` a un
+   * `PixelSource` independiente (`extractPixelSource`, `importImage.ts`)
+   * -- devuelve tambien el rectangulo ya recortado a los limites REALES
+   * del buffer (`clampRectToBox` contra una caja del tamaño completo del
+   * buffer), que "Cortar" necesita ademas para saber exactamente que
+   * pixeles limpiar despues. `SelectionOverlay` ya garantiza que el rect
+   * esta dentro de esos limites en todo momento, pero una funcion que
+   * lee memoria por indice nunca debe confiar en eso sin verificarlo de
+   * nuevo -- mismo criterio defensivo que el resto del modulo. Comun a
+   * "Copiar" y "Cortar" (ver ambos handlers mas abajo).
+   */
+  const cropSelection = useCallback((): { clamped: { x0: number; y0: number; x1: number; y1: number }; source: PixelSource } | null => {
+    if (!selectionRect) return null;
+    const fullBufferBox = { x0: 0, y0: 0, x1: buffer.width, y1: buffer.height };
+    const clamped = clampRectToBox(selectionRect, fullBufferBox);
+    if (!clamped) return null;
+    const snapshot: PixelSource = { width: buffer.width, height: buffer.height, data: buffer.getRawData() };
+    return { clamped, source: extractPixelSource(snapshot, clamped) };
+  }, [selectionRect, buffer]);
+
+  const handleCopySelection = useCallback(() => {
+    const cropped = cropSelection();
+    if (!cropped) return;
+    setInternalClipboard({ source: cropped.source });
+    setSelectionRect(null);
+  }, [cropSelection]);
+
+  /**
+   * "Cortar" (confirmado con Marco: los pixeles originales quedan
+   * transparentes, igual que el Borrador -- no rellenos del color
+   * seleccionado). Copia primero (`cropSelection`, igual que "Copiar") y
+   * despues limpia esos mismos pixeles a `ERASE_RGBA` como UN unico
+   * trazo de historial (`beginStroke`/`recordChange`/`commitStroke`) --
+   * mismo mecanismo de undo/redo que cualquier otra escritura del
+   * editor, ver `handleConfirmPaste`/`applyPixelsWithSymmetry` arriba.
+   */
+  const handleCutSelection = useCallback(() => {
+    const cropped = cropSelection();
+    if (!cropped) return;
+    const { clamped, source } = cropped;
+    setInternalClipboard({ source });
+
+    history.beginStroke();
+    let changed = false;
+    for (let y = clamped.y0; y < clamped.y1; y++) {
+      for (let x = clamped.x0; x < clamped.x1; x++) {
+        const before = buffer.getPixel(x, y);
+        if (buffer.setPixel(x, y, ERASE_RGBA)) {
+          history.recordChange(x, y, before, ERASE_RGBA);
+          changed = true;
+        }
+      }
+    }
+    history.commitStroke();
+
+    if (changed) setVersion((v) => v + 1);
+    setHistoryTick((t) => t + 1);
+    setSelectionRect(null);
+  }, [cropSelection, buffer, history]);
+
+  /**
+   * "Pegar" (contenido del portapapeles interno) -- reutiliza TAL CUAL
+   * el mismo flujo de confirmar/ajustar/cancelar que ya existe para
+   * pegar una imagen EXTERNA (`pendingPaste`/`PasteImageOverlay`/
+   * `handleConfirmPaste`/`handleCancelPaste`, HU-9): la unica diferencia
+   * es de DONDE sale el `PixelSource` inicial (del portapapeles interno
+   * en vez de un archivo/Ctrl+V) y que su `previewUrl` se genera recien
+   * aca, bajo demanda (`encodePixelSourceToPreviewUrl`, `decodeTexture.ts`)
+   * en vez de venir ya decodificado de un `File`/`Blob`. Fuerza
+   * `paintMode` fuera de 'select' para que `SelectionOverlay` (que
+   * vive en el mismo espacio que `PasteImageOverlay`, ver el `return`
+   * mas abajo) nunca compita por el puntero con el overlay de pegado
+   * que esta a punto de aparecer.
+   */
+  const handlePasteFromClipboard = useCallback(async () => {
+    if (!internalClipboard) return;
+    if (pendingPaste) {
+      setPasteError('Ya hay una imagen pendiente de confirmar o descartar -- resuelvela antes de pegar otra.');
+      return;
+    }
+    if (paintMode === 'select') handleSetPaintMode('paint');
+    try {
+      const previewUrl = await encodePixelSourceToPreviewUrl(internalClipboard.source);
+      const rect = computeInitialPasteRect(internalClipboard.source, isolatedRegion?.rect ?? null, uvBoxes[0] ?? null);
+      setPasteError(null);
+      setPendingPaste({ source: internalClipboard.source, previewUrl, rect });
+    } catch (err) {
+      setPasteError(err instanceof Error ? err.message : 'No se pudo preparar el contenido del portapapeles para pegarlo.');
+    }
+  }, [internalClipboard, pendingPaste, paintMode, handleSetPaintMode, uvBoxes, isolatedRegion]);
+
   // Disparador "pegar" del portapapeles (HU-9) -- listener a nivel de
   // `window`, mismo patron que los atajos de Ctrl/Cmd+Z de arriba (no
   // requiere foco en un elemento particular de la pagina).
@@ -1024,17 +1206,19 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
           MISMOS handlers/estado que antes (`handleUndo`/`handleRedo`/
           `paintMode`/`symmetryEnabled`/`showGrid`/`eraseBrushSize`), sin
           logica nueva. "Selector"/"Copiar"/"Recortar" de la imagen de
-          referencia se OMITEN a proposito -- no tienen un equivalente
-          funcional real hoy en la app (regla 8 de CLAUDE.md, "sin
-          parches silenciosos": no se construyen botones decorativos que
-          no hagan nada) -- decision a confirmar con Marco al presentar
-          este ticket. */}
+          referencia se habian OMITIDO a proposito en el ticket 072 (sin
+          equivalente funcional real en ese momento, regla 8 de
+          CLAUDE.md) -- "Seleccionar" se agrega aca (pedido posterior de
+          Marco), Copiar/Cortar viven como botones flotantes sobre la
+          seleccion activa (`SelectionOverlay.tsx`, no en esta barra) y
+          "Pegar" se agrega junto a "Importar", habilitado solo con
+          contenido en el portapapeles interno. */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '10px 14px', background: 'var(--panel-bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
         <div role="group" aria-label="Herramienta activa" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Button variant={paintMode === 'paint' ? 'primary' : 'secondary'} aria-pressed={paintMode === 'paint'} title="Pincel" onClick={() => setPaintMode('paint')}>
+          <Button variant={paintMode === 'paint' ? 'primary' : 'secondary'} aria-pressed={paintMode === 'paint'} title="Pincel" onClick={() => handleSetPaintMode('paint')}>
             <IconBrush size={16} /> Pincel
           </Button>
-          <Button variant={paintMode === 'erase' ? 'primary' : 'secondary'} aria-pressed={paintMode === 'erase'} title="Borrador" onClick={() => setPaintMode('erase')}>
+          <Button variant={paintMode === 'erase' ? 'primary' : 'secondary'} aria-pressed={paintMode === 'erase'} title="Borrador" onClick={() => handleSetPaintMode('erase')}>
             <IconEraser size={16} /> Borrador
           </Button>
           {/* "Mano" (pedido de Marco): arrastra el lienzo para mover el
@@ -1042,8 +1226,20 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
               de `paintMode`, mutuamente excluyente con Pincel/Borrador --
               ver el overlay condicional sobre el lienzo, mas abajo, y
               `handlePanPointerDown`/`Move`/`End`. */}
-          <Button variant={paintMode === 'pan' ? 'primary' : 'secondary'} aria-pressed={paintMode === 'pan'} title="Mano -- arrastra para mover el scroll" onClick={() => setPaintMode('pan')}>
-            <IconHand size={16} /> Mano
+          <Button variant={paintMode === 'pan' ? 'primary' : 'secondary'} aria-pressed={paintMode === 'pan'} title="Mover -- arrastra para mover el scroll" onClick={() => handleSetPaintMode('pan')}>
+            <IconHand size={16} /> Mover
+          </Button>
+          {/* "Seleccionar" (pedido de Marco): cuarto modo de `paintMode`,
+              mutuamente excluyente con Pincel/Borrador/Mover -- mientras
+              esta activo, `SelectionOverlay` (ver el overlay condicional
+              sobre el lienzo, mas abajo) intercepta el arrastre para
+              dibujar/ajustar un rectangulo de seleccion en vez de
+              pintar. Copiar/Cortar/Cancelar viven como botones flotantes
+              sobre ESE rectangulo (no aca en la barra) -- solo tienen
+              sentido con una seleccion activa, mismo criterio que el
+              tamaño de pincel del Borrador, justo abajo. */}
+          <Button variant={paintMode === 'select' ? 'primary' : 'secondary'} aria-pressed={paintMode === 'select'} title="Seleccionar -- arrastra para dibujar un area, copiala o cortala" onClick={() => handleSetPaintMode('select')}>
+            <IconSelect size={16} /> Seleccionar
           </Button>
           {/* Tamaño de pincel del borrador (ticket 030) -- reubicado aca
               (era un slot fijo "Tamaño" de la barra, corregido por
@@ -1084,6 +1280,19 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
           <IconImage size={16} /> Importar
         </Button>
         <ImportTextureControl ref={importFileInputRef} expectedWidth={buffer.width} expectedHeight={buffer.height} onFileSelected={(file) => void handleImportFile(file)} />
+        {/* "Pegar" (contenido del portapapeles interno de Copiar/Cortar,
+            pedido de Marco) -- deshabilitado sin nada copiado/cortado
+            todavia. Ctrl/Cmd+V sigue siendo EXCLUSIVO del pegado de
+            imagenes EXTERNAS (`handleWindowPaste`, sin cambios) -- este
+            boton es la unica via para el portapapeles interno, a
+            proposito: mezclar ambos en el mismo atajo de teclado seria
+            ambiguo (¿que se pega si hay una imagen en el portapapeles
+            del sistema Y algo cortado en el de la app?), y ninguna de
+            las dos vias existentes lo resolvia sin inventar una regla
+            de prioridad no pedida. */}
+        <Button onClick={() => void handlePasteFromClipboard()} disabled={!internalClipboard} title={internalClipboard ? 'Pegar lo copiado/cortado' : 'Copia o corta una seleccion primero'}>
+          <IconClipboardPaste size={16} /> Pegar
+        </Button>
 
         <div aria-hidden="true" style={{ width: 1, alignSelf: 'stretch', background: 'var(--border)' }} />
 
@@ -1265,6 +1474,29 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
                     onRectChange={handlePendingRectChange}
                     onConfirm={handleConfirmPaste}
                     onCancel={handleCancelPaste}
+                  />
+                )}
+                {/* Overlay de la herramienta "Seleccionar" (pedido de
+                    Marco) -- mismo wrapper hermano que `PasteImageOverlay`
+                    de arriba, por la misma razon (no recortarse contra el
+                    `overflow: hidden` de `TextureEditor`). Oculto mientras
+                    `pendingPaste` esta activo: ambos overlays viven en el
+                    mismo espacio y competirian por el puntero si se
+                    solaparan (ver `handlePasteFromClipboard`, que ademas
+                    saca a `paintMode` de 'select' al pegar, para que esto
+                    nunca llegue a pasar en la practica). */}
+                {paintMode === 'select' && !pendingPaste && (
+                  <SelectionOverlay
+                    rect={selectionRect}
+                    bufferWidth={buffer.width}
+                    bufferHeight={buffer.height}
+                    scaleX={canvasDisplayScale.scaleX}
+                    scaleY={canvasDisplayScale.scaleY}
+                    onRectCreated={handleSelectionCreated}
+                    onRectChange={handleSelectionRectChange}
+                    onCopy={handleCopySelection}
+                    onCut={handleCutSelection}
+                    onCancel={handleCancelSelection}
                   />
                 )}
               </div>

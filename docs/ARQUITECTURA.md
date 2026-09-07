@@ -1630,7 +1630,7 @@ Con este ticket se completa el rediseño de "Proyecto" de 3 partes definido en `
 
 ## Ticket 058 -- Bug de preview 2D en alta resolución + fidelidad visual de tarjetas de mob
 
-Marco comparó su proyecto real ("Galgoth_v1", con una textura de Zombie en resolución x6) contra la imagen de referencia y señaló dos cosas: la miniatura del Zombie se veía con ruido de colores mezclados (bug real, no un tema de diseño), y la tarjeta de mob todavía difería del mockup en varios detalles. Ronda de preguntas resuelta con Marco (`AskUserQuestion`): el menú "⋮" por mob solo necesita "Eliminar mob del proyecto"; la pestaña "Configuración del proyecto" se mantiene omitida (decisión del ticket 056 sin cambios).
+Marco comparó su proyecto real ("Galgoth_v1", con una textura de Zombie en resolución x6) contra la imagen de referencia y señaló dos cosas: la miniatura del Zombie se veía con ruido de colores mezclados (bug real, no un tema de diseño), y la tarjeta de mob todavía difería del mockup en varios detalles. Ronda de preguntas resuelta con Marco (`AskUserQuestion`): el menú "⋮" por mob solo necesita "Eliminar"; la pestaña "Configuración del proyecto" se mantiene omitida (decisión del ticket 056 sin cambios).
 
 ### Bug real #1: ruido de color en preview 2D de alta resolución (`renderMobFrontSprite2D.ts`)
 
@@ -1920,3 +1920,100 @@ Sidebar principal y del editor en tema claro y oscuro, hover de items visible en
 ### Nota sobre el empaquetado en un único PR (tickets 074-076)
 
 Mismo criterio que 071-073: los 3 tickets se implementaron en una misma sesión continua de iteración en vivo con Marco, con cambios entrelazados en `Editor.tsx`/`index.css`/`Sidebar.tsx` -- separarlos en PRs limpios habría significado rehacer los cambios varias veces. Empaquetados en un único PR bajo un único VoBo explícito de Marco ("doy vobo"), siguiendo el mismo precedente ya establecido y confirmado con él en la ronda anterior.
+
+## Ticket 077 -- Perspectiva 3D de la Araña + encuadre de cámara compartido entre visor y miniatura
+
+Marco reportó, en varias rondas sucesivas sobre la misma sesión, que la Araña se veía mal en el visor 3D: primero de espaldas, después con una perspectiva demasiado inclinada, después la miniatura de la tarjeta seguía mostrándola volteada aunque el visor ya estaba corregido, y finalmente el encuadre quedaba recortado o con demasiado espacio vacío según el mob. Corrección explícita de Marco sobre cómo describir esto: "no asumas que se invirtio como tal, asi siempre debio ser, estabas renderizando mal" -- son bugs de renderizado reales, no cambios de estilo pedidos.
+
+### `swapFrontBack` -- bug real de orientación de la cabeza de la Araña
+
+Nuevo campo opcional `swapFrontBack?: boolean` en `MobBoxPart` (`frontend/src/types/baseAssets.ts` y `backend/src/types/baseAssets.ts`) y en `applyBoxUV.ts` (`ApplyBoxUVOptions`): intercambia qué cara de la caja 3D (`pz`/`nz`) recibe las regiones UV `front`/`back`, análogo a como `mirrorX` ya intercambiaba `right`/`left`. Solo afecta qué textura 3D se pinta en cada cara de la caja -- nunca el mapa de píxeles 2D ni `faceLabels`. Activado en la cabeza de la Araña (`backend/src/geometry/spiderGeometry.ts`).
+
+### `computeMobCameraFraming` -- única fuente de verdad del encuadre de cámara
+
+Antes de este ticket, `Viewer3D.tsx` (visor interactivo) y `renderMobSnapshot3D.ts` (miniatura estática de tarjeta/modal) tenían cada uno su propia fórmula de posición de cámara -- exactamente lo que causó que la miniatura de la Araña siguiera "volteada" después de corregir el visor: nadie propagó el fix al otro lugar. Se extrajo `computeMobCameraFraming(geometry, cameraZoom)` a `frontend/src/geometry/geometryBounds.ts` (junto con la constante `CAMERA_FOV_DEG`, también compartida -- antes cada consumidor fijaba su propio FOV) como la única función que decide `target`/`cameraPosition`, consumida por ambos lugares.
+
+La función resuelve, en orden: (1) el `target` (x/z del centro de la cabeza si existe, si no el centro del bounding box completo; y del centro del bounding box en el eje y siempre); (2) la elevación, un blend del 15% entre un ángulo de referencia fijo (afinado para bípedos) y uno derivado del aspect ratio real del cuerpo (más pronunciado para cuerpos anchos/planos, para separar visualmente el abanico de patas izquierda/derecha de la Araña); (3) un factor de distancia que acerca la cámara en función de qué tan lejos está la cabeza del centro del cuerpo completo (encuadre tipo retrato, favoreciendo la cabeza sobre una parte que se arrastra detrás, como el abdomen); (4) `frontSign` (derivado de `swapFrontBack`) que invierte tanto el offset X como el Z de la cámara, para que se acerque desde el lado correcto (de frente) y la cara quede del lado izquierdo del cuadro -- antes de esta ronda solo invertía Z, dejando la cara del lado derecho.
+
+### "Nunca recortar" sin dejar espacio vacío de sobra
+
+Un primer intento de imponer un piso de distancia mínima (para que la miniatura nunca recortara el modelo) usaba una esfera 3D (`sin(FOV/2)`) contra el radio máximo del bounding box -- sobrecorregía, dejando mucho espacio vacío alrededor de cuerpos alargados en profundidad (la cámara "ve" poca extensión en ese eje, a diferencia de ancho/alto). Se cambió a una proyección sobre los ejes reales derecha/arriba de la cámara (`tan(FOV/2)`, no `sin`) -- verificados contra el comportamiento real de `THREE.PerspectiveCamera` con un script de Node usando el paquete `three` real (`.lookAt()` + extracción de la matriz de mundo), no solo fórmulas derivadas a mano.
+
+Incluso con la proyección correcta, medir la distancia contra los 8 corners del bounding box COMPLETO seguía sobrestimando el espacio necesario para un cuerpo de patas extendidas como la Araña -- ese bounding box es una caja floja, con mucho aire entre las patas. Se agregó `computeAllPartCorners(geometry)` (los corners de CADA parte individual, no del conjunto) y se proyectan esos en su lugar. Verificado con una técnica de medición directa (no solo matemática): dibujar el PNG renderizado en un canvas, escanear los píxeles no transparentes y calcular qué porcentaje del cuadro ocupan -- el llenado mejoró de 55%/46% (ancho/alto) a 68%/57%.
+
+### Cámara desactualizada al cambiar de mob en "Nuevo proyecto"
+
+Bug real encontrado durante la verificación en vivo, sin relación directa con la Araña: `<Viewer3D>` en `NuevoProyecto.tsx` no tenía `key` -- React-Three-Fiber solo aplica `<Canvas camera={{position}}>` al MONTAR, así que cambiar de mob sin remontar el `Canvas` dejaba la cámara en el ángulo que había quedado del mob anterior. Se agregó `key={previewMobId}`, mismo patrón ya usado en `App.tsx` (`key={selectedMobId}` sobre `<Editor>`) y en el botón "Restablecer" del propio Editor (`key={viewerKey}`).
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Perspectiva de la Araña contra las capturas de referencia de Marco (nivelada, cabeza a la izquierda), miniatura de tarjeta sincronizada con el visor tras el fix de `swapFrontBack`, encuadre sin recortes y con buen llenado verificado por medición de píxeles para los 4 mobs (Esqueleto/Zombie/Araña/Creeper), cámara correcta al cambiar de mob en "Nuevo proyecto". Oscuro y claro. `npx tsc --noEmit`, `npx oxlint`, `npx vitest run`, `npm run build` en verde.
+
+## Ticket 078 -- Herramienta "Seleccionar" + Copiar/Cortar/Pegar, y renombre de "Mano" a "Mover"
+
+Marco pidió renombrar el botón "Mano" (herramienta de mover el lienzo) a "Mover", y agregar una herramienta de selección rectangular con Copiar/Cortar/Pegar. Ronda de preguntas resuelta con Marco (`AskUserQuestion`): selección rectangular (no lasso), portapapeles interno de la app -- no el del sistema operativo, reutiliza el mismo overlay de confirmación ya construido para "pegar imagen" -- y "Cortar" deja los píxeles originales transparentes, igual que el Borrador (no rellenos de color).
+
+### Renombre "Mano" → "Mover"
+
+`Editor.tsx`: solo el texto/tooltip visible del botón de `paintMode === 'pan'`. Nombres internos (`handlePanPointerDown`/`Move`/`End`, comentarios, el propio valor `'pan'` de `paintMode`) sin cambios -- no son user-facing.
+
+### `SelectionOverlay.tsx` -- selección rectangular en dos fases
+
+`paintMode` se extiende a `'paint' | 'erase' | 'pan' | 'select'`. Nuevo componente `SelectionOverlay.tsx`, mismo patrón de UI que `PasteImageOverlay.tsx` (overlay-hermano de `TextureEditor` dentro del mismo wrapper, para no recortarse contra su `overflow: hidden`), pero maneja DOS fases dentro del mismo componente (a diferencia de "pegar imagen", donde la fase de decodificar el archivo vive en `Editor.tsx` porque no es interacción de puntero):
+
+- **Fase 1 (dibujar)**: mientras no hay un rectángulo confirmado, el overlay entero actúa de lienzo de arrastre -- un click sin arrastre produce una selección de 1×1 texel, igual que un click de pincel pinta un solo pixel.
+- **Fase 2 (ajustar)**: con un rectángulo ya confirmado, se puede mover (arrastrar el cuerpo) o redimensionar (esquina inferior derecha), con los botones flotantes Copiar/Cortar/Cancelar en la esquina superior derecha -- mismo patrón visual que los botones ✓/✗ de `PasteImageOverlay.tsx`.
+
+A diferencia de "pegar imagen" (que permite arrastrar una imagen externa más allá del borde del canvas, recortándose recién al confirmar sobre la caja UV objetivo), una selección se recorta a los límites REALES del buffer en todo momento -- tanto al dibujarla como al ajustarla, nunca solo al final, porque siempre representa píxeles que existen de verdad.
+
+### `extractPixelSource` -- la operación inversa de `computeBurnPixels`
+
+Nueva función pura en `importImage.ts`: recorta una región de un `PixelSource` cualquiera (1:1, sin resampling -- a diferencia de `sampleSourceForDestPixel`, que sí reescala). Es la operación inversa de `computeBurnPixels` (que escribe los píxeles de una fuente SOBRE el buffer); esta LEE una porción del buffer y devuelve una copia independiente. Con tests unitarios dedicados en `test/importImage.spec.ts`.
+
+### Portapapeles interno + reuso del flujo de pegado existente
+
+Estado nuevo `internalClipboard` en `Editor.tsx` (`{ source: PixelSource }`) -- confirmado con Marco: vive y se pierde junto con el `Editor` (no sobrevive un cambio de mob, ya que `Editor` se remonta completo por `key={mobId}` en `App.tsx`). "Copiar"/"Cortar" comparten un helper `cropSelection` que recorta y extrae los píxeles; "Cortar" además limpia esos mismos píxeles a transparente como un único trazo de historial (`beginStroke`/`recordChange`/`commitStroke`), el mismo mecanismo que cualquier otra escritura del editor.
+
+"Pegar" (botón nuevo junto a "Importar", deshabilitado sin contenido en el portapapeles) reutiliza TAL CUAL el mismo `pendingPaste`/`PasteImageOverlay`/`handleConfirmPaste`/`handleCancelPaste` que ya pegaba imágenes externas -- la única diferencia es de dónde sale el `PixelSource` inicial y que su `previewUrl` se genera bajo demanda con una función nueva, `encodePixelSourceToPreviewUrl` (`decodeTexture.ts`): dibuja el `PixelSource` en un canvas offscreen y lo codifica a un blob PNG + object URL, mismo contrato de ciclo de vida que la decodificación de un archivo externo. Ctrl/Cmd+V (portapapeles del sistema operativo) sigue siendo una vía completamente separada -- deliberado, para no mezclar dos fuentes de "qué se pega" bajo el mismo atajo de teclado.
+
+### Hallazgo del hook `ui-accessibility-guard.sh`
+
+Documentado en la memoria del equipo (`ui-accessibility-guard-gotchas.md`): un `<button>` icon-only con `aria-label` correcto en la apertura del tag igual se marcaba "sin etiqueta" si el tag quedaba partido en varias líneas -- el hook extrae el match completo (con sus saltos de línea internos) pero el loop que lo consume corta por CUALQUIER newline, así que cada línea del match se evalúa por separado buscando el atributo. Se resolvió escribiendo cada botón flotante completo (apertura + ícono + cierre) en una sola línea, mismo patrón ya usado por `PasteImageOverlay.tsx`.
+
+### Verificación en vivo (Claude in Chrome, local, proyecto real del Esqueleto)
+
+Dibujar una selección por arrastre real (no simulado -- un primer intento con coordenadas mal calculadas cayó fuera del overlay y no generó nada, diagnosticado disparando `PointerEvent`s a mano hasta aislar la causa), redimensionar arrastrando la esquina, Copiar → Pegar (el overlay de pegado aparece con la vista previa correcta y confirmar quema los píxeles), Cortar (píxeles quedan transparentes) y Ctrl/Cmd+Z (restaura en un solo paso, confirmando que "Cortar" es una sola unidad de historial). Oscuro y claro. `npx tsc --noEmit`, `npx oxlint`, `npx vitest run` (227, +7 tests nuevos de `extractPixelSource`), `npm run build` en verde.
+
+## Ticket 079 -- Sidebar colapsable a una franja de solo íconos
+
+Marco pidió que el sidebar pudiera "hacerse pequeño". Ronda de preguntas resuelta con Marco (`AskUserQuestion`): colapsa a una franja angosta de solo íconos (no se oculta por completo) -- la tarjeta "Proyecto actual"/lista de mobs del editor se oculta mientras está colapsado, sin una versión de solo-ícono para ese contenido (el portapapeles interno del ticket 078 confirmó el mismo criterio de "vive local al componente, no se sube a `App.tsx` sin necesidad real").
+
+### Estado y persistencia
+
+Nuevo módulo `frontend/src/sidebarCollapse.ts` (`getSidebarCollapsed`/`setSidebarCollapsed`), mismo patrón exacto que `theme.ts` (mismo criterio de `globalThis.localStorage` con try/catch, mismo motivo de testabilidad sin DOM). Estado levantado en `App.tsx` (mismo criterio que `theme`: dos consumidores potenciales -- hoy solo el botón del propio `Sidebar.tsx`, pero levantado por si acaso, igual que ya se hizo con `displayName`/`theme`), pasado a través de `AppShell.tsx` (nuevos props `sidebarCollapsed`/`onToggleSidebarCollapsed`) hacia `Sidebar.tsx`.
+
+### `Sidebar.tsx` colapsado
+
+Ancho `272px` (expandido, sin cambios) / `76px` (colapsado, afinado en vivo -- empezó en `64px`). Colapsado: los 2 íconos de navegación quedan centrados sin su etiqueta visible (oculta con `.sr-only`, NO quitada del DOM -- el botón conserva su nombre accesible real, con `title` además para el tooltip nativo al pasar el mouse), `extraContent` no se renderiza, y la tarjeta de marca del pie muestra solo el logo (el nombre/tagline no entra en una franja tan angosta sin partirse en varias líneas, y ya está disponible en la topbar compartida sin importar el estado de este sidebar). Radio de esquina de los botones de navegación bajado de `--radius-lg` (14px) a `--radius-md` (8px) -- pedido explícito de Marco tras ver el resultado, aplica en ambos estados.
+
+### El botón de colapsar, y un hallazgo real de CSS Overflow
+
+Primera versión: el botón (círculo flotante con `IconChevronLeft`, mismo patrón visual que los botones circulares de `PasteImageOverlay.tsx`/`SelectionOverlay.tsx`) vivía DENTRO del propio `<nav>` que scrollea (`overflowY: 'auto'`), posicionado con `right: -12` para asomar la mitad fuera del borde. Marco reportó en vivo: "el boton genera un scroll en el sidebar, ademas se corta el boton". Causa: la spec de CSS Overflow dice que si un eje tiene un valor de scroll (`auto`) y el otro quedó en `visible`, el navegador computa TAMBIÉN el segundo eje como `auto` -- fijar solo `overflow-y` en el `<nav>` forzaba `overflow-x` a comportarse como `auto` también (mismo mecanismo, en el eje contrario, que el ya documentado para `textureSectionWrapperRef` en el ticket 074), atrapando el fragmento del botón que sobresalía dentro de esa área de scroll horizontal recién generada -- de ahí la barra de scroll y el botón "cortado" (solo visible arrastrando ese scroll).
+
+Se resolvió sacando el botón del `<nav>` que scrollea: ahora `Sidebar.tsx` renderiza un `<div>` wrapper (sin `overflow` propio, `visible` por default) que contiene al `<nav>` (que sigue scrolleando SU contenido interno) y al botón como hermanos -- el botón puede asomar fuera del borde del wrapper sin que nada fuerce un eje de scroll adicional.
+
+### Espaciado, tras una segunda ronda de feedback ("se ve muy amontonado")
+
+Con el botón ya fuera del `<nav>`, Marco señaló (con una captura ampliada) que colapsado se veía muy apretado: el primer ícono quedaba pegado en diagonal al botón de colapsar, y los 2 íconos de navegación entre sí sin aire. Se subió el `padding-top` del `<nav>` colapsado a 52px (despeja por completo la altura que ocupa el botón flotante, que antes cruzaba encima del primer ícono) y el `gap` entre íconos de 4px a 10px -- ambos valores SOLO para el estado colapsado, el expandido no cambió.
+
+### Segundo hallazgo del hook `ui-accessibility-guard.sh` (nuevo, distinto al ya documentado)
+
+Documentado en la memoria del equipo: un match de icon-only `<button>` que queda partido en varias líneas se evalúa línea por línea buscando `aria-label` (el hook extrae el match completo con sus saltos de línea, pero el loop que lo consume corta por cualquier newline) -- un botón de 3 líneas con el atributo correcto en la apertura igual generó 2 falsos positivos (uno por la línea del ícono, otro por la línea del cierre). Se resolvió escribiendo el tag completo (apertura + ícono + cierre) en una sola línea, mismo patrón ya usado en el ticket 078.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Colapsar/expandir sin scroll horizontal ni recorte del botón (confirmado también vía `scrollWidth`/`clientWidth` por consola), `extraContent` oculto/visible correctamente dentro del editor real de un proyecto, persistencia tras recargar la página (sin parpadeo del estado contrario), y espaciado/radio corregidos tras cada ronda de feedback de Marco. Oscuro y claro. `npx tsc --noEmit`, `npx oxlint`, `npx vitest run` (227, +7 tests nuevos de `sidebarCollapse.ts`), `npm run build` en verde.
+
+### Nota sobre el empaquetado en un único PR (tickets 077-079, + cierre pendiente del ticket 058)
+
+Mismo criterio que 071-073 y 074-076: los 3 tickets se implementaron en una misma sesión continua de iteración en vivo con Marco, con cambios entrelazados en varios archivos compartidos (`Editor.tsx`, `Sidebar.tsx`, `AppShell.tsx`, `App.tsx`, `geometryBounds.ts`) -- empaquetados en un único PR bajo un único VoBo explícito de Marco ("doy vobo, continua el flujo"). Además, este PR incluye un cambio suelto sin commitear del ticket 058 (ya cerrado, ver `done/058-fidelidad-tarjetas-mob-y-fix-preview-alta-res.md`): el texto del menú "⋮" de una tarjeta de mob de "Eliminar mob del proyecto" a "Eliminar" -- código y docs de ese ticket ya estaban en sincronía, solo faltaba comitearlo; Marco confirmó explícitamente incluirlo en este mismo PR en vez de dejarlo aparte.

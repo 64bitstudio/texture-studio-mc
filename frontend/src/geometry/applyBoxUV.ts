@@ -34,6 +34,21 @@ export interface ApplyBoxUVOptions {
   h: number;
   d: number;
   mirrorX?: boolean;
+  /**
+   * Ticket 077 -- bug real de renderizado encontrado por Marco tras
+   * revisar el visor 3D (la cabeza de la araña mostraba la cara/nuca
+   * invertidas; corrección explícita de Marco: "no asumas que se
+   * invirtio como tal, asi siempre debio ser, estabas renderizando
+   * mal") -- intercambia las regiones UV `front`/`back` entre sí,
+   * análogo a como `mirrorX` intercambia
+   * `right`/`left`. Solo cambia a qué cara 3D (`pz`/`nz`) se asigna cada
+   * region de pixeles -- nunca mueve el rectángulo en sí dentro del
+   * mapa de textura (mismo criterio que `mirrorX`), así que no afecta
+   * el editor de pixeles 2D ni las etiquetas de región ("Cara"/"Nuca"
+   * en `spiderGeometry.ts` siguen describiendo la MISMA region de
+   * pixeles de siempre).
+   */
+  swapFrontBack?: boolean;
   textureWidth: number;
   textureHeight: number;
 }
@@ -83,11 +98,11 @@ export function computeBoxFaceRects(u: number, v: number, w: number, h: number, 
 }
 
 export function applyBoxUV(geometry: THREE.BoxGeometry, opts: ApplyBoxUVOptions): void {
-  const { u, v, w, h, d, mirrorX = false, textureWidth, textureHeight } = opts;
+  const { u, v, w, h, d, mirrorX = false, swapFrontBack = false, textureWidth, textureHeight } = opts;
 
   const rects = computeBoxFaceRects(u, v, w, h, d);
-  let { right, left } = rects;
-  const { top, bottom, front, back } = rects;
+  let { right, left, front, back } = rects;
+  const { top, bottom } = rects;
 
   if (mirrorX) {
     // El lado izquierdo reutiliza la textura del lado derecho: las
@@ -95,6 +110,11 @@ export function applyBoxUV(geometry: THREE.BoxGeometry, opts: ApplyBoxUVOptions)
     [right, left] = [left, right];
     // ...y ademas TODA la caja se refleja horizontalmente (ver abajo),
     // igual que `mirror: True` en el pipeline de referencia.
+  }
+
+  if (swapFrontBack) {
+    // Ver comentario de `swapFrontBack` en `ApplyBoxUVOptions`.
+    [front, back] = [back, front];
   }
 
   // Orden exacto de THREE.BoxGeometry.addGroup: px(+x), nx(-x), py(+y), ny(-y), pz(+z), nz(-z).

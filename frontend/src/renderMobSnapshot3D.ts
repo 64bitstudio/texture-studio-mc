@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { applyBoxUV } from './geometry/applyBoxUV';
-import { computeGeometryCenter } from './geometry/geometryBounds';
+import { CAMERA_FOV_DEG, computeMobCameraFraming } from './geometry/geometryBounds';
 import type { MobBoxPart, MobGeometry } from './types/baseAssets';
 
 const DEG_TO_RAD = Math.PI / 180;
@@ -13,32 +13,34 @@ const DEG_TO_RAD = Math.PI / 180;
 // proyección isométrica a mano (matemática nueva, alto riesgo de no
 // coincidir con la referencia), este módulo reutiliza el MISMO motor
 // 3D que ya usa el editor en vivo (`Viewer3D.tsx`: misma geometría por
-// cajas + UV clásico vía `applyBoxUV`, mismo ángulo de cámara inicial
-// -- confirmado con Marco vía AskUserQuestion) para tomar UNA foto fija
-// -- sin `OrbitControls`, sin escena persistente -- y devolverla como
+// cajas + UV clásico vía `applyBoxUV`, mismo encuadre de cámara --
+// `computeMobCameraFraming`, ticket 077) para tomar UNA foto fija --
+// sin `OrbitControls`, sin escena persistente -- y devolverla como
 // data URL, exactamente igual que el compositor 2D anterior devolvía
 // la suya. Consumido por `useMobSnapshot3D.ts`.
 //
-// Mismo ángulo/FOV que el `<Canvas camera={{ position: [45, 40, 65],
-// fov: 40 }}>` de `Viewer3D.tsx` -- es el ángulo con el que arranca el
-// editor de CUALQUIER mob antes de tocar los controles orbitales, ya
-// afinado a lo largo de varios tickets (048-052) contra imágenes de
-// referencia para que se vea bien en los 4 mobs actuales. Reusarlo
-// tal cual asegura consistencia visual entre "lo que ves si abres el
-// editor" y "la miniatura de la tarjeta", sin duplicar el ajuste.
-const CAMERA_POSITION: [number, number, number] = [45, 40, 65];
-const CAMERA_FOV = 40;
+// Ticket 077 (bug real reportado por Marco: la miniatura de la
+// tarjeta seguia mostrando a la Araña "volteada" -- abdomen al frente,
+// cara escondida -- despues de corregir el visor interactivo): este
+// modulo tenia su PROPIA formula de camara (`CAMERA_POSITION`/
+// `CAMERA_ZOOM` fijos, sin el encuadre-segun-forma-real que gano
+// `Viewer3D.tsx` a lo largo de 6 rondas ese mismo ticket) -- las dos
+// se fueron desincronizando cada vez que se afinaba una sin tocar la
+// otra. Ahora ambas comparten `computeMobCameraFraming`
+// (`geometryBounds.ts`, ver ese comentario para el detalle completo),
+// asi que un ajuste futuro se refleja automaticamente en los dos
+// lugares (incluido el FOV -- ver `CAMERA_FOV_DEG` en
+// `geometryBounds.ts`, unica fuente de verdad para que el piso de "no
+// recortar nada" del punto 5 use el mismo angulo que la camara real).
 
 // Ticket 065 (pedido de Marco: "los mobs deben verse mas grande...
-// acerca mas los mobs"): el ángulo de `Viewer3D.tsx` de arriba está
-// pensado para un visor INTERACTIVO (deja margen de sobra para poder
-// rotar/hacer zoom sin que el modelo se salga de cuadro) -- para una
-// miniatura fija ese margen solo deja al mob chico dentro del cuadro.
-// `CAMERA_ZOOM` acerca la cámara hacia el centro de la geometría
-// (nunca hacia el origen del mundo -- así funciona igual de bien para
-// la Araña, cuyo bounding box está en otra posición/altura que la de
-// un biped) MANTENIENDO exactamente el mismo ángulo de vista, solo
-// reduce la distancia. Afinado en vivo contra los 4 mobs reales
+// acerca mas los mobs"): el encuadre de `computeMobCameraFraming` esta
+// pensado por defecto (`cameraZoom=1`) para un visor INTERACTIVO (deja
+// margen de sobra para poder rotar/hacer zoom sin que el modelo se
+// salga de cuadro) -- para una miniatura fija ese margen solo deja al
+// mob chico dentro del cuadro. Este valor MANTIENE exactamente el
+// mismo angulo de vista, solo reduce la distancia (ver `cameraZoom` en
+// `computeMobCameraFraming`). Afinado en vivo contra los 4 mobs reales
 // (Esqueleto/Zombie/Araña/Creeper) -- lo bastante cerca para que el
 // mob llene la mayoría del cuadro sin recortar cabeza/pies.
 const CAMERA_ZOOM = 0.75;
@@ -102,7 +104,7 @@ function createSnapshotTexture(img: HTMLImageElement): THREE.CanvasTexture {
 function buildPartMesh(part: MobBoxPart, textureWidth: number, textureHeight: number, material: THREE.Material): THREE.Object3D {
   const [w, h, d] = part.size;
   const geometry = new THREE.BoxGeometry(w, h, d);
-  applyBoxUV(geometry, { u: part.uv.x, v: part.uv.y, w, h, d, mirrorX: part.mirrorX, textureWidth, textureHeight });
+  applyBoxUV(geometry, { u: part.uv.x, v: part.uv.y, w, h, d, mirrorX: part.mirrorX, swapFrontBack: part.swapFrontBack, textureWidth, textureHeight });
 
   if (!part.pivot) {
     const mesh = new THREE.Mesh(geometry, material);
@@ -149,16 +151,8 @@ export async function renderMobSnapshot3D(geometry: MobGeometry, texturePngDataU
   const scene = new THREE.Scene();
   scene.add(root);
 
-  const target = computeGeometryCenter(geometry);
-  // Acerca la cámara hacia `target` (nunca hacia el origen del mundo,
-  // ver `CAMERA_ZOOM`) -- mismo ángulo de vista que `Viewer3D.tsx`,
-  // solo más cerca.
-  const cameraPosition: [number, number, number] = [
-    target[0] + (CAMERA_POSITION[0] - target[0]) * CAMERA_ZOOM,
-    target[1] + (CAMERA_POSITION[1] - target[1]) * CAMERA_ZOOM,
-    target[2] + (CAMERA_POSITION[2] - target[2]) * CAMERA_ZOOM,
-  ];
-  const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 1000);
+  const { target, cameraPosition } = computeMobCameraFraming(geometry, CAMERA_ZOOM);
+  const camera = new THREE.PerspectiveCamera(CAMERA_FOV_DEG, 1, 0.1, 1000);
   camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
   camera.lookAt(target[0], target[1], target[2]);
 

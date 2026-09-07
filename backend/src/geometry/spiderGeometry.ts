@@ -137,6 +137,14 @@ export const SPIDER_GEOMETRY: MobGeometry = {
       size: [8, 8, 8],
       position: [0, 9, -7],
       uv: { x: 32, y: 4 },
+      // Ticket 077 -- bug real de renderizado encontrado por Marco
+      // viendo el visor 3D (la cabeza mostraba la cara/nuca invertidas,
+      // no un ajuste de estilo -- correccion explicita de Marco: "no
+      // asumas que se invirtio como tal, asi siempre debio ser, estabas
+      // renderizando mal"). Ver `swapFrontBack` en
+      // `backend/src/types/baseAssets.ts` para el porque no toca el
+      // mapa de pixeles 2D ni los `faceLabels` de abajo.
+      swapFrontBack: true,
       faceLabels: SPIDER_HEAD_FACE_LABELS,
     },
     thorax: {

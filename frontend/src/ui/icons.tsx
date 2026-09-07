@@ -491,6 +491,56 @@ export function IconHand(props: IconProps) {
   );
 }
 
+/** "Seleccionar" (herramienta de la barra del editor, HU de "Seleccionar" + Copiar/Cortar) -- rectangulo de trazo punteado, mismo estilo visual que el rectangulo de arrastre que dibuja `SelectionOverlay.tsx` sobre la textura. */
+export function IconSelect(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <rect x="4.5" y="4.5" width="15" height="15" rx="1" strokeDasharray="3 2.5" />
+    </LineIcon>
+  );
+}
+
+/** "Copiar" (boton flotante de `SelectionOverlay.tsx`) -- 2 rectangulos superpuestos, mismo trazo que `IconDuplicate` (icono de "Duplicar proyecto") -- concepto visual identico, se define aparte con nombre propio para no acoplar el toolbar del editor de textura a un icono pensado para las tarjetas de proyecto. */
+export function IconCopy(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <rect x={8.5} y={8.5} width={12} height={12} rx={2.2} />
+      <path d="M15.5 8.5V6.7a2.2 2.2 0 0 0-2.2-2.2H5.7a2.2 2.2 0 0 0-2.2 2.2v7.6a2.2 2.2 0 0 0 2.2 2.2h1.8" />
+    </LineIcon>
+  );
+}
+
+/** "Cortar" (boton flotante de `SelectionOverlay.tsx`) -- tijeras clasicas (2 aros + hojas cruzadas). */
+export function IconScissors(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <circle cx="6.5" cy="6.5" r="2.3" />
+      <circle cx="6.5" cy="17.5" r="2.3" />
+      <path d="M8.3 8 20 19M8.3 16 20 5" />
+    </LineIcon>
+  );
+}
+
+/** "Pegar" (boton de la barra del editor -- pega el contenido del portapapeles interno, ver `Editor.tsx`/`SelectionOverlay.tsx`) -- portapapeles con clip superior. */
+export function IconClipboardPaste(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <rect x="5" y="4.5" width="14" height="17" rx="2" />
+      <rect x="9" y="3" width="6" height="3" rx="1" />
+      <path d="M8.5 12h7M8.5 16h5" />
+    </LineIcon>
+  );
+}
+
+/** Colapsar/expandir el sidebar (`Sidebar.tsx`, pedido de Marco: "que el sidebar pueda hacerse pequeno") -- una sola flecha "‹", el llamador la rota 180° con CSS (`style={{ transform: 'rotate(180deg)' }}`) para que apunte "›" cuando el sidebar ya está colapsado (expandir), en vez de mantener 2 íconos espejados. */
+export function IconChevronLeft(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="M14.5 5.5 8 12l6.5 6.5" />
+    </LineIcon>
+  );
+}
+
 /**
  * Logo pixel-art de bloque de pasto -- REEMPLAZADO en la revisión 2 de
  * este ticket por el PNG real que mandó Marco (`assets/brand/logo.png`,

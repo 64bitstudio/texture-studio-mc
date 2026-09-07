@@ -358,7 +358,7 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 ### Ticket 058 -- Bug de preview 2D en alta resolución + fidelidad visual de tarjetas de mob
 
 - **`renderMobFrontSprite2D.ts`** — fix: el canvas de salida se arma a la resolución REAL de la textura (antes se armaba en tamaño "x1" y se encogía la textura real al copiar, produciendo ruido de color en texturas detalladas de alta resolución).
-- **`components/MobEntryCard.tsx`** — preview 2D más grande, campo "Modelo" reincorporado, ícono de ojo compacto (icon-square), tarjeta "Agregar mob" al final del grid/lista, menú "⋮" con "Eliminar mob del proyecto"; fix del modal ampliado (`width`/`height` fijos en px, no `maxWidth`/`maxHeight` ni porcentajes).
+- **`components/MobEntryCard.tsx`** — preview 2D más grande, campo "Modelo" reincorporado, ícono de ojo compacto (icon-square), tarjeta "Agregar mob" al final del grid/lista, menú "⋮" con "Eliminar"; fix del modal ampliado (`width`/`height` fijos en px, no `maxWidth`/`maxHeight` ni porcentajes).
 - **`projectStorage.ts`** — nueva función `removeMobFromProject(name, mobId)`.
 - **`components/Proyecto.tsx`** — pasa `onRemoveMob` a cada tarjeta; nueva tarjeta "Agregar mob".
 - **`components/App.tsx`** — nuevo `handleMobRemoved`/prop `onMobRemoved`: sincroniza `activeProject.mobIds` tras quitar un mob (bug real de datos desactualizados encontrado en vivo).
@@ -480,3 +480,28 @@ Reemplaza el motor de miniaturas del ticket 055 -- ver `docs/ARQUITECTURA.md`, "
 
 - **`components/Sidebar.tsx`** — `SIDEBAR_TEXT`/`SIDEBAR_TEXT_DIM` (reusados por `EditorProjectSidebar.tsx`) de strings fijos a tokens de tema (`var(--text)`/`var(--text-dim)`); `<nav>` y tarjeta de marca de colores fijos a `var(--panel-bg)`/`var(--border)`/`var(--surface-raised)`/`var(--border-strong)`. Ícono del item activo se deja fijo a propósito (contraste sobre `--accent`).
 - **`index.css`** — `.ts-nav-item*`/`.ts-sidebar-*` (agregadas en el ticket 073) de rgba/hex fijos a tokens de tema.
+
+### Ticket 077 -- Perspectiva 3D de la Araña + encuadre de cámara compartido
+
+- **`geometry/geometryBounds.ts`** — nueva `computeMobCameraFraming(geometry, cameraZoom)` (única fuente de verdad del encuadre de cámara), `CAMERA_FOV_DEG` (FOV compartido), `computeAllPartCorners` (corners de cada parte, no solo del bounding box completo).
+- **`components/Viewer3D.tsx`** / **`renderMobSnapshot3D.ts`** — ambos consumen `computeMobCameraFraming`/`CAMERA_FOV_DEG` en vez de fórmulas propias independientes (causa real de que la miniatura de la Araña quedara desincronizada del visor).
+- **`geometry/applyBoxUV.ts`** — nuevo `swapFrontBack?: boolean` en `ApplyBoxUVOptions`, intercambia las regiones UV `front`/`back` entre las caras `pz`/`nz` de la caja.
+- **`types/baseAssets.ts`** (frontend y backend) — `MobBoxPart` gana `swapFrontBack?: boolean`.
+- **`backend/src/geometry/spiderGeometry.ts`** — `swapFrontBack: true` en la cabeza (bug real de orientación, no un cambio de diseño).
+- **`components/NuevoProyecto.tsx`** — `<Viewer3D key={previewMobId}>` (bug real: la cámara no se reseteaba al cambiar de mob sin esta key).
+
+### Ticket 078 -- Herramienta "Seleccionar" + Copiar/Cortar/Pegar, y renombre "Mano" → "Mover"
+
+- **`components/Editor.tsx`** — botón de mover renombrado a "Mover" (sin cambios internos); `paintMode` gana `'select'`; nuevo `internalClipboard` + handlers `handleCopySelection`/`handleCutSelection`/`handlePasteFromClipboard`/`cropSelection`; nuevo botón "Pegar" junto a "Importar".
+- **`components/SelectionOverlay.tsx`** (nuevo) — overlay de selección rectangular en 2 fases (dibujar + ajustar), mismo patrón visual que `PasteImageOverlay.tsx`.
+- **`importImage.ts`** — nueva `extractPixelSource(source, clamped)`, operación inversa de `computeBurnPixels`. Con tests en `test/importImage.spec.ts`.
+- **`decodeTexture.ts`** — nueva `encodePixelSourceToPreviewUrl(source)`, codifica un `PixelSource` en memoria a blob PNG + object URL (para reusar el flujo de `pendingPaste` con contenido del portapapeles interno).
+- **`ui/icons.tsx`** — nuevos `IconSelect`, `IconCopy`, `IconScissors`, `IconClipboardPaste`.
+
+### Ticket 079 -- Sidebar colapsable a una franja de solo íconos
+
+- **`sidebarCollapse.ts`** (nuevo) — `getSidebarCollapsed`/`setSidebarCollapsed`, mismo patrón que `theme.ts`. Con tests en `test/sidebarCollapse.spec.ts`.
+- **`App.tsx`** — estado `sidebarCollapsed` levantado (mismo criterio que `theme`), pasado a `AppShell.tsx`.
+- **`components/AppShell.tsx`** — nuevos props `sidebarCollapsed`/`onToggleSidebarCollapsed`, pasados a `Sidebar.tsx`.
+- **`components/Sidebar.tsx`** — ancho `272px`/`76px` (expandido/colapsado); colapsado oculta `extraContent` y las etiquetas de texto (via `.sr-only`, con `title` de tooltip); nuevo botón circular de colapsar/expandir, vive en un wrapper `<div>` hermano del `<nav>` (no dentro, para no heredar su `overflow-y: auto` -- ver `docs/ARQUITECTURA.md`, "Ticket 079"); radio de los botones de navegación de `--radius-lg` a `--radius-md`.
+- **`ui/icons.tsx`** — nuevo `IconChevronLeft` (rotado 180° por CSS según el estado).
