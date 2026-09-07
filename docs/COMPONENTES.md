@@ -380,3 +380,11 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`components/Proyecto.tsx`** — breadcrumb reescrito como flex con `gap` real entre "Mis proyectos", "›" y el nombre (antes: padding vertical del ticket 060, que no era lo pedido, más espacios literales dentro del texto); card "Agregar mob" (modo grid) gana el subtítulo "Añade un nuevo mob a este proyecto.".
 - **`components/MobEntryCard.tsx`** — nombre del mob en modo grid de `--font-sm` a `--font-md` (ya estaba pegado hasta arriba, sin cambio de layout ahí).
 - Sigue explícitamente pendiente (imagen de referencia no llegó legible en el canal, ver el ticket): la perspectiva del motor de preview 2D.
+
+### Ticket 062 -- Motor de preview: foto fija 3D con perspectiva "estilo wiki oficial"
+
+Reemplaza el motor de miniaturas del ticket 055 -- ver `docs/ARQUITECTURA.md`, "Ticket 062" para la decisión de arquitectura completa (confirmada con Marco vía `AskUserQuestion`) y el detalle técnico.
+
+- **`renderMobSnapshot3D.ts`** (nuevo, reemplaza a `renderMobFrontSprite2D.ts` + `geometry/mobFrontSprite.ts`, ambos retirados) — Three.js puro, misma geometría/UV que `Viewer3D.tsx`, mismo ángulo de cámara que el editor, `WebGLRenderer` compartido entre llamadas, devuelve una foto fija (data URL) con perspectiva de 3/4 en vez de la vista de frente plana anterior.
+- **`hooks/useMobSnapshot3D.ts`** (nuevo, reemplaza a `useMobFrontSprite2D.ts`, retirado) — mismo patrón de memoización, sin el parámetro `resolution`.
+- **`components/MobEntryCard.tsx`** — consume el nuevo hook; `spriteUrl` renombrado a `snapshotUrl` en todo el archivo.

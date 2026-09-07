@@ -1675,3 +1675,35 @@ Cada línea de la lista de info ahora es `<Icon/> texto` en vez de texto plano. 
 Confirmado en grid y lista, dark y light theme: los 4 íconos se ven claros y distinguibles junto a cada línea de info; en modo grid la miniatura queda a la izquierda y el detalle a la derecha, coincidiendo con la imagen de referencia. Sin errores de consola.
 
 `npm run lint`, `npx tsc --noEmit`, `npm test` (220, sin tests nuevos -- cambio 100% visual/presentacional), `npm run build` en verde.
+
+## Ticket 060/061 -- Tarjetas más grandes, orden de botones, íconos de edición sin caja, breadcrumb
+
+Rondas de ajustes visuales puntuales de Marco sobre `MobEntryCard.tsx`/`Proyecto.tsx` -- miniatura/tarjeta más grandes, "Editar textura" a la izquierda y el ojo a la derecha (antes al revés), modal ampliado más grande, botones de editar título/descripción sin caja (nuevo `variant="icon-plain"` en `ui/Button.tsx`), breadcrumb con espacio horizontal real entre segmentos (el 061 corrige un malentendido del 060, que había interpretado el pedido como espaciado vertical), nombre de mob en la tarjeta un poco más grande, subtítulo en la tarjeta "Agregar mob". Ver `docs/COMPONENTES.md` para el detalle archivo por archivo -- sin cambios de arquitectura, solo estilo.
+
+## Ticket 062 -- Motor de preview: de compositor 2D plano a foto fija 3D con perspectiva "estilo wiki"
+
+Reemplaza por completo el motor de miniaturas del ticket 055 (`mobFrontSprite.ts`/`renderMobFrontSprite2D.ts`/`useMobFrontSprite2D.ts`, los tres RETIRADOS en este ticket -- nada más los usaba, confirmado por búsqueda antes de borrar). Marco mandó una imagen de referencia mostrando que la miniatura debía verse con perspectiva de 3/4 (frente + lado, con volumen), el mismo estilo que los íconos oficiales de la Wiki ya usados en `mobIcons.ts` -- no la vista de frente plana que generaba el compositor anterior.
+
+### Decisión de arquitectura (confirmada con Marco vía `AskUserQuestion` antes de implementar)
+
+Dos caminos posibles para lograr esa perspectiva: (a) escribir una proyección isométrica a mano en Canvas 2D puro (matemática nueva, mayor riesgo de no coincidir con la referencia), o (b) reutilizar el MISMO motor 3D que ya usa el editor en vivo (`Viewer3D.tsx`) para tomar una foto fija en ese ángulo. Se eligió (b): reusa geometría/UV/material ya probados, garantiza fidelidad exacta con lo que el usuario ve al abrir el editor de ese mob, y el resultado sigue siendo una imagen estática en la tarjeta (`<img>`, sin controles) -- el cambio es puramente interno a cómo se genera esa imagen, no reintroduce un visor interactivo por tarjeta (eso seguiría vetado, ver ticket 055/definición del rediseño).
+
+### `renderMobSnapshot3D.ts` (nuevo)
+
+Three.js puro (sin react-three-fiber -- este módulo no monta nada en el árbol de React, es una función `async` que devuelve un data URL, mismo contrato que su predecesor). Reusa `applyBoxUV`/`computeGeometryCenter` (las mismas utilidades puras que ya usaba `Viewer3D.tsx`, sin duplicar la lógica de mapeo UV ni de bounding box) para construir cada `MobBoxPart` como un `THREE.Mesh` (con el mismo manejo de `pivot`/`rotation` para las patas de la Araña que `MobPartMesh`). Cámara fija en el MISMO ángulo/FOV que el `<Canvas camera={{ position: [45, 40, 65], fov: 40 }}>` de `Viewer3D.tsx` -- el ángulo con el que arranca el editor de cualquier mob antes de tocar los controles orbitales, ya afinado en los tickets 048-052.
+
+**Renderer compartido a nivel de módulo** (`getSharedRenderer`): crear un `WebGLRenderer` nuevo (= un contexto WebGL nuevo) por cada miniatura agotaría el límite de contextos simultáneos que impone el navegador en un proyecto con muchos mobs. Un único renderer reutilizado en serie (JS single-threaded, sin carrera entre llamadas) evita ese límite -- lo que SÍ se libera después de cada llamada es la escena/geometría/material/textura de esa llamada específica (`disposeSnapshotResources`), no el renderer en sí. Fondo transparente (`alpha: true` + `setClearColor(..., 0)`), `preserveDrawingBuffer: true` (necesario para que `toDataURL` lea el buffer real después del render), salida cuadrada de 512px. Textura creada con los mismos sampler settings que `useCanvasTexture.ts` (`NearestFilter`, sin mipmaps, `colorSpace` sRGB explícito -- mismo criterio del ticket 052, mismo motivo).
+
+### `hooks/useMobSnapshot3D.ts` (nuevo, reemplaza a `useMobFrontSprite2D.ts`)
+
+Mismo patrón de memoización/cache que su predecesor (efecto que llama a la función async, cancelable, deriva `null` directamente cuando falta geometría/textura en vez de pasar por `setState` -- mismo hallazgo del ticket 055 sobre `react/set-state-in-effect`). Sin el parámetro `resolution`: el motor 3D renderiza siempre al mismo `outputSize` fijo, no escala su canvas de salida según la resolución de la textura de origen (a diferencia del compositor 2D anterior).
+
+### `MobEntryCard.tsx`
+
+Consume el nuevo hook; variable/prop renombrada de `spriteUrl` a `snapshotUrl` en todo el archivo.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Confirmado contra el proyecto real "Set Nether" (Araña/Creeper/Esqueleto/Zombie): las 4 miniaturas muestran la perspectiva de 3/4 correcta con la textura real del proyecto (no la vanilla), en grid, lista (40px, siguen legibles), modal ampliado, dark y light theme. Verificado también tras navegar fuera y de vuelta a la pantalla (confirma que el `WebGLRenderer` compartido sigue funcionando en remounts, sin fugas visibles). Sin errores de consola en ningún caso.
+
+`npx tsc --noEmit`, `npx oxlint`, `npx vitest run` (215, 5 menos que antes -- los tests del módulo retirado), `npm run build` en verde.

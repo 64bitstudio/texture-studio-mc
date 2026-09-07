@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Menu } from '../ui';
 import { IconDocument, IconDots, IconEye, IconMaximize, IconModel, IconPencil, IconScale, IconTrash, IconX } from '../ui/icons';
 import { fetchMobBaseAssets } from '../api/baseAssets';
-import { useMobFrontSprite2D } from '../hooks/useMobFrontSprite2D';
+import { useMobSnapshot3D } from '../hooks/useMobSnapshot3D';
 import type { MobGeometry } from '../types/baseAssets';
 import type { ToggleLayout } from '../ui';
 
@@ -33,11 +33,9 @@ function vanillaFileName(mobId: string): string {
  *
  * Ticket 058 (hallazgo real #1, bug de Marco): la imagen usaba
  * `maxWidth`/`maxHeight`, que solo LIMITAN el tamaño -- nunca fuerzan a
- * agrandar un sprite nativo chico (un proyecto x1 produce un sprite de
- * ~20x35px reales, que se veía diminuto dentro de la caja de 256x256).
- * `width`/`height` sí fuerzan el tamaño de caja, y `objectFit: 'contain'`
- * mantiene la proporción real sin deformar -- ahora sí escala hacia
- * arriba.
+ * agrandar una miniatura nativa chica. `width`/`height` sí fuerzan el
+ * tamaño de caja, y `objectFit: 'contain'` mantiene la proporción real
+ * sin deformar -- ahora sí escala hacia arriba.
  *
  * Ticket 058 (hallazgo real #2, encontrado verificando el fix de
  * arriba): `width`/`height` en PORCENTAJE (`'90%'`) no resuelven contra
@@ -49,7 +47,7 @@ function vanillaFileName(mobId: string): string {
  * caja. Fix: valores fijos en píxeles (`230`, no `'90%'`) -- sin
  * porcentaje que resolver, sin ambigüedad.
  */
-function MobPreviewModal({ label, spriteUrl, onClose }: { label: string; spriteUrl: string | null; onClose: () => void }) {
+function MobPreviewModal({ label, snapshotUrl, onClose }: { label: string; snapshotUrl: string | null; onClose: () => void }) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose();
@@ -75,9 +73,9 @@ function MobPreviewModal({ label, spriteUrl, onClose }: { label: string; spriteU
           </Button>
         </div>
         <div style={{ width: 340, height: 340, display: 'grid', placeItems: 'center', background: 'var(--bg)', borderRadius: 'var(--radius-md)' }}>
-          {spriteUrl ? (
+          {snapshotUrl ? (
             // Una sola línea -- ver `ProjectCard.tsx` (ticket 053) para el hallazgo real de por qué (bug de `ui-accessibility-guard.sh` con tags multilínea, reportado via `SendFeedback`).
-            <img src={spriteUrl} alt={`Vista previa ampliada de ${label}`} style={{ width: 310, height: 310, objectFit: 'contain', imageRendering: 'pixelated' }} />
+            <img src={snapshotUrl} alt={`Vista previa ampliada de ${label}`} style={{ width: 310, height: 310, objectFit: 'contain', imageRendering: 'pixelated' }} />
           ) : (
             <p style={{ margin: 0, fontSize: 'var(--font-sm)', color: 'var(--text-dim)' }}>Generando vista previa…</p>
           )}
@@ -90,12 +88,14 @@ function MobPreviewModal({ label, spriteUrl, onClose }: { label: string; spriteU
 /**
  * Tarjeta de un mob dentro de "Proyecto" (ticket 057, ajustada de
  * fidelidad visual en el ticket 058 tras comparar contra la imagen de
- * referencia con un proyecto real de Marco): miniatura 2D grande (motor
- * del ticket 055, corregido en el 058 para no perder detalle en
- * texturas de alta resolución -- ver `renderMobFrontSprite2D.ts`), info
- * derivada (archivo/dimensiones/escala/modelo, sin storage nuevo), un
- * ícono de ojo compacto + "Editar textura", y un menú "⋮" con "Eliminar
- * mob del proyecto" (confirmación inline, ticket 058).
+ * referencia con un proyecto real de Marco): miniatura grande con la
+ * textura del proyecto aplicada al modelo 3D real, fotografiada en un
+ * ángulo fijo estilo "wiki oficial" (motor del ticket 062, ver
+ * `renderMobSnapshot3D.ts` -- reemplaza al compositor 2D plano del
+ * ticket 055/058, retirado), info derivada (archivo/dimensiones/
+ * escala/modelo, sin storage nuevo), un ícono de ojo compacto +
+ * "Editar textura", y un menú "⋮" con "Eliminar mob del proyecto"
+ * (confirmación inline, ticket 058).
  */
 export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geometryCache, onEditTexture, onRemoveMob }: MobEntryCardProps) {
   const cachedGeometry = geometryCache.get(mobId) ?? null;
@@ -120,7 +120,7 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
     };
   }, [mobId, geometryCache]);
 
-  const spriteUrl = useMobFrontSprite2D(geometry, pngDataUrl, resolution);
+  const snapshotUrl = useMobSnapshot3D(geometry, pngDataUrl);
   const handleOpenPreview = useCallback(() => setShowPreview(true), []);
   const handleClosePreview = useCallback(() => setShowPreview(false), []);
   const handleConfirmRemove = useCallback(() => {
@@ -171,7 +171,7 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
   );
 
   // Una sola línea -- ver `ProjectCard.tsx` (ticket 053) para el hallazgo real de por qué (bug de `ui-accessibility-guard.sh` con tags multilínea, reportado via `SendFeedback`).
-  const thumb = <img src={spriteUrl ?? pngDataUrl} alt={`Miniatura de la textura guardada de ${label}`} style={{ width: thumbSize, height: thumbSize, objectFit: 'contain', imageRendering: 'pixelated', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', flexShrink: 0 }} />;
+  const thumb = <img src={snapshotUrl ?? pngDataUrl} alt={`Miniatura de la textura guardada de ${label}`} style={{ width: thumbSize, height: thumbSize, objectFit: 'contain', imageRendering: 'pixelated', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', flexShrink: 0 }} />;
 
   // Ticket 059 (corrección de Marco: "te falta agregar iconos") -- cada
   // línea de info gana un ícono a la izquierda (`ui/icons.tsx`, mismo
@@ -218,7 +218,7 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
         {editButton}
         {eyeButton}
         {menu}
-        {showPreview && <MobPreviewModal label={label} spriteUrl={spriteUrl} onClose={handleClosePreview} />}
+        {showPreview && <MobPreviewModal label={label} snapshotUrl={snapshotUrl} onClose={handleClosePreview} />}
       </li>
     );
   }
@@ -250,7 +250,7 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
         {editButton}
         {eyeButton}
       </div>
-      {showPreview && <MobPreviewModal label={label} spriteUrl={spriteUrl} onClose={handleClosePreview} />}
+      {showPreview && <MobPreviewModal label={label} snapshotUrl={snapshotUrl} onClose={handleClosePreview} />}
     </li>
   );
 }
