@@ -234,8 +234,13 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         {thumb}
         <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Ticket 061 (corrección de Marco): el nombre va pegado
+              hasta arriba de la tarjeta (ya lo estaba -- primer
+              elemento de la columna, `alignItems: 'flex-start'` en la
+              fila de arriba) y un poco más grande (`--font-sm` ->
+              `--font-md`). */}
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-            <span style={{ fontWeight: 600, fontSize: 'var(--font-sm)' }}>{label}</span>
+            <span style={{ fontWeight: 600, fontSize: 'var(--font-md)' }}>{label}</span>
             {menu}
           </div>
           {info}
