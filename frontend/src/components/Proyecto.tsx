@@ -208,7 +208,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
   void refreshTick; // solo dispara el re-render de arriba, ver su comentario -- no se usa directamente en el JSX.
 
   return (
-    <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="ts-fade-in" style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
       {/* Ticket 061 (corrección de Marco sobre el 060: el espaciado que
           pedía NO era vertical -- era el espacio entre cada texto y el
           separador "›". `gap` en un flex en vez de espacios literales

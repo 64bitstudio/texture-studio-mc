@@ -1,14 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Editor } from './components/Editor';
-import { MobSelector } from './components/MobSelector';
 import { MisProyectos } from './components/MisProyectos';
-import { Recientes } from './components/Recientes';
 import { Proyecto } from './components/Proyecto';
-import { AgregarMobs } from './components/AgregarMobs';
+import { AgregarMobModal } from './components/AgregarMobModal';
+import { EditorProjectSidebar } from './components/EditorProjectSidebar';
 import { AppShell } from './components/AppShell';
 import type { NavView } from './components/Sidebar';
-import { ThemeToggle } from './components/ThemeToggle';
-import { Avatar } from './components/Avatar';
 import { Settings } from './components/Settings';
 import { NuevoProyecto } from './components/NuevoProyecto';
 import { getUserPrefs } from './userPrefs';
@@ -31,7 +28,16 @@ import { Button, LoadingOverlay } from './ui';
  * cubría los que faltaban desde el ticket 037, se eliminó por completo
  * al quedar sin consumidores, ver docs/ARQUITECTURA.md, "Ticket 042").
  */
-type View = 'nuevo-proyecto' | 'mis-proyectos' | 'recientes' | 'proyecto' | 'agregar-mobs' | 'editor' | 'configuracion';
+// Ticket 071 (pedido de Marco, con imagen de referencia): "Agregar mob"
+// deja de ser una vista propia (`'agregar-mobs'`, ticket 042, retirada
+// en este ticket) -- pasa a ser un modal (`AgregarMobModal.tsx`) que se
+// abre/cierra sobre `'proyecto'` con un booleano (`showAddMobModal`
+// abajo), no un valor más de `View`.
+//
+// Pedido de Marco: "Recientes" se retira por completo -- deja de ser un
+// destino navegable (`Recientes.tsx` se elimina del repo, sin
+// consumidores).
+type View = 'nuevo-proyecto' | 'mis-proyectos' | 'proyecto' | 'editor' | 'configuracion';
 
 type MobsState =
   | { status: 'loading' }
@@ -64,9 +70,13 @@ function App() {
   // Ticket 038: cual proyecto esta activo ahora mismo -- poblado al
   // crearlo (`handleProjectCreated`), abrirlo (`handleProjectActivated`)
   // o agregarle mobs (`handleMobsAdded`). Fuente de verdad que usan
-  // `Proyecto.tsx` (041) y `AgregarMobs.tsx` (042); el ticket 043 la usa
-  // tambien para restringir el selector de mob del editor.
+  // `Proyecto.tsx` (041) y `AgregarMobModal.tsx` (071, antes
+  // `AgregarMobs.tsx`, ticket 042); el ticket 043 la usa tambien para
+  // restringir el selector de mob del editor.
   const [activeProject, setActiveProject] = useState<{ name: string; mobIds: string[] } | null>(null);
+  // Ticket 071: "Agregar mob" es un modal sobre `'proyecto'`, no una
+  // vista propia -- este booleano decide si `AgregarMobModal` se monta.
+  const [showAddMobModal, setShowAddMobModal] = useState(false);
 
   // Catalogo de mobs (ticket 018, HU-1) -- `GET /api/mobs`. El menu no
   // hardcodea ninguna lista: muestra exactamente lo que este fetch
@@ -221,8 +231,9 @@ function App() {
   }
 
   // Ticket 041: acciones de la vista de detalle de "Proyecto".
+  // Ticket 071: abre el modal en vez de navegar a una vista aparte.
   function handleAddMobs() {
-    setView('agregar-mobs');
+    setShowAddMobModal(true);
   }
 
   function handleProjectRenamed(newName: string) {
@@ -231,12 +242,12 @@ function App() {
 
   // Ticket 058: "Eliminar mob del proyecto" desde el menú "⋮" de una
   // tarjeta de `Proyecto.tsx` -- mismo criterio que `handleProjectRenamed`/
-  // `handleMobsAdded`, mantiene `activeProject.mobIds` sincronizado con
+  // `handleMobAdded`, mantiene `activeProject.mobIds` sincronizado con
   // lo que de verdad quedó en `localStorage` (`removeMobFromProject`, ya
   // llamado por `Proyecto.tsx` antes de este callback). Sin este ajuste,
-  // `existingMobIds` de `AgregarMobs.tsx` y el filtro de `editorMobs` de
-  // abajo seguirían viendo el mob recién quitado como si perteneciera al
-  // proyecto (bug real encontrado en vivo).
+  // `existingMobIds` de `AgregarMobModal.tsx` y el filtro de `editorMobs`
+  // de abajo seguirían viendo el mob recién quitado como si perteneciera
+  // al proyecto (bug real encontrado en vivo).
   function handleMobRemoved(mobId: string) {
     setActiveProject((prev) => (prev ? { ...prev, mobIds: prev.mobIds.filter((id) => id !== mobId) } : prev));
   }
@@ -246,31 +257,30 @@ function App() {
     setView('mis-proyectos');
   }
 
-  // Ticket 042: `AgregarMobs.tsx` ya llamo a `saveProject` con exito
-  // ANTES de este callback (mismo orden que el resto de acciones de
-  // proyecto) -- suma los ids recien agregados a `activeProject.mobIds`
-  // (sin duplicar si por alguna razon ya estaban) y vuelve a la vista
-  // de detalle.
-  function handleMobsAdded(addedMobIds: string[]) {
-    setActiveProject((prev) => (prev ? { ...prev, mobIds: Array.from(new Set([...prev.mobIds, ...addedMobIds])) } : prev));
-    setView('proyecto');
+  // Ticket 042/071: `AgregarMobModal.tsx` ya llamo a `saveProject` con
+  // exito ANTES de este callback (mismo orden que el resto de acciones
+  // de proyecto) -- suma el id recien agregado a `activeProject.mobIds`
+  // (sin duplicar si por alguna razon ya estaba) y cierra el modal
+  // (ticket 071: ya no navega, `'proyecto'` sigue siendo la vista
+  // activa por debajo).
+  function handleMobAdded(addedMobId: string) {
+    setActiveProject((prev) => (prev ? { ...prev, mobIds: Array.from(new Set([...prev.mobIds, addedMobId])) } : prev));
+    setShowAddMobModal(false);
   }
 
-  function handleCancelAddMobs() {
-    setView('proyecto');
+  function handleCancelAddMob() {
+    setShowAddMobModal(false);
   }
 
   const selectedMobLabel =
     (mobsState.status === 'ready' && mobsState.mobs.find((m) => m.id === selectedMobId)?.label) || null;
 
-  // Ticket 043 (HU-2): el selector de mob DENTRO del editor muestra
-  // solo los mobs del proyecto activo -- `MobSelector.tsx` sigue sin
-  // saber nada de "proyecto" (sigue siendo generico, ticket 018), es
-  // aca donde se filtra ANTES de pasarselo. `activeProject` deberia
-  // estar SIEMPRE poblado al llegar a `'editor'` en este punto del
-  // epic (toda navegacion a editor pasa por `Proyecto.tsx`, tickets
-  // 038-042) -- el fallback al catalogo completo es puramente
-  // defensivo, no un camino real alcanzable desde la UI.
+  // Ticket 043 (HU-2): el editor muestra solo los mobs del proyecto
+  // activo -- `activeProject` deberia estar SIEMPRE poblado al llegar a
+  // `'editor'` en este punto del epic (toda navegacion a editor pasa
+  // por `Proyecto.tsx`, tickets 038-042) -- el fallback al catalogo
+  // completo es puramente defensivo, no un camino real alcanzable
+  // desde la UI.
   const editorMobs =
     mobsState.status === 'ready' && activeProject
       ? mobsState.mobs.filter((mob) => activeProject.mobIds.includes(mob.id))
@@ -278,26 +288,64 @@ function App() {
         ? mobsState.mobs
         : [];
 
-  // Ticket 037: todas las vistas EXCEPTO 'editor' se envuelven en
-  // `<AppShell>` (sidebar + header persistentes) -- el editor conserva
-  // su layout dedicado propio, sin sidebar, para maximizar el espacio
-  // de trabajo (ver el bloque `if (view === 'editor')` mas abajo).
-  if (view !== 'editor') {
-    // `activeNav` resalta el item del sidebar SOLO si `view` es
-    // exactamente uno de sus 3 destinos -- `'proyecto'`/`'agregar-mobs'`/
-    // `'configuracion'` son subvistas alcanzadas DESDE ahi, no items
-    // propios del sidebar (ver `Sidebar.tsx`).
-    const activeNav: NavView | null =
-      view === 'nuevo-proyecto' || view === 'mis-proyectos' || view === 'recientes' ? view : null;
+  // Ticket 071: el modal "Agregar mob" se puede abrir tanto desde
+  // "Proyecto" (`Proyecto.tsx`, botón del header/tarjeta "Agregar mob")
+  // como desde el editor (sidebar del ticket 072, botón "+ Agregar
+  // mob" -- mismo `handleAddMobs`) -- se calcula UNA vez aquí y se
+  // inserta en el único `return` de abajo (ambas vistas comparten el
+  // mismo `<AppShell>` desde el ticket 072).
+  const addMobModal =
+    showAddMobModal && activeProject && mobsState.status === 'ready' ? (
+      <AgregarMobModal
+        projectName={activeProject.name}
+        mobs={mobsState.mobs}
+        existingMobIds={activeProject.mobIds}
+        onMobAdded={handleMobAdded}
+        onCancel={handleCancelAddMob}
+      />
+    ) : null;
 
-    return (
-      <AppShell
+  // Ticket 072 (pedido de Marco, con imagen de referencia): contenido
+  // extra del sidebar SOLO cuando el editor está activo -- "Proyecto
+  // actual" + "Mobs del proyecto" (con el mob activo resaltado, click
+  // para cambiar de mob sin volver a "Proyecto" primero). Reemplaza al
+  // selector de pestañas (`MobSelector.tsx`, retirado en este ticket)
+  // que antes vivía en la topbar dedicada del editor (también retirada
+  // -- ver `sidebarExtra` más abajo, el editor ya comparte el mismo
+  // `<AppShell>` que el resto de la app en vez de su propio layout).
+  const editorSidebarExtra =
+    view === 'editor' && activeProject && mobsState.status === 'ready' ? (
+      <EditorProjectSidebar
+        projectName={activeProject.name}
+        mobs={editorMobs}
+        activeMobId={selectedMobId ?? ''}
+        onSelectMob={handleSelectMob}
+        onBackToProject={() => setView('proyecto')}
+        onAddMob={handleAddMobs}
+      />
+    ) : undefined;
+
+  // Ticket 037/072: TODAS las vistas (incluido el editor, desde el
+  // ticket 072 -- pedido de Marco, con imagen de referencia: el editor
+  // recupera el sidebar completo de navegación) se envuelven en el
+  // mismo `<AppShell>` (sidebar + header persistentes).
+  // `activeNav` resalta el item del sidebar SOLO si `view` es
+  // exactamente uno de sus 3 destinos -- `'proyecto'`/`'editor'`/
+  // `'configuracion'` son subvistas alcanzadas DESDE ahi, no items
+  // propios del sidebar (ver `Sidebar.tsx`). Ticket 071: "Agregar
+  // mob" ya no es una `View` -- es un modal sobre `'proyecto'`, ver
+  // `showAddMobModal`.
+  const activeNav: NavView | null = view === 'nuevo-proyecto' || view === 'mis-proyectos' ? view : null;
+
+  return (
+    <AppShell
         activeNav={activeNav}
         onNavigate={setView}
         displayName={displayName}
         theme={theme}
         onThemeChange={setTheme}
         onOpenSettings={handleOpenSettings}
+        sidebarExtra={editorSidebarExtra}
       >
         {view === 'configuracion' && (
           <Settings displayName={displayName} onDisplayNameSaved={setDisplayName} theme={theme} onThemeChange={setTheme} />
@@ -347,23 +395,6 @@ function App() {
           </>
         )}
 
-        {/* Ticket 040: "Recientes" ya tiene contenido real. */}
-        {view === 'recientes' && (
-          <>
-            {mobsState.status === 'loading' && <LoadingOverlay message="Cargando catálogo de mobs…" />}
-
-            {mobsState.status === 'error' && (
-              <div style={{ display: 'grid', placeItems: 'center', padding: 48, gap: 12 }}>
-                <p role="alert">No se pudo cargar el catálogo de mobs: {mobsState.message}</p>
-                <Button onClick={handleRetryMobs}>Reintentar</Button>
-              </div>
-            )}
-
-            {mobsState.status === 'ready' && (
-              <Recientes mobs={mobsState.mobs} bufferCache={bufferCache} onProjectSelected={handleProjectActivated} />
-            )}
-          </>
-        )}
         {/* Ticket 041: "Proyecto" ya tiene contenido real. */}
         {view === 'proyecto' && activeProject && mobsState.status === 'ready' && (
           <Proyecto
@@ -377,147 +408,56 @@ function App() {
             onBackToList={() => setView('mis-proyectos')}
           />
         )}
-        {/* Ticket 042: "Agregar mobs" ya tiene contenido real. */}
-        {view === 'agregar-mobs' && activeProject && mobsState.status === 'ready' && (
-          <AgregarMobs
-            projectName={activeProject.name}
-            mobs={mobsState.mobs}
-            existingMobIds={activeProject.mobIds}
-            onMobsAdded={handleMobsAdded}
-            onCancel={handleCancelAddMobs}
-          />
-        )}
-      </AppShell>
-    );
-  }
+        {/* Ticket 072 (pedido de Marco, con imagen de referencia): el
+            editor ya NO tiene su propio `<main>`/header dedicado (ver
+            docs/ARQUITECTURA.md, "Ticket 072", que reemplaza la decisión
+            del ticket 037/045 citada más abajo) -- comparte el mismo
+            `<AppShell>` que el resto de la app, con "Proyecto
+            actual"/"Mobs del proyecto" viviendo en el sidebar
+            (`editorSidebarExtra`, arriba) en vez de un `MobSelector` en
+            una topbar propia (retirado). `Editor.tsx` construye su
+            propio breadcrumb/título/toolbar/paneles por dentro; acá solo
+            se resuelven los 3 estados de carga del asset, igual que
+            antes. */}
+        {view === 'editor' && (
+          <div style={{ position: 'relative', minHeight: '100%' }}>
+            {mobsState.status === 'ready' && selectedMobId && assetState.status === 'loading' && (
+              <LoadingOverlay message="Cargando modelo…" />
+            )}
 
-  return (
-    <main style={{ width: '100vw', height: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <header
-        style={{
-          flexShrink: 0,
-          padding: '10px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 16,
-          flexWrap: 'wrap',
-          borderBottom: '1px solid var(--border)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          {/* Ticket 032 (HU-7): texto visible junto al icono -- ya no
-              solo icono (`aria-label` se elimina, el texto real es
-              ahora el nombre accesible; `title` se conserva como
-              tooltip adicional). */}
-          <Button variant="icon" title="Volver al inicio" onClick={() => setView('nuevo-proyecto')}>
-            <span aria-hidden="true">←</span> Volver al inicio
-          </Button>
-          <h1 style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>
-            Texture Studio MC{selectedMobLabel ? ` — ${selectedMobLabel}` : ''}
-          </h1>
-        </div>
+            {mobsState.status === 'ready' && selectedMobId && assetState.status === 'error' && (
+              <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%', minHeight: 400, gap: 12 }}>
+                <p role="alert">No se pudo cargar el modelo: {assetState.message}</p>
+                <Button onClick={handleRetryAsset}>Reintentar</Button>
+              </div>
+            )}
 
-        {mobsState.status === 'ready' && selectedMobId && (
-          <MobSelector mobs={editorMobs} selectedMobId={selectedMobId} onSelect={handleSelectMob} onAddMob={handleAddMobs} />
-        )}
-
-        {assetState.status === 'ready' && assetState.data.texture.isPlaceholder && (
-          <span
-            style={{
-              fontSize: 12,
-              color: 'var(--text-dim)',
-              background: 'var(--panel-bg)',
-              padding: '4px 8px',
-              borderRadius: 4,
-            }}
-          >
-            Textura placeholder (asset vanilla real pendiente — ver ticket 007)
-          </span>
-        )}
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ThemeToggle theme={theme} onThemeChange={setTheme} />
-          <Button variant="icon" title="Configuración" onClick={handleOpenSettings}>
-            <span aria-hidden="true">⚙️</span> Configuración
-          </Button>
-          <Avatar displayName={displayName} />
-        </div>
-      </header>
-
-      {/* Ticket 045 (HU -- retiro del flujo de edicion libre sin
-          proyecto): aca vivia el menu "Proyecto" (`ProjectControls.tsx`,
-          ticket 019/031) -- guardar/cargar/eliminar un proyecto
-          CUALQUIERA directo desde el editor, sin pasar por
-          `activeProject`. Se retiro por completo (`git rm`): permitia
-          crear/sobrescribir un proyecto sin pasar por "Nuevo proyecto"
-          (sin la restriccion de un solo mob inicial) y cargar un
-          proyecto DISTINTO al activo sin actualizar `activeProject` --
-          la app quedaba en un estado inconsistente (el editor mostraba
-          buffers de un proyecto mientras `activeProject`/la navegacion
-          seguian apuntando al anterior). Guardar/cargar/eliminar
-          proyectos ahora vive UNICAMENTE en el flujo nuevo
-          (`NuevoProyecto`/`MisProyectos`/`Recientes`/`Proyecto`/
-          `AgregarMobs`, tickets 038-042), que siempre mantiene
-          `activeProject` sincronizado -- ver docs/ARQUITECTURA.md,
-          "Ticket 045", para el detalle completo (regla 9 de
-          CLAUDE.md: cambio de comportamiento documentado
-          explicitamente). */}
-
-      {/* `mobsState.status === 'loading'/'error'` no se manejan aca --
-          ya no son alcanzables en la vista de editor (ticket 027): solo
-          se llega a `view === 'editor'` desde `NuevoProyecto`/`MisProyectos`/`MobSelector`,
-          y ambos solo renderizan con `mobsState.status === 'ready'`. Esos
-          dos estados se manejan en 'nuevo-proyecto'/'mis-proyectos' de arriba. */}
-      {/* `position: relative` (ticket 033, HU-8): ancla `LoadingOverlay`
-          a esta area (el editor), no a toda la ventana -- cubre el
-          cambio de mob (`assetState` vuelve a `loading` en
-          `handleSelectMob`/`handleProjectOpenedFromHome`) y la carga
-          inicial (arranca en `loading` por default, ver `useState`
-          arriba). */}
-      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-        {mobsState.status === 'ready' && selectedMobId && assetState.status === 'loading' && (
-          <LoadingOverlay message="Cargando modelo…" />
-        )}
-
-        {mobsState.status === 'ready' && selectedMobId && assetState.status === 'error' && (
-          <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%', gap: 12 }}>
-            <p role="alert">No se pudo cargar el modelo: {assetState.message}</p>
-            <Button onClick={handleRetryAsset}>Reintentar</Button>
+            {mobsState.status === 'ready' && selectedMobId && assetState.status === 'ready' && selectedMobLabel && (
+              // `key={selectedMobId}` remonta `Editor` por completo al
+              // cambiar de mob (ticket 018) -- todo su estado interno (zoom,
+              // historial, simetria, parte aislada, panel de importar/pegar,
+              // etc.) se resetea a los defaults de una sesion nueva, EXCEPTO
+              // el `TextureBuffer` de pixeles, que `Editor` recupera de
+              // `bufferCache` si ya existe para este mob (ver
+              // `Editor.tsx`/`docs/ARQUITECTURA.md`, "Ticket 018") -- es la
+              // unica pieza de estado que el ticket exige preservar entre
+              // visitas al mismo mob dentro de la sesion.
+              <Editor
+                key={selectedMobId}
+                data={assetState.data}
+                mobId={selectedMobId}
+                mobLabel={selectedMobLabel}
+                bufferCache={bufferCache}
+                projectName={activeProject?.name ?? ''}
+                onBackToProjectsList={() => setView('mis-proyectos')}
+                onBackToProject={() => setView('proyecto')}
+              />
+            )}
           </div>
         )}
-
-        {mobsState.status === 'ready' && selectedMobId && assetState.status === 'ready' && selectedMobLabel && (
-          // `key={selectedMobId}` remonta `Editor` por completo al
-          // cambiar de mob (ticket 018) -- todo su estado interno (zoom,
-          // historial, simetria, parte aislada, panel de importar/pegar,
-          // etc.) se resetea a los defaults de una sesion nueva, EXCEPTO
-          // el `TextureBuffer` de pixeles, que `Editor` recupera de
-          // `bufferCache` si ya existe para este mob (ver
-          // `Editor.tsx`/`docs/ARQUITECTURA.md`, "Ticket 018") -- es la
-          // unica pieza de estado que el ticket exige preservar entre
-          // visitas al mismo mob dentro de la sesion.
-          //
-          // Ticket 045: ya NO hace falta un segundo componente en la key
-          // (`loadGeneration`, ticket 019) para forzar este remount
-          // cuando un proyecto cargado incluye al mob activo -- ese
-          // escenario solo era alcanzable desde `ProjectControls.tsx`
-          // (retirado en este ticket), que podia cargar buffers en
-          // `bufferCache` SIN desmontar `Editor`. El unico camino que
-          // queda para cargar un proyecto (`MisProyectos`/`Recientes`,
-          // tickets 039/040) siempre navega a `'proyecto'` ANTES,
-          // desmontando `Editor` por completo -- el remount natural de
-          // React al volver a `'editor'` ya cubre el caso.
-          <Editor
-            key={selectedMobId}
-            data={assetState.data}
-            mobId={selectedMobId}
-            mobLabel={selectedMobLabel}
-            bufferCache={bufferCache}
-          />
-        )}
-      </div>
-    </main>
+        {/* Ticket 071 (pedido de Marco, con imagen de referencia): "Agregar mob" es un modal sobre "Proyecto", ya no una vista aparte (retira `AgregarMobs.tsx`, ticket 042) -- también se abre desde el editor (sidebar, `editorSidebarExtra`). */}
+        {addMobModal}
+      </AppShell>
   );
 }
 

@@ -116,7 +116,7 @@ export function MisProyectos({ mobs, bufferCache, onProjectSelected, onProjectEd
   );
 
   return (
-    <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="ts-fade-in" style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
         <div>
           <h2 style={{ margin: '0 0 4px', fontSize: 'var(--font-xl)' }}>Mis proyectos</h2>

@@ -71,7 +71,7 @@ export function Settings({ displayName, onDisplayNameSaved, theme, onThemeChange
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="ts-fade-in" style={{ padding: 24, maxWidth: 420, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <h2 style={{ margin: 0, fontSize: 18 }}>Configuración</h2>
 
       <Section title="Perfil local">

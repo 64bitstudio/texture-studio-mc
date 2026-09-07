@@ -62,9 +62,10 @@ function MobPreviewModal({ label, snapshotUrl, onClose }: { label: string; snaps
       aria-modal="true"
       aria-label={`Vista previa de ${label}`}
       onClick={onClose}
+      className="ts-modal-backdrop"
       style={{ position: 'fixed', inset: 0, background: 'rgba(0, 0, 0, 0.6)', display: 'grid', placeItems: 'center', zIndex: 100 }}
     >
-      <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-lg)', padding: 20, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 260 }}>
+      <div onClick={(e) => e.stopPropagation()} className="ts-modal-panel" style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-lg)', padding: 20, display: 'flex', flexDirection: 'column', gap: 12, minWidth: 260 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
           <h3 style={{ margin: 0, fontSize: 'var(--font-lg)' }}>{label}</h3>
           <Button variant="icon-square" onClick={onClose} title="Cerrar">
@@ -75,9 +76,16 @@ function MobPreviewModal({ label, snapshotUrl, onClose }: { label: string; snaps
         <div style={{ width: 340, height: 340, display: 'grid', placeItems: 'center', background: 'var(--bg)', borderRadius: 'var(--radius-md)' }}>
           {snapshotUrl ? (
             // Una sola línea -- ver `ProjectCard.tsx` (ticket 053) para el hallazgo real de por qué (bug de `ui-accessibility-guard.sh` con tags multilínea, reportado via `SendFeedback`).
-            <img src={snapshotUrl} alt={`Vista previa ampliada de ${label}`} style={{ width: 310, height: 310, objectFit: 'contain', imageRendering: 'pixelated' }} />
+            <img src={snapshotUrl} alt={`Vista previa ampliada de ${label}`} className="ts-fade-in" style={{ width: 310, height: 310, objectFit: 'contain', imageRendering: 'pixelated' }} />
           ) : (
-            <p style={{ margin: 0, fontSize: 'var(--font-sm)', color: 'var(--text-dim)' }}>Generando vista previa…</p>
+            // Pedido de Marco: animación de carga -- mismo pulso que
+            // `.ts-render-loading` (`index.css`), aplicado al texto ya
+            // que aca no hay una imagen de respaldo que mostrar
+            // mientras tanto (a diferencia de `MobEntryCard`/
+            // `ProjectCard`, este modal no recibe `pngDataUrl`).
+            <p className="ts-render-loading" style={{ margin: 0, fontSize: 'var(--font-sm)', color: 'var(--text-dim)' }}>
+              Generando vista previa…
+            </p>
           )}
         </div>
       </div>
@@ -158,10 +166,14 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
   // 053) para el hallazgo real de por qué (bug de
   // `ui-accessibility-guard.sh` con tags multilínea, reportado via
   // `SendFeedback`).
+  // Pedido de Marco: animación de carga (`.ts-render-thumb`/
+  // `.ts-render-loading`, `index.css`) mientras `snapshotUrl` sigue
+  // `null` -- la imagen visible en ese momento es el fallback plano
+  // (`pngDataUrl`), no el render 3D final, ver `useMobSnapshot3D`.
   const thumb = isList ? (
-    <img src={snapshotUrl ?? pngDataUrl} alt={`Miniatura de la textura guardada de ${label}`} style={{ width: 40, height: 40, objectFit: 'contain', imageRendering: 'pixelated', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', flexShrink: 0 }} />
+    <img src={snapshotUrl ?? pngDataUrl} alt={`Miniatura de la textura guardada de ${label}`} className={`ts-render-thumb${snapshotUrl ? '' : ' ts-render-loading'}`} style={{ width: 40, height: 40, objectFit: 'contain', imageRendering: 'pixelated', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', flexShrink: 0 }} />
   ) : (
-    <img src={snapshotUrl ?? pngDataUrl} alt={`Miniatura de la textura guardada de ${label}`} style={{ width: '100%', height: 140, objectFit: 'contain', imageRendering: 'pixelated', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }} />
+    <img src={snapshotUrl ?? pngDataUrl} alt={`Miniatura de la textura guardada de ${label}`} className={`ts-render-thumb${snapshotUrl ? '' : ' ts-render-loading'}`} style={{ width: '100%', height: 140, objectFit: 'contain', imageRendering: 'pixelated', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }} />
   );
 
   // Ticket 059 (corrección de Marco: "te falta agregar iconos") -- cada

@@ -428,3 +428,32 @@ Reemplaza el motor de miniaturas del ticket 055 -- ver `docs/ARQUITECTURA.md`, "
 - **`components/ProjectCard.tsx`** — nuevo subcomponente `ProjectMobThumb`: las miniaturas de "Mis proyectos" dejan de ser el ícono vanilla fijo -- fotografían la textura real de cada proyecto con el motor 3D del ticket 062, con fallback al ícono vanilla si el mob/registro ya no existe.
 - **`components/MisProyectos.tsx`** — nueva `geometryCache` compartida entre todas las `ProjectCard` de la pantalla, pasada por props.
 - Hallazgo señalado a Marco (aceptado, no un bug): `ProjectCard` ahora lee el proyecto completo (`loadProject`) para sus miniaturas -- `listProjects()` sigue sin decodificar PNGs, pero cada tarjeta visible sí lo hace para sus hasta 3 miniaturas.
+
+### Ticket 071 -- Modal "Agregar mob" al proyecto
+
+- **`components/AgregarMobModal.tsx`** (nuevo, reemplaza a `AgregarMobs.tsx`, eliminado) — modal (no una vista de `View` propia) con buscador + grid de mobs disponibles del catálogo actual, panel de detalle del mob seleccionado (ícono/descripción/resolución/modelo, sin visor 3D en vivo), selección de UN mob a la vez. Se abre desde `Proyecto.tsx` y desde `EditorProjectSidebar.tsx` (ticket 072).
+- **`projectStorage.ts`** — `saveProject` corregido: preservaba `description`/`coverImageDataUrl` del registro existente al sobrescribir, bug real desde el ticket 042 (`existing?.description`/`existing?.coverImageDataUrl` en vez de descartarlos).
+- **`App.tsx`** — `'agregar-mobs'` deja de ser un valor de `View` (retirado); `showAddMobModal` (booleano) controla el modal sobre `'proyecto'`.
+
+### Ticket 072 -- Rediseño completo del Editor
+
+- **`components/Editor.tsx`** — reescrito completo: breadcrumb + fila de título (nombre real del mob, sin apodo, badge "Minecraft Java Edition", "Guardar"/"Exportar PNG") + barra de herramientas horizontal (Pincel/Borrador+tamaño de pincel/Deshacer/Rehacer/Resolución/Simetría/Cuadrícula/Zoom) + cuerpo en 3 columnas (`HsvColorPicker` / cuadrícula de textura SIN CAMBIOS / visor 3D+"Parte enfocada"+"Información de la textura"+"Archivo"+"Consejo"). Nuevo "Guardar" real (`buildProjectSnapshot`+`saveProject`) y "Restablecer"/pantalla completa reales del visor 3D (remount por `viewerKey` + Fullscreen API).
+- **`components/HsvColorPicker.tsx`** (nuevo, reemplaza a `ColorPicker.tsx`) — cuadro de saturación/valor + matiz (`<input type="range">` estilado, `.ui-hue-slider`) + hex + "Colores recientes" (estado de `Editor.tsx`) + paleta Minecraft.
+- **`colorConversion.ts`** (nuevo) — hex/rgb/hsv puro, sin DOM.
+- **`components/EditorProjectSidebar.tsx`** (nuevo) — contenido de `Sidebar.extraContent` cuando el editor está activo: "Proyecto actual" + "Mobs del proyecto" (click para cambiar sin volver a "Proyecto") + "Agregar mob".
+- **`components/Sidebar.tsx`** / **`components/AppShell.tsx`** — nuevo prop `extraContent`/`sidebarExtra` (genérico, sin saber de "proyecto").
+- **`App.tsx`** — el editor ya NO tiene su layout dedicado sin sidebar (revierte ticket 037) -- comparte el mismo `<AppShell>` que el resto de la app.
+- **`components/ExportControls.tsx`** — `variant="primary"` + ícono (`IconExport`).
+- **`components/ResolutionControls.tsx`** — sigue existiendo pero ya no se usa dentro de `Editor.tsx` (su `<Select>` inline se reconstruyó directo en la barra de herramientas, layout de una sola línea).
+
+### Ticket 073 -- Quita "Recientes", animaciones/transiciones, y rebranding
+
+- **`components/Recientes.tsx`** — **eliminado** (`git rm`), sin consumidores. `Sidebar.tsx`/`App.tsx` sin `'recientes'` en `NavView`/`View`.
+- **`index.css`** — transición extendida de `.ui-button` (color/filter/transform + `:active`), hover+transición en `.ui-select`/`.ui-menu__item`, `.ts-modal-backdrop`/`.ts-modal-panel` (nuevo, modales), `.ts-render-thumb`/`.ts-render-loading` (nuevo, pulso de carga de miniaturas 3D), `.ts-nav-item`/`.ts-sidebar-*`/`.ts-swatch` (nuevo, hover de elementos que antes tenían sus colores en estilo inline -- ver "Hecho" del ticket 073 para el porqué).
+- **`components/NuevoProyecto.tsx`** / **`MisProyectos.tsx`** / **`Proyecto.tsx`** / **`Settings.tsx`** — `className="ts-fade-in"` en su contenedor raíz (antes solo `Editor.tsx`).
+- **`components/AgregarMobModal.tsx`** / **`components/MobEntryCard.tsx`** (`MobPreviewModal`) — `.ts-modal-backdrop`/`.ts-modal-panel` en sus 2 capas.
+- **`components/MobEntryCard.tsx`** / **`components/ProjectCard.tsx`** — `.ts-render-thumb`/`.ts-render-loading` en las miniaturas 3D mientras `useMobSnapshot3D` no termina.
+- **`components/Sidebar.tsx`** / **`components/EditorProjectSidebar.tsx`** — colores de sus botones movidos de estilo inline a clases CSS para que el hover funcione de verdad (ver `index.css`).
+- **`assets/brand/sidebar-bg.png`** — **eliminado**, fondo del `<nav>` ahora `#0f171d` sólido.
+- **`assets/brand/logo.png`** — reemplazado (logo nuevo de Marco, reescalado a 256×256).
+- **`public/favicon.png`** (nuevo, reemplaza a `favicon.svg`, eliminado) — mismo logo, 64×64, referenciado desde `index.html`.

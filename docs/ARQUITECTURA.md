@@ -1747,3 +1747,104 @@ Extrae el fetch+cache de geometría (antes inline en `MobEntryCard.tsx`) a un ho
 Cada uno de los 5 puntos se verificó en vivo y se envió como captura a Marco (`SendUserFile`) ANTES de continuar al siguiente -- dark y light theme, grid y lista, sin errores de consola en ningún paso. VoBo explícito ("doy vobo") recibido para el conjunto antes de este commit.
 
 `npx tsc --noEmit`, `npx oxlint`, `npx vitest run` (215, sin tests nuevos -- ticket 100% visual/de datos derivados), `npm run build` en verde.
+
+## Ticket 071 -- Modal "Agregar mob" al proyecto
+
+Reemplaza la pantalla completa `AgregarMobs.tsx` (ticket 042) por un modal (`AgregarMobModal.tsx`), pedido de Marco con imagen de referencia. Antes de implementar, se acotó el alcance vía `AskUserQuestion` (la referencia mostraba un catálogo extendido de ~60 mobs con categorías -- fuera de alcance, cada mob nuevo exige investigar su geometría oficial y verificarla pixel a pixel, ver memoria `texture-studio-mc-metodologia-mobs`): el modal solo cubre el catálogo actual de 4 mobs, selección de uno a la vez (no múltiple, a diferencia de la pantalla que reemplaza), sin barra de categorías, sin visor 3D en vivo (ícono oficial + descripción + resolución/modelo derivados de la geometría en su lugar).
+
+### `AgregarMobModal.tsx` (nuevo)
+
+`role="dialog"` + `aria-modal`, cierre por click afuera/Escape/botón X. Reusa `buildProjectSnapshot`+`saveProject` (el mismo par que ya usaban `NuevoProyecto.tsx`/el flujo de guardado general) con Maps de una sola entrada para el mob recién agregado, mergeados sobre `record.mobs` existente.
+
+### Bug real encontrado: `saveProject` perdía `description`/`coverImageDataUrl`
+
+Al implementar el guardado de este modal se detectó que `saveProject` (`projectStorage.ts`) construía el nuevo registro como `{ updatedAt, mobs }`, sin preservar `description`/`coverImageDataUrl` del registro EXISTENTE -- cualquier `saveProject(..., { overwrite: true })` sobre un proyecto que ya tuviera descripción/portada las borraba en silencio. Bug real desde el ticket 042 (la primera vez que `saveProject` se llamó con `overwrite: true` sobre un proyecto preexistente), nunca antes ejercitado en pruebas porque ningún proyecto probado en vivo tenía descripción/portada Y recibía un mob agregado en la misma sesión. Fix: leer el registro existente antes de escribir y preservar esos 2 campos salvo que se sobrescriban explícitamente vía `updateProjectDescription`/`updateProjectCover` (sin cambios). Verificado con `npx vitest run projectStorage` (40/40) y en vivo.
+
+### `App.tsx`
+
+`'agregar-mobs'` deja de ser un valor de `View` -- `showAddMobModal` (booleano) decide si `AgregarMobModal` se monta sobre `'proyecto'`. El modal se calcula una sola vez (`addMobModal`) y se inserta en el único `return` compartido con el resto de vistas (ver ticket 072, que además lo hace accesible desde el sidebar del editor).
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Abrir el modal desde "Proyecto" y desde el sidebar del Editor (ticket 072), agregar un mob real y confirmar que persiste tras recargar la vista, catálogo ya completo (estado vacío explicativo), cerrar por los 3 caminos sin efectos secundarios. Sin errores de consola.
+
+`npx tsc --noEmit`, `npx oxlint`, `npx vitest run` (215), `npm run build` en verde.
+
+## Ticket 072 -- Rediseño completo del Editor
+
+Pedido de Marco, con imagen de referencia: rediseñar el Editor de textura completo -- sidebar, breadcrumb, título con acciones, barra de herramientas, selector de color, panel de visor 3D+información -- EXCEPTO la cuadrícula de edición de la textura en sí ("la parte de la textura en si que esta desacomodada... mantenlo como lo tenemos nosotros", palabras de Marco). Por el tamaño del cambio (toca la pantalla más compleja de la app, revierte una decisión de arquitectura previa), se usó `AskUserQuestion` dos veces antes de implementar, en vez de asumir:
+
+1. La imagen de referencia mostraba un mob con un nombre distinto de su modelo base ("Carcomido" sobre un Creeper) -- ¿implica reabrir el soporte de apodo/skin nombrada por mob, ya descartado en la definición original del rediseño? Marco confirmó que sigue sin quererlo -- el editor muestra el nombre REAL del mob, sin campo nuevo.
+2. ¿El editor debe recuperar el sidebar completo de navegación, revirtiendo la decisión del ticket 037 ("el editor conserva su layout dedicado propio, sin sidebar, para maximizar el espacio de trabajo")? Marco confirmó que sí, sidebar completo como en la imagen.
+
+### `App.tsx` -- el editor deja de tener layout dedicado
+
+Se elimina el `if (view !== 'editor') { ... } return <main>...</main>;` especial que existía desde el ticket 037 -- TODAS las vistas, incluido `'editor'`, se envuelven ahora en el mismo `<AppShell>`. `sidebarExtra` (nuevo prop de `AppShell`/`Sidebar`, ver abajo) se calcula solo cuando `view === 'editor'`.
+
+### `EditorProjectSidebar.tsx` (nuevo)
+
+Contenido de `Sidebar.extraContent` mientras el editor está activo: tarjeta "Proyecto actual" (click vuelve a `'proyecto'`) + lista "Mobs del proyecto" (mob activo resaltado, click cambia de mob sin pasar por `'proyecto'`) + "Agregar mob" (abre `AgregarMobModal.tsx`, ticket 071). Reemplaza al `MobSelector.tsx` que antes vivía en la topbar dedicada del editor (esa topbar ya no existe). Deliberadamente sin nombre personalizado por mob (ver pregunta 1 de arriba) -- cada fila muestra únicamente el nombre real.
+
+`Sidebar.tsx`/`AppShell.tsx` ganan un prop `extraContent`/`sidebarExtra` (`ReactNode` opcional) genérico -- ninguno de los dos sabe qué es "un proyecto" o "un editor", solo renderizan lo que reciben entre los items de navegación y la tarjeta de marca del pie.
+
+### `Editor.tsx` -- reescritura completa del JSX, MISMO estado/lógica
+
+El layout anterior (visor 3D fijo a la izquierda con `flexBasis: 400` + panel lateral en grid `auto-fit` de `Section` sueltas, tickets 025-031) se reemplaza por: breadcrumb+acciones, título+badge, barra de herramientas horizontal, cuerpo en 3 columnas. Se preserva el 100% de los hooks/handlers existentes (`buffer`, `history`, `symmetryEnabled`, `isolatedRegion`, `paintMode`, `eraseBrushSize`, `resolution`, importar/pegar imagen, etc.) -- el cambio es exclusivamente de presentación, salvo 3 piezas de estado NUEVAS:
+
+- `viewerKey` (contador) -- "Restablecer" del visor 3D fuerza un remount completo incrementándolo (no hay API expuesta por `Viewer3D`/`OrbitControls` para resetear la cámara sin desmontar), mismo patrón ya usado por `App.tsx` (`key={selectedMobId}`).
+- Fullscreen nativo sobre el `<div>` que envuelve `Viewer3D` (no todo el documento) -- `document.fullscreenElement`/`requestFullscreen`/`exitFullscreen`, con `.catch` que loguea (no traga en silencio) el rechazo -- verificado en vivo que el navegador puede rechazar la promesa si el gesto de click no se considera "confiable" (ej. automatización), sin que eso rompa nada visible al usuario real.
+- `saving`/`saveError`/`savedJustNow` + `handleSave` -- "Guardar" real (antes no existía en el editor): construye un snapshot de un solo mob (`buildProjectSnapshot` con Maps de una entrada) y lo mergea sobre el `ProjectRecord` existente vía `saveProject(..., { overwrite: true })`, mismo patrón que `AgregarMobModal.tsx` (ticket 071).
+
+Iteraciones en vivo tras la primera entrega (todas antes del VoBo final):
+
+- El slot "Tamaño" de la barra de herramientas, corregido por Marco: no era el tamaño de pincel del borrador, era la RESOLUCIÓN de trabajo (x1-x10) -- se reconstruyó un `<Select>` inline (no `ResolutionControls`/`FormField`, cuyo layout de label-arriba-select no encaja en una fila horizontal). El tamaño de pincel del borrador se reubicó junto al botón "Borrador" mismo, solo visible con ese modo activo.
+- "Guardar"/"Exportar PNG" subieron de la fila de título a la fila del breadcrumb (a su misma altura).
+- "Exportar PNG" (`ExportControls.tsx`) pasó a `variant="primary"` + ícono (`IconExport`) -- antes secundario sin ícono.
+
+Decisiones disclosed a Marco al presentar (no asumidas en silencio): se omiten "Selector"/"Copiar"/"Recortar" de la barra de herramientas de la imagen de referencia -- sin equivalente funcional real hoy en la app (regla 8 de CLAUDE.md, nunca botones decorativos que no hacen nada); "Rotar/Zoom/Mover" del visor 3D se muestran como texto informativo, no botones (son gestos continuos de mouse que `OrbitControls` ya maneja, no una acción discreta que disparar); se agregó un panel "Archivo" (Importar/Pegar, ticket 031) en la columna derecha, NO presente en la imagen de referencia, para no perder esa funcionalidad existente en silencio.
+
+### `HsvColorPicker.tsx` (nuevo, reemplaza a `ColorPicker.tsx`) + `colorConversion.ts` (nuevo)
+
+Cuadro de saturación/valor (técnica CSS de 2 gradientes superpuestos sobre `hsl(matiz)`, sin canvas -- más liviano, se re-pinta solo con una variable CSS) + control de matiz (`<input type="range">` nativo estilado en arcoíris, `.ui-hue-slider`, en vez de un segundo control de arrastre hecho a mano -- accesibilidad/teclado gratis del elemento nativo) + entrada hex + "Colores recientes" (estado de `Editor.tsx`, prepend+dedup+tope de 8) + la misma paleta Minecraft de antes. `colorConversion.ts` aporta las conversiones hex/rgb/hsv puras que faltaban (el picker anterior usaba `<input type="color">` nativo, sin necesitar descomponer el color).
+
+**Bug real encontrado y corregido en vivo**: el campo de hex mostraba el valor VIEJO cuando el color cambiaba por cualquier medio que NO fuera escribir en ese campo (palette, cuadro de saturación, matiz) -- `hexInput` (estado local) solo se inicializaba una vez (`useState(color)`) y nunca se resincronizaba con la prop `color`. Fix: patrón oficial de React "ajustar estado cuando cambia una prop" DURANTE el render (comparar `color` contra un `prevColor` guardado y `setHexInput`/`setPrevColor` si difieren), no un `useEffect` -- evita el warning de lint `react/set-state-in-effect` (cascada de renders innecesaria) que sí disparó la primera versión con `useEffect`.
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Repetida en cada iteración (oscuro/claro): pintar/deshacer/rehacer, cambiar de mob por el sidebar (remonta el editor completo, confirma que el buffer cacheado del mob anterior sobrevive), guardar y confirmar persistencia (recargando "Proyecto"), exportar PNG, cambiar resolución de trabajo, abrir "Agregar mob" desde el sidebar del editor, Restablecer cámara (remount visible del visor), pantalla completa. Sin errores de consola.
+
+`npx tsc --noEmit`, `npx oxlint`, `npx vitest run` (215), `npm run build` en verde en cada iteración.
+
+## Ticket 073 -- Quita "Recientes", animaciones/transiciones sutiles, y rebranding
+
+Tres pedidos puntuales de Marco tras revisar el Editor rediseñado (ticket 072) en vivo, en la misma sesión.
+
+### Quita "Recientes"
+
+`Recientes.tsx` eliminado del repo (confirmado sin otros consumidores antes de borrar) -- `NavView` (`Sidebar.tsx`) y `View` (`App.tsx`) pierden `'recientes'`, junto con la rama de render y el `import` correspondientes.
+
+### Animaciones/transiciones sutiles en toda la app
+
+Alcance y estilo confirmados con Marco vía `AskUserQuestion` antes de implementar ("toda la app" vs. solo el Editor; "sutiles" vs. "más elaboradas") -- ambas veces la opción recomendada/más conservadora.
+
+- `.ui-button` (`index.css`): transición extendida de solo `background-color`/`border-color` a también `color`/`filter`/`transform`, más un `:active:not(:disabled) { transform: scale(0.97) }` (retroalimentación táctil al soltar). Como es la clase base de prácticamente todos los botones de la app, esto cubre la mayoría de la superficie interactiva sin tocar cada componente.
+- `.ui-select`/`.ui-menu__item`: mismo criterio de hover+transición que `.ui-button`.
+- `.ts-fade-in` (ya existía desde el ticket 032, solo para `Editor.tsx`): extendido al contenedor raíz de `NuevoProyecto.tsx`/`MisProyectos.tsx`/`Proyecto.tsx`/`Settings.tsx` -- las 5 pantallas se montan/desmontan por completo al navegar (sin router, `view` en `App.tsx` decide con `&&`), así que el mismo mecanismo de "fundido por montaje" aplica sin cambios a cada una.
+- `.ts-modal-backdrop`/`.ts-modal-panel` (nuevos): fundido del fondo + fundido-y-escala del panel, aplicados a los 2 modales reales de la app (`AgregarMobModal.tsx`, `MobPreviewModal` dentro de `MobEntryCard.tsx`).
+- `.ts-render-thumb`/`.ts-render-loading` (nuevos): pulso de opacidad mientras `useMobSnapshot3D` todavía no termina de fotografiar el modelo (el fallback visible en ese momento es `pngDataUrl`, la textura cruda, no el render final -- antes ese estado era indistinguible del resultado terminado). Aplicado en `MobEntryCard.tsx` (ambos layouts), `ProjectCard.tsx` (`ProjectMobThumb`), y como texto pulsante en `MobPreviewModal` (que no recibe `pngDataUrl`, solo `snapshotUrl`).
+
+**Hallazgo real, encontrado al probar el hover en vivo**: los botones de navegación del sidebar principal (`Sidebar.tsx`) y los 3 botones de `EditorProjectSidebar.tsx` tenían `background`/`border`/`color` puestos como estilo INLINE condicional (según `isActive`). Un valor inline SIEMPRE gana sobre una regla de hoja de estilos, incluida `:hover` -- así que ningún hover de CSS podía aplicar sobre esas 3 propiedades en esos botones, sin importar qué clase tuvieran. No es que les faltara animación: el hover en sí nunca había funcionado. Fix: esos colores se movieron a clases CSS nuevas (`.ts-nav-item`/`.ts-nav-item--active`, `.ts-sidebar-project-card`, `.ts-sidebar-mob-item`/`--active`, `.ts-sidebar-add-mob`) con los MISMOS valores de reposo/activo que ya tenían inline -- solo se agregó `:hover`, ningún color visible cambió salvo al pasar el mouse. Mismo motivo para `.ts-swatch` (swatches de color de `HsvColorPicker.tsx`): ahí solo se anima `transform` (nunca `background`/`border`, que sí siguen siendo inline por diseño -- cada swatch necesita su propio color dinámico), así que no hay conflicto de especificidad.
+
+### Rebranding: sin fondo de imagen en el sidebar, logo nuevo, favicon
+
+`assets/brand/sidebar-bg.png` eliminado del repo -- el fondo del `<nav>` del sidebar pasa de `` `#0f171d url(${sidebarBgUrl}) no-repeat left bottom / cover` `` a simplemente `'#0f171d'` (mismo color sólido que ya tenía debajo de la imagen). `assets/brand/logo.png` reemplazado por el logo nuevo que mandó Marco (bloque de pasto con un lápiz), reescalado de 1254×1254 a 256×256 con `sips` (mismo orden de magnitud que el logo anterior -- se usa a 28-34px en la UI, no había razón para inflar el bundle con la resolución original). `public/favicon.png` (nuevo, 64×64, mismo logo) reemplaza a `favicon.svg` (genérico, del scaffold inicial del proyecto) -- referenciado desde `index.html` como `<link rel="icon" type="image/png">`. Un favicon necesita servirse desde una URL estática (`public/`), no puede importarse como asset procesado/hasheado de `src/` (por eso es una copia del logo, no el mismo archivo).
+
+### Verificación en vivo (Claude in Chrome, local)
+
+Hover del sidebar principal y del sidebar del editor (confirmado que ahora sí responde), apertura de ambos modales con la animación nueva, navegación entre las 5 pantallas (fundido visible en cada una), logo visible en topbar/tarjeta de marca del sidebar/favicon de la pestaña del navegador (`http://localhost:5173/favicon.png` cargando la imagen correcta), dark y light theme. Sin errores de consola.
+
+`npx tsc --noEmit`, `npx oxlint`, `npx vitest run` (215, sin tests nuevos -- ticket 100% visual/CSS/assets), `npm run build` en verde.
+
+### Nota sobre el empaquetado en un único PR (tickets 071-073)
+
+Los 3 tickets de esta sección se implementaron en una misma sesión continua de iteración en vivo con Marco, con cambios entrelazados en varios archivos compartidos (`App.tsx`, `index.css`, `Sidebar.tsx`, `EditorProjectSidebar.tsx`) -- separarlos en ramas/PRs limpios de verdad habría significado rehacer manualmente los mismos cambios 2-3 veces (el entorno no soporta `git add -i`/`git add -p` para staging interactivo por hunks). Marco confirmó explícitamente vía `AskUserQuestion` empaquetar los 3 en un único PR bajo el mismo VoBo, en vez del "un PR por ticket" habitual de este proyecto -- decisión puntual de este caso, no un cambio de convención general.

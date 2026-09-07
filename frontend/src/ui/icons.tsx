@@ -365,6 +365,103 @@ export function IconModel(props: IconProps) {
   );
 }
 
+// Íconos nuevos del ticket 072 (rediseño del editor de texturas, imagen
+// de referencia de Marco) -- mismo criterio hand-drawn del ticket 046,
+// trazo fino (`LineIcon`) para herramientas/acciones neutras.
+
+/** Herramienta "Pincel" (barra de herramientas del editor). */
+export function IconBrush(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="M15.5 3.5 20.5 8.5 10 19H5v-5Z" />
+      <path d="M13.5 5.5 18.5 10.5" />
+    </LineIcon>
+  );
+}
+
+/** Herramienta "Borrador" (barra de herramientas del editor). */
+export function IconEraser(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="m17 3 4 4-10.5 10.5H6L3 14Z" />
+      <path d="M9 21H21" />
+      <path d="m9.5 6.5 8 8" />
+    </LineIcon>
+  );
+}
+
+/** "Deshacer" (barra de herramientas del editor -- mismo concepto que `HistoryControls.tsx`, ahora con ícono en vez de solo texto). */
+export function IconUndo(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="M9 7 4 12l5 5" />
+      <path d="M4 12h10a6 6 0 0 1 0 12h-2" />
+    </LineIcon>
+  );
+}
+
+/** "Rehacer" -- espejo horizontal de `IconUndo`. */
+export function IconRedo(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="m15 7 5 5-5 5" />
+      <path d="M20 12H10a6 6 0 0 0 0 12h2" />
+    </LineIcon>
+  );
+}
+
+/** "Guardar" (botón nuevo del editor, ticket 072 -- guarda el buffer actual de vuelta al proyecto). */
+export function IconSave(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="M5 3h11l3 3v15H5Z" />
+      <path d="M8 3v6h8V3" />
+      <path d="M8 21v-7h8v7" />
+    </LineIcon>
+  );
+}
+
+/** "Pantalla completa" (visor 3D del editor). */
+export function IconExpand(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4" />
+    </LineIcon>
+  );
+}
+
+/** "Restablecer" (visor 3D del editor -- vuelve la cámara a su posición inicial). */
+export function IconRefresh(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="M4 12a8 8 0 0 1 14-5.2M20 12a8 8 0 0 1-14 5.2" />
+      <path d="M18 3v4h-4M6 21v-4h4" />
+    </LineIcon>
+  );
+}
+
+/** "Consejo" (tip box del editor) -- foco/bombilla, FORMA RELLENA (mismo criterio del ticket 046: íconos de acento/marca en forma sólida, no trazo). */
+export function IconLightbulb(props: IconProps) {
+  return (
+    <FilledIcon {...props}>
+      <path d="M12 2a7 7 0 0 0-4 12.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26A7 7 0 0 0 12 2Z" />
+      <rect x="9" y="19" width="6" height="1.6" rx="0.8" />
+      <rect x="10" y="21.2" width="4" height="1.4" rx="0.7" />
+    </FilledIcon>
+  );
+}
+
+/** "Simetría" (barra de herramientas del editor) -- dos triángulos espejados sobre un eje central punteado. */
+export function IconSymmetry(props: IconProps) {
+  return (
+    <LineIcon {...props}>
+      <path d="M12 3v18" strokeDasharray="2.5 2.5" />
+      <path d="M11 6 4 12l7 6Z" />
+      <path d="M13 6l7 6-7 6Z" />
+    </LineIcon>
+  );
+}
+
 /**
  * Logo pixel-art de bloque de pasto -- REEMPLAZADO en la revisión 2 de
  * este ticket por el PNG real que mandó Marco (`assets/brand/logo.png`,

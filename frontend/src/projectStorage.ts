@@ -169,6 +169,20 @@ export function listProjects(): ProjectSummary[] {
  *   el usuario y volver a llamar con `overwrite: true` si confirma.
  * - Cualquier fallo de `localStorage.setItem` (ej. `QuotaExceededError`)
  *   se propaga sin atrapar -- ver `writeAllProjects`.
+ *
+ * Ticket 072 (hallazgo real, encontrado revisando este archivo antes de
+ * agregar "Guardar" al editor -- bug preexistente desde el ticket 042,
+ * nunca antes ejercitado en vivo con un proyecto que ya tuviera
+ * `description`/`coverImageDataUrl`, ver docs/ARQUITECTURA.md, "Ticket
+ * 072"): al sobrescribir un proyecto EXISTENTE (`overwrite: true`,
+ * unico caso real -- `AgregarMobModal.tsx` y el nuevo "Guardar" del
+ * editor), esta funcion armaba el registro nuevo con SOLO `updatedAt` +
+ * `mobs`, descartando en silencio `description`/`coverImageDataUrl` si
+ * el proyecto ya los tenia. Fix: preservar esos 2 campos del registro
+ * existente (si lo hay) -- esta funcion sigue sin saber nada de
+ * "editar descripcion/portada" (eso vive en `updateProjectDescription`/
+ * `updateProjectCover`), solo ya no los borra como efecto secundario de
+ * guardar mobs.
  */
 export function saveProject(name: string, mobs: Record<string, ProjectMobEntry>, options: { overwrite?: boolean } = {}): void {
   const trimmed = name.trim();
@@ -180,11 +194,17 @@ export function saveProject(name: string, mobs: Record<string, ProjectMobEntry>,
   }
 
   const all = readAllProjects();
-  if (trimmed in all && !options.overwrite) {
+  const existing = all[trimmed];
+  if (existing && !options.overwrite) {
     throw new ProjectAlreadyExistsError(trimmed);
   }
 
-  all[trimmed] = { updatedAt: new Date().toISOString(), mobs };
+  all[trimmed] = {
+    updatedAt: new Date().toISOString(),
+    mobs,
+    description: existing?.description,
+    coverImageDataUrl: existing?.coverImageDataUrl,
+  };
   writeAllProjects(all);
 }
 
