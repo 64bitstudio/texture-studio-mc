@@ -88,14 +88,17 @@ function MobPreviewModal({ label, snapshotUrl, onClose }: { label: string; snaps
 /**
  * Tarjeta de un mob dentro de "Proyecto" (ticket 057, ajustada de
  * fidelidad visual en el ticket 058 tras comparar contra la imagen de
- * referencia con un proyecto real de Marco): miniatura grande con la
- * textura del proyecto aplicada al modelo 3D real, fotografiada en un
- * ángulo fijo estilo "wiki oficial" (motor del ticket 062, ver
- * `renderMobSnapshot3D.ts` -- reemplaza al compositor 2D plano del
- * ticket 055/058, retirado), info derivada (archivo/dimensiones/
- * escala/modelo, sin storage nuevo), un ícono de ojo compacto +
- * "Editar textura", y un menú "⋮" con "Eliminar mob del proyecto"
- * (confirmación inline, ticket 058).
+ * referencia con un proyecto real de Marco). Modo grid (ticket 069):
+ * nombre + menú "⋮" arriba, miniatura debajo a todo el ancho, info
+ * debajo de esa. Modo lista (ticket 068): miniatura chica + nombre en
+ * una sola fila, sin info detallada (deformaba la fila angosta).
+ * Miniatura con la textura del proyecto aplicada al modelo 3D real,
+ * fotografiada en un ángulo fijo estilo "wiki oficial" (motor del
+ * ticket 062, ver `renderMobSnapshot3D.ts` -- reemplaza al compositor
+ * 2D plano del ticket 055/058, retirado), info derivada (archivo/
+ * dimensiones/escala/modelo, sin storage nuevo), un ícono de ojo
+ * compacto + "Editar textura", y un menú "⋮" con "Eliminar mob del
+ * proyecto" (confirmación inline, ticket 058).
  */
 export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geometryCache, onEditTexture, onRemoveMob }: MobEntryCardProps) {
   const cachedGeometry = geometryCache.get(mobId) ?? null;
@@ -129,12 +132,6 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
   }, [onRemoveMob]);
 
   const isList = layout === 'list';
-  // Ticket 060 (corrección de Marco: "las cards deben ser mas grandes y
-  // tambien los renders 2D de cada textura") -- en grid, la miniatura
-  // crece de 96 a 160 y la tarjeta completa gana padding/gaps a juego
-  // (ver el `<li>` de abajo). En modo lista se deja igual: ahí la fila
-  // es angosta y compacta por diseño (ticket 057).
-  const thumbSize = isList ? 40 : 160;
   const dimensions = geometry ? `${geometry.textureWidth * resolution}×${geometry.textureHeight * resolution} px` : '—';
 
   const menu = (
@@ -170,8 +167,20 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
     </Menu>
   );
 
-  // Una sola línea -- ver `ProjectCard.tsx` (ticket 053) para el hallazgo real de por qué (bug de `ui-accessibility-guard.sh` con tags multilínea, reportado via `SendFeedback`).
-  const thumb = <img src={snapshotUrl ?? pngDataUrl} alt={`Miniatura de la textura guardada de ${label}`} style={{ width: thumbSize, height: thumbSize, objectFit: 'contain', imageRendering: 'pixelated', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', flexShrink: 0 }} />;
+  // Ticket 069 (pedido de Marco, con imagen de referencia): en modo
+  // grid la miniatura deja de ser un cuadro chico de 160px a un lado
+  // del nombre -- pasa a ocupar TODO el ancho de la tarjeta, debajo
+  // del nombre (ver el `return` de más abajo). En modo lista sigue
+  // siendo el cuadrito chico de 40px junto al nombre (ticket 057/068,
+  // sin cambios ahí). Una sola línea -- ver `ProjectCard.tsx` (ticket
+  // 053) para el hallazgo real de por qué (bug de
+  // `ui-accessibility-guard.sh` con tags multilínea, reportado via
+  // `SendFeedback`).
+  const thumb = isList ? (
+    <img src={snapshotUrl ?? pngDataUrl} alt={`Miniatura de la textura guardada de ${label}`} style={{ width: 40, height: 40, objectFit: 'contain', imageRendering: 'pixelated', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', flexShrink: 0 }} />
+  ) : (
+    <img src={snapshotUrl ?? pngDataUrl} alt={`Miniatura de la textura guardada de ${label}`} style={{ width: '100%', height: 200, objectFit: 'contain', imageRendering: 'pixelated', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }} />
+  );
 
   // Ticket 059 (corrección de Marco: "te falta agregar iconos") -- cada
   // línea de info gana un ícono a la izquierda (`ui/icons.tsx`, mismo
@@ -228,33 +237,21 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
   }
 
   return (
-    <li style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 20, borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', background: 'var(--surface-raised)' }}>
-      {/* Ticket 059 (corrección de Marco: "la card... debe estar de
-          lado izquierdo la imagen del mob y del lado derecho el
-          detalle") -- miniatura a la izquierda, nombre+menú+info a la
-          derecha, en vez de nombre arriba y la miniatura grande
-          centrada debajo. Ticket 060: tarjeta y miniatura más grandes
-          (ver `thumbSize` y el padding/gap del `<li>` de arriba). */}
-      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        {thumb}
-        {/* Ticket 066 (pedido de Marco: "los textos... estan muy
-            juntos, espacialos mas") -- gap de 8 a 14 entre el nombre y
-            el bloque de info. */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Ticket 061 (corrección de Marco): el nombre va pegado
-              hasta arriba de la tarjeta (ya lo estaba -- primer
-              elemento de la columna, `alignItems: 'flex-start'` en la
-              fila de arriba) y un poco más grande (`--font-sm` ->
-              `--font-md`). Ticket 066: sigue igual -- primer elemento
-              de la columna, pegado a la izquierda del todo (sin
-              padding/margen propio). */}
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-            <span style={{ fontWeight: 600, fontSize: 'var(--font-md)' }}>{label}</span>
-            {menu}
-          </div>
-          {info}
-        </div>
+    // Ticket 069 (pedido de Marco, con imagen de referencia): el
+    // nombre + el menú "⋮" pasan a ser la fila de hasta arriba de la
+    // tarjeta (antes: miniatura a la izquierda, nombre+menú+info a la
+    // derecha, ticket 059) -- nombre a la izquierda, menú a la
+    // derecha, ambos centrados verticalmente en su fila
+    // (`alignItems: 'center'`). Debajo, la miniatura ocupa todo el
+    // ancho, y debajo de esa la info. `gap` de 14 a 18 -- "los textos
+    // dentro de la card deven verse mas espaciados".
+    <li style={{ display: 'flex', flexDirection: 'column', gap: 18, padding: 20, borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', background: 'var(--surface-raised)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{ fontWeight: 600, fontSize: 'var(--font-md)' }}>{label}</span>
+        {menu}
       </div>
+      {thumb}
+      {info}
       <div style={{ display: 'flex', gap: 8 }}>
         {editButton}
         {eyeButton}

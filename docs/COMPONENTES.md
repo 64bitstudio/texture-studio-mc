@@ -415,3 +415,7 @@ Reemplaza el motor de miniaturas del ticket 055 -- ver `docs/ARQUITECTURA.md`, "
 ### Ticket 068 -- Quita el bloque de info detallada en modo lista
 
 - **`components/MobEntryCard.tsx`** — en modo lista, ya no se muestra el bloque de info (archivo/dimensiones/escala/modelo) -- deformaba la fila angosta; solo queda el nombre. Modo grid sin cambios.
+
+### Ticket 069 -- Tarjeta de mob (modo grid): nombre+menú arriba, imagen a todo el ancho debajo
+
+- **`components/MobEntryCard.tsx`** (modo grid) — el nombre + el menú "⋮" pasan a ser la fila de hasta arriba de la tarjeta (nombre izquierda, menú derecha); la miniatura pasa de un cuadro fijo de 160px junto al nombre a ocupar todo el ancho de la tarjeta debajo de esa fila; la info va debajo de la miniatura. Más espacio entre secciones (`gap` 14 -> 18). Modo lista sin cambios (ticket 068).
