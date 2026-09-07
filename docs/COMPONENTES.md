@@ -407,3 +407,7 @@ Reemplaza el motor de miniaturas del ticket 055 -- ver `docs/ARQUITECTURA.md`, "
 
 - **`components/MobEntryCard.tsx`** — más espacio entre el nombre y el bloque de info (gap 8 -> 14) y entre cada línea de info (gap 4 -> 7).
 - **`components/Proyecto.tsx`** — `dl` de "Información del proyecto" con más espacio entre filas (gap 8 -> 14) + un ícono por fila (`IconDocument`/`IconModel`/`IconClock`); separador quitado de arriba de "Eliminar proyecto"; nuevo separador de 1px debajo del breadcrumb.
+
+### Ticket 067 -- Homologa el diseño de "Información del proyecto" con la referencia
+
+- **`components/Proyecto.tsx`** — encabezados "Información del proyecto"/"Acciones" en texto normal negrita (override local, sin tocar `.ui-section__title` compartido); cada fila del `dl` con un ícono grande (20px) al lado de un bloque de 2 líneas (etiqueta/valor) en vez del ícono inline junto a la etiqueta; nueva fila "Descripción" (dato ya existente, `record.description`, solo faltaba mostrarlo aquí); íconos reasignados: Nombre -> `IconFolder`, Mobs -> `IconModel`, Última modificación -> `IconClock`, Descripción -> `IconDocument`.
