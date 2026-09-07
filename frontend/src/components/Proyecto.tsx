@@ -328,31 +328,34 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
         </div>
       </div>
 
-      {/* Ticket 063 (pedido de Marco, con imagen de referencia): la zona
-          de mobs ya NO es una "card" (antes envuelta en `<Section>`, con
-          borde/fondo propio) -- el buscador + el toggle grid/lista salen
-          de esa caja, y el grid/lista de tarjetas de mob queda "suelto"
-          directamente sobre el fondo de la pantalla. Las ÚNICAS cards
-          reales que quedan son "Información del proyecto" y "Acciones"
-          (columna derecha, sin cambios). */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 260px', gap: 20, alignItems: 'start' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <h3 className="ui-section__title" style={{ margin: 0 }}>
-              Mobs de este proyecto ({mobIds.length})
-            </h3>
-            {mobIds.length > 0 && (
-              <SearchSortToggleBar
-                searchValue={mobSearchText}
-                onSearchChange={setMobSearchText}
-                searchPlaceholder="Buscar mobs…"
-                searchAriaLabel="Buscar mobs de este proyecto por nombre"
-                layout={mobLayout}
-                onLayoutChange={setMobLayout}
-              />
-            )}
-          </div>
+      {/* Ticket 065 (pedido de Marco, con imagen de referencia): el
+          buscador + el toggle grid/lista pasan a compartir fila con el
+          encabezado "Mobs de este proyecto (N)" EN TODO EL ANCHO del
+          contenido (no solo la columna izquierda) -- así el buscador
+          queda "hasta la derecha" de verdad, a la misma altura donde
+          empieza la card lateral, en vez de encima solo de la columna
+          de mobs. La grid de 2 columnas (mobs | panel lateral) empieza
+          justo debajo, con `alignItems: 'start'` para que la card
+          lateral quede a la MISMA altura que las tarjetas de mob (ver
+          ticket 063: esa card ya no envuelve al buscador). */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <h3 className="ui-section__title" style={{ margin: 0 }}>
+          Mobs de este proyecto ({mobIds.length})
+        </h3>
+        {mobIds.length > 0 && (
+          <SearchSortToggleBar
+            searchValue={mobSearchText}
+            onSearchChange={setMobSearchText}
+            searchPlaceholder="Buscar mobs…"
+            searchAriaLabel="Buscar mobs de este proyecto por nombre"
+            layout={mobLayout}
+            onLayoutChange={setMobLayout}
+          />
+        )}
+      </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 260px', gap: 20, alignItems: 'start' }}>
+        <div>
           {mobIds.length === 0 ? (
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-dim)' }}>Este proyecto todavía no tiene mobs -- usa "Agregar mob".</p>
           ) : (
@@ -405,60 +408,76 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
           )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <Section title="Información del proyecto">
-            <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 'var(--font-sm)' }}>
-              <div>
-                <dt style={{ color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Nombre</dt>
-                <dd style={{ margin: 0 }}>{projectName}</dd>
-              </div>
-              <div>
-                <dt style={{ color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Mobs</dt>
-                <dd style={{ margin: 0 }}>{mobIds.length}</dd>
-              </div>
-              <div>
-                <dt style={{ color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Última modificación</dt>
-                <dd style={{ margin: 0 }}>{new Date(record.updatedAt).toLocaleString()}</dd>
-              </div>
-            </dl>
-          </Section>
-
-          <Section title="Acciones">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <button type="button" className="ui-menu__item" onClick={handleStartEditTitle}>
-                <IconPencil size={16} /> Renombrar proyecto
-              </button>
-              <button type="button" className="ui-menu__item" onClick={handleDuplicateFromPanel}>
-                <IconDuplicate size={16} /> Duplicar proyecto
-              </button>
-              <button type="button" className="ui-menu__item" onClick={() => void exportZip()} disabled={exporting}>
-                <IconExport size={16} /> {exporting ? 'Exportando…' : 'Exportar proyecto'}
-              </button>
-              <div style={{ height: 1, background: 'var(--border)', margin: '4px 2px' }} />
-              {confirmDelete ? (
-                <div role="alertdialog" aria-label={`Confirmar eliminación del proyecto «${projectName}»`} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 6px' }}>
-                  <p style={{ margin: 0, fontSize: 'var(--font-sm)' }}>¿Eliminar «{projectName}»? Esta acción no se puede deshacer.</p>
-                  <div style={{ display: 'flex', gap: 6 }}>
-                    <Button variant="danger" onClick={handleConfirmDeleteFromPanel} style={{ flex: 1, justifyContent: 'center' }}>
-                      Sí, eliminar
-                    </Button>
-                    <Button onClick={() => setConfirmDelete(false)} style={{ flex: 1, justifyContent: 'center' }}>
-                      Cancelar
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <button type="button" className="ui-menu__item" style={{ color: 'var(--danger)' }} onClick={() => setConfirmDelete(true)}>
-                  <IconTrash size={16} /> Eliminar proyecto
-                </button>
-              )}
+        {/* Ticket 065 (pedido de Marco): "Información del proyecto" y
+            "Acciones" pasan de ser 2 cards separadas a UNA sola card con
+            una división interna -- mismo `<Section>`, ahora con AMBOS
+            sub-encabezados y un separador (`<div>` de 1px, mismo criterio
+            ya usado dentro de "Acciones" para separar "Eliminar
+            proyecto"). `style={{ background: 'var(--surface-raised)' }}`
+            -- hallazgo real de Marco: `--panel-bg` (el fondo por defecto
+            de `.ui-section`) es IGUAL a `--bg` (el fondo de toda la
+            pantalla) en ambos temas, así que esta card se veía "sin
+            fondo" (solo el borde) -- se fuerza el mismo fondo que ya
+            usan las tarjetas de mob (`--surface-raised`) para que se
+            vea como una card real. */}
+        <Section style={{ background: 'var(--surface-raised)' }}>
+          <h3 className="ui-section__title" style={{ margin: 0 }}>
+            Información del proyecto
+          </h3>
+          <dl style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 8, fontSize: 'var(--font-sm)' }}>
+            <div>
+              <dt style={{ color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Nombre</dt>
+              <dd style={{ margin: 0 }}>{projectName}</dd>
             </div>
-            {duplicatedName && (
-              <p style={{ margin: '8px 0 0', fontSize: 'var(--font-xs)', color: 'var(--accent)' }}>Se creó una copia: «{duplicatedName}» (en "Mis proyectos").</p>
+            <div>
+              <dt style={{ color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Mobs</dt>
+              <dd style={{ margin: 0 }}>{mobIds.length}</dd>
+            </div>
+            <div>
+              <dt style={{ color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}>Última modificación</dt>
+              <dd style={{ margin: 0 }}>{new Date(record.updatedAt).toLocaleString()}</dd>
+            </div>
+          </dl>
+
+          <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+
+          <h3 className="ui-section__title" style={{ margin: 0 }}>
+            Acciones
+          </h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <button type="button" className="ui-menu__item" onClick={handleStartEditTitle}>
+              <IconPencil size={16} /> Renombrar proyecto
+            </button>
+            <button type="button" className="ui-menu__item" onClick={handleDuplicateFromPanel}>
+              <IconDuplicate size={16} /> Duplicar proyecto
+            </button>
+            <button type="button" className="ui-menu__item" onClick={() => void exportZip()} disabled={exporting}>
+              <IconExport size={16} /> {exporting ? 'Exportando…' : 'Exportar proyecto'}
+            </button>
+            <div style={{ height: 1, background: 'var(--border)', margin: '4px 2px' }} />
+            {confirmDelete ? (
+              <div role="alertdialog" aria-label={`Confirmar eliminación del proyecto «${projectName}»`} style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 6px' }}>
+                <p style={{ margin: 0, fontSize: 'var(--font-sm)' }}>¿Eliminar «{projectName}»? Esta acción no se puede deshacer.</p>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <Button variant="danger" onClick={handleConfirmDeleteFromPanel} style={{ flex: 1, justifyContent: 'center' }}>
+                    Sí, eliminar
+                  </Button>
+                  <Button onClick={() => setConfirmDelete(false)} style={{ flex: 1, justifyContent: 'center' }}>
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="ui-menu__item" style={{ color: 'var(--danger)' }} onClick={() => setConfirmDelete(true)}>
+                <IconTrash size={16} /> Eliminar proyecto
+              </button>
             )}
-            {actionError && <InlineError message={actionError} />}
-          </Section>
-        </div>
+          </div>
+          {duplicatedName && (
+            <p style={{ margin: '8px 0 0', fontSize: 'var(--font-xs)', color: 'var(--accent)' }}>Se creó una copia: «{duplicatedName}» (en "Mis proyectos").</p>
+          )}
+          {actionError && <InlineError message={actionError} />}
+        </Section>
       </div>
     </div>
   );

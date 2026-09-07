@@ -397,3 +397,8 @@ Reemplaza el motor de miniaturas del ticket 055 -- ver `docs/ARQUITECTURA.md`, "
 ### Ticket 064 -- Más espacio entre los 3 textos del header, ícono de descripción alineado con su texto
 
 - **`components/Proyecto.tsx`** — `gap` del contenedor de título/resumen/descripción de 6px a 12px; fila de la descripción cambiada de `alignItems: 'flex-start'` a `'center'` para que el ícono de editar quede alineado con el texto de una sola línea (mismo criterio que ya usaba la fila del título).
+
+### Ticket 065 -- Card lateral unificada con fondo real, buscador a todo lo ancho, mobs más grandes en el snapshot 3D
+
+- **`components/Proyecto.tsx`** — "Información del proyecto" y "Acciones" fusionadas en UNA sola card (`<Section>`) con separador interno y fondo real (`var(--surface-raised)`, igual que las tarjetas de mob -- el fondo por defecto de `<Section>` es igual al fondo de toda la pantalla, ver el ticket); el buscador/toggle grid-lista pasan a compartir fila con "Mobs de este proyecto (N)" en TODO el ancho del contenido (antes solo sobre la columna de mobs), quedando alineados con el borde derecho de la card lateral, que ahora empieza a la misma altura que las tarjetas de mob.
+- **`renderMobSnapshot3D.ts`** — nueva constante `CAMERA_ZOOM` (0.75): acerca la cámara hacia el centro de la geometría del mob (nunca hacia el origen del mundo) manteniendo el mismo ángulo, para que la miniatura se vea más grande sin recortar al mob.

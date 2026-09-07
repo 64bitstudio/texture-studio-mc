@@ -29,6 +29,20 @@ const DEG_TO_RAD = Math.PI / 180;
 const CAMERA_POSITION: [number, number, number] = [45, 40, 65];
 const CAMERA_FOV = 40;
 
+// Ticket 065 (pedido de Marco: "los mobs deben verse mas grande...
+// acerca mas los mobs"): el ángulo de `Viewer3D.tsx` de arriba está
+// pensado para un visor INTERACTIVO (deja margen de sobra para poder
+// rotar/hacer zoom sin que el modelo se salga de cuadro) -- para una
+// miniatura fija ese margen solo deja al mob chico dentro del cuadro.
+// `CAMERA_ZOOM` acerca la cámara hacia el centro de la geometría
+// (nunca hacia el origen del mundo -- así funciona igual de bien para
+// la Araña, cuyo bounding box está en otra posición/altura que la de
+// un biped) MANTENIENDO exactamente el mismo ángulo de vista, solo
+// reduce la distancia. Afinado en vivo contra los 4 mobs reales
+// (Esqueleto/Zombie/Araña/Creeper) -- lo bastante cerca para que el
+// mob llene la mayoría del cuadro sin recortar cabeza/pies.
+const CAMERA_ZOOM = 0.75;
+
 // Canvas WebGL + renderer COMPARTIDOS entre llamadas (módulo-level,
 // creados una sola vez de forma perezosa): cada tarjeta de mob genera
 // su propia miniatura, y crear un `WebGLRenderer` nuevo (= un contexto
@@ -136,8 +150,16 @@ export async function renderMobSnapshot3D(geometry: MobGeometry, texturePngDataU
   scene.add(root);
 
   const target = computeGeometryCenter(geometry);
+  // Acerca la cámara hacia `target` (nunca hacia el origen del mundo,
+  // ver `CAMERA_ZOOM`) -- mismo ángulo de vista que `Viewer3D.tsx`,
+  // solo más cerca.
+  const cameraPosition: [number, number, number] = [
+    target[0] + (CAMERA_POSITION[0] - target[0]) * CAMERA_ZOOM,
+    target[1] + (CAMERA_POSITION[1] - target[1]) * CAMERA_ZOOM,
+    target[2] + (CAMERA_POSITION[2] - target[2]) * CAMERA_ZOOM,
+  ];
   const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, 0.1, 1000);
-  camera.position.set(CAMERA_POSITION[0], CAMERA_POSITION[1], CAMERA_POSITION[2]);
+  camera.position.set(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
   camera.lookAt(target[0], target[1], target[2]);
 
   const renderer = getSharedRenderer();
