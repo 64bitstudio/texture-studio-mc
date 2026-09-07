@@ -402,3 +402,8 @@ Reemplaza el motor de miniaturas del ticket 055 -- ver `docs/ARQUITECTURA.md`, "
 
 - **`components/Proyecto.tsx`** — "Información del proyecto" y "Acciones" fusionadas en UNA sola card (`<Section>`) con separador interno y fondo real (`var(--surface-raised)`, igual que las tarjetas de mob -- el fondo por defecto de `<Section>` es igual al fondo de toda la pantalla, ver el ticket); el buscador/toggle grid-lista pasan a compartir fila con "Mobs de este proyecto (N)" en TODO el ancho del contenido (antes solo sobre la columna de mobs), quedando alineados con el borde derecho de la card lateral, que ahora empieza a la misma altura que las tarjetas de mob.
 - **`renderMobSnapshot3D.ts`** — nueva constante `CAMERA_ZOOM` (0.75): acerca la cámara hacia el centro de la geometría del mob (nunca hacia el origen del mundo) manteniendo el mismo ángulo, para que la miniatura se vea más grande sin recortar al mob.
+
+### Ticket 066 -- Más espacio en textos, iconos en "Información del proyecto", separador bajo breadcrumb, sin separador sobre "Eliminar"
+
+- **`components/MobEntryCard.tsx`** — más espacio entre el nombre y el bloque de info (gap 8 -> 14) y entre cada línea de info (gap 4 -> 7).
+- **`components/Proyecto.tsx`** — `dl` de "Información del proyecto" con más espacio entre filas (gap 8 -> 14) + un ícono por fila (`IconDocument`/`IconModel`/`IconClock`); separador quitado de arriba de "Eliminar proyecto"; nuevo separador de 1px debajo del breadcrumb.
