@@ -13,8 +13,8 @@ Validar contra la realidad (no solo contra documentación) que un `.bbmodel` con
 ## Progreso (parcial -- falta verificación visual de Marco)
 
 Servidor de prueba montado y funcionando (local, en este equipo, ver `.gitignore` -- no se versiona):
-- Paper 1.21.4 build 232 (STABLE) + Java 25 (Homebrew, compatible con el requisito de Java 21+).
-- FreeMinecraftModels **2.11.2** (⚠️ ver hallazgo 1 abajo -- no la que trae `/releases/latest` de GitHub).
+- Paper **1.21.11** build 132 (STABLE) -- corregido de 1.21.4 a la versión real del cliente de Marco (el protocolo de red de Minecraft no es compatible entre versiones, un cliente 1.21.11 no puede unirse a un servidor 1.21.4). Java 25 (Homebrew, compatible con el requisito de Java 21+).
+- FreeMinecraftModels **2.11.2** (⚠️ ver hallazgo 1 abajo -- no la que trae `/releases/latest` de GitHub) -- soporta 1.21.4 a 1.21.11 por igual, confirmado contra Modrinth antes de elegir versión.
 - Servidor corriendo en `localhost:25565`, `online-mode=true` (para que Marco se conecte con su cliente Java real).
 
 ### Hallazgos reales (ya confirmados contra el juego, no contra documentación)
