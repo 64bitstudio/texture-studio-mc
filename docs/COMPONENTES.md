@@ -374,3 +374,9 @@ El frontend antes del ticket 002 no tenía runner de tests propio — la validac
 - **`ui/Button.tsx`** / **`index.css`** — nuevo `variant="icon-plain"`: mismo criterio de nombre accesible vía `.sr-only` que `icon-square`, pero sin fondo/borde/caja -- solo el ícono. Usado por los botones de renombrar/editar-descripción de `Proyecto.tsx` (antes `icon-square`, Marco pidió "solo el icono sin el cuadro que lo envuelve").
 - **`components/Proyecto.tsx`** — botones de editar título/descripción cambiados a `icon-plain`; el grid de tarjetas de mob sube su columna mínima de 220px a 320px (a juego con la tarjeta más grande); breadcrumb ("Mis proyectos › Nombre") gana padding vertical propio para separarse más del resto del header.
 - Explícitamente NO incluido (pendiente de que Marco reenvíe una imagen de referencia): cambiar la perspectiva del motor de preview 2D (`renderMobFrontSprite2D.ts`/`mobFrontSprite.ts`), que hoy sigue siendo una proyección ortográfica de frente.
+
+### Ticket 061 -- Corrección de espaciado del breadcrumb, nombre de tarjeta más grande, subtítulo en "Agregar mob"
+
+- **`components/Proyecto.tsx`** — breadcrumb reescrito como flex con `gap` real entre "Mis proyectos", "›" y el nombre (antes: padding vertical del ticket 060, que no era lo pedido, más espacios literales dentro del texto); card "Agregar mob" (modo grid) gana el subtítulo "Añade un nuevo mob a este proyecto.".
+- **`components/MobEntryCard.tsx`** — nombre del mob en modo grid de `--font-sm` a `--font-md` (ya estaba pegado hasta arriba, sin cambio de layout ahí).
+- Sigue explícitamente pendiente (imagen de referencia no llegó legible en el canal, ver el ticket): la perspectiva del motor de preview 2D.

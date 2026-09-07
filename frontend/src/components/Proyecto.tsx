@@ -209,16 +209,16 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
 
   return (
     <div style={{ padding: 28, display: 'flex', flexDirection: 'column', gap: 20 }}>
-      {/* Ticket 060 (corrección de Marco: "la seccion de hasta arriba
-          que dice mis proyectos > nombre del proyecto debe estar mas
-          espaciada") -- padding propio en vez de depender solo del gap
-          del contenedor, para que el breadcrumb respire del resto del
-          header. */}
-      <nav aria-label="Ruta" style={{ fontSize: 'var(--font-sm)', color: 'var(--text-dim)', padding: '4px 0 12px' }}>
+      {/* Ticket 061 (corrección de Marco sobre el 060: el espaciado que
+          pedía NO era vertical -- era el espacio entre cada texto y el
+          separador "›". `gap` en un flex en vez de espacios literales
+          dentro del texto (que dependían de que el navegador no los
+          colapsara) -- espaciado explícito y consistente. */}
+      <nav aria-label="Ruta" style={{ fontSize: 'var(--font-sm)', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: 10 }}>
         <button type="button" onClick={onBackToList} style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', cursor: 'pointer', textDecoration: 'underline' }}>
           Mis proyectos
         </button>
-        <span> › </span>
+        <span aria-hidden="true">›</span>
         <span style={{ color: 'var(--text)' }}>{projectName}</span>
       </nav>
 
@@ -360,7 +360,11 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
                       }
                     >
                       <IconPlus size={mobLayout === 'grid' ? 24 : 16} />
-                      <span>{mobLayout === 'grid' ? 'Agregar mob' : 'Agregar mob a este proyecto'}</span>
+                      <span style={mobLayout === 'grid' ? { fontWeight: 600 } : undefined}>{mobLayout === 'grid' ? 'Agregar mob' : 'Agregar mob a este proyecto'}</span>
+                      {/* Ticket 061 (pedido de Marco): subtítulo solo en
+                          la card de grid -- en modo lista es una barra
+                          angosta, no una "card", y el texto no cabe. */}
+                      {mobLayout === 'grid' && <span style={{ fontSize: 'var(--font-xs)' }}>Añade un nuevo mob a este proyecto.</span>}
                     </button>
                   </li>
                 </ul>
