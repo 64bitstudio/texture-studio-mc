@@ -371,6 +371,34 @@ export function removeMobFromProject(name: string, mobId: string): void {
 }
 
 /**
+ * Actualiza la geometría/estado de UN mob dentro de un proyecto (ticket
+ * 083, editor de modelo 3D) -- a diferencia de `renameProject`/
+ * `updateProjectDescription` (metadato, no tocan `updatedAt`), esto SÍ
+ * refresca `updatedAt`: editar el modelo es trabajo real hecho sobre el
+ * proyecto (mismo criterio que `saveProject`), no un cambio de
+ * metadato. Lanza si el proyecto o el mob ya no existen (mismo mensaje
+ * que `renameProject`/`updateProjectDescription` -- probablemente se
+ * eliminó en otra pestaña).
+ */
+export function updateMobGeometry(
+  name: string,
+  mobId: string,
+  update: Pick<ProjectMobEntry, 'geometryStatus' | 'customGeometry'>,
+): void {
+  const all = readAllProjects();
+  const record = all[name];
+  if (!record || !(mobId in record.mobs)) {
+    throw new Error(`El mob "${mobId}" ya no existe en el proyecto "${name}" -- puede que se haya eliminado en otra pestaña.`);
+  }
+  all[name] = {
+    ...record,
+    updatedAt: new Date().toISOString(),
+    mobs: { ...record.mobs, [mobId]: { ...record.mobs[mobId]!, ...update } },
+  };
+  writeAllProjects(all);
+}
+
+/**
  * Duplica un proyecto guardado (ticket 053, menú "⋮" de "Mis proyectos") --
  * copia COMPLETA de `mobs` (mismos PNGs/resolución, sin volver a
  * codificar nada) bajo un nombre nuevo autogenerado, con `updatedAt`

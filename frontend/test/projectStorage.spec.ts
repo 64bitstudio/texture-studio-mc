@@ -22,6 +22,7 @@ import {
   renameProject,
   removeMobFromProject,
   saveProject,
+  updateMobGeometry,
   updateProjectCover,
   updateProjectDescription,
 } from '../src/projectStorage';
@@ -484,5 +485,42 @@ describe('ProjectMobEntry -- geometryStatus/customGeometry/animations (ticket 08
     expect(getMobGeometryStatus(loaded.mobs.skeleton!)).toBe('vanilla');
     expect(loaded.mobs.skeleton!.customGeometry).toBeUndefined();
     expect(getMobGeometryStatus(loaded.mobs.zombie!)).toBe('confirmado');
+  });
+});
+
+describe('updateMobGeometry (ticket 083)', () => {
+  it('actualiza geometryStatus/customGeometry de un mob existente y refresca updatedAt', async () => {
+    saveProject('proyecto-modelo', SAMPLE_MOBS);
+    const before = loadProject('proyecto-modelo')!.updatedAt;
+
+    // Pequena espera real para que el ISO string de updatedAt cambie de verdad (resolucion de milisegundos).
+    await new Promise((resolve) => setTimeout(resolve, 2));
+
+    updateMobGeometry('proyecto-modelo', 'skeleton', { geometryStatus: 'modelando', customGeometry: SAMPLE_CUSTOM_GEOMETRY });
+    const loaded = loadProject('proyecto-modelo')!;
+
+    expect(getMobGeometryStatus(loaded.mobs.skeleton!)).toBe('modelando');
+    expect(loaded.mobs.skeleton!.customGeometry).toEqual(SAMPLE_CUSTOM_GEOMETRY);
+    expect(loaded.updatedAt).not.toBe(before);
+  });
+
+  it('no afecta a otros mobs del mismo proyecto', () => {
+    saveProject('proyecto-modelo-2', {
+      skeleton: { resolution: 1, pngDataUrl: 'data:image/png;base64,AAA' },
+      zombie: { resolution: 1, pngDataUrl: 'data:image/png;base64,ZZZ' },
+    });
+    updateMobGeometry('proyecto-modelo-2', 'skeleton', { geometryStatus: 'confirmado', customGeometry: SAMPLE_CUSTOM_GEOMETRY });
+
+    const loaded = loadProject('proyecto-modelo-2')!;
+    expect(getMobGeometryStatus(loaded.mobs.zombie!)).toBe('vanilla');
+  });
+
+  it('lanza si el proyecto ya no existe', () => {
+    expect(() => updateMobGeometry('no-existe', 'skeleton', { geometryStatus: 'modelando' })).toThrow(/ya no existe/);
+  });
+
+  it('lanza si el mob ya no existe en ese proyecto', () => {
+    saveProject('proyecto-modelo-3', SAMPLE_MOBS);
+    expect(() => updateMobGeometry('proyecto-modelo-3', 'zombie', { geometryStatus: 'modelando' })).toThrow(/ya no existe/);
   });
 });

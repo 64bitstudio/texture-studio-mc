@@ -13,6 +13,8 @@ export interface ProyectoProps {
   mobs: MobSummary[];
   /** Elegir un mob del proyecto para editarlo -- mismo `handleSelectMob` que ya usa el resto de la app (ticket 018/027), navega a `'editor'`. El editor real no cambia con este ticket -- confirmado explícito con Marco. */
   onSelectMob: (mobId: string) => void;
+  /** Menú "⋮" -> "Editar modelo 3D" (ticket 083) -- navega a `'editor-modelo'` para ese mob. */
+  onEditModel: (mobId: string) => void;
   /** Navega a `'agregar-mobs'` (ticket 042). */
   onAddMobs: () => void;
   /** El proyecto activo cambió de nombre -- `App.tsx` actualiza `activeProject.name`. */
@@ -60,7 +62,7 @@ function mobLabelFor(mobId: string, mobs: MobSummary[]): string {
  * texturas (`Editor.tsx`, con su visor 3D en vivo) -- `onSelectMob`
  * navega exactamente igual que siempre.
  */
-export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectRenamed, onProjectDeleted, onMobRemoved, onBackToList }: ProyectoProps) {
+export function Proyecto({ projectName, mobs, onSelectMob, onEditModel, onAddMobs, onProjectRenamed, onProjectDeleted, onMobRemoved, onBackToList }: ProyectoProps) {
   const [geometryCache] = useState(() => new Map<string, MobGeometry>());
   const { actionError, exporting, rename, duplicate, exportZip, remove, clearError } = useProjectActions(projectName);
 
@@ -383,6 +385,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onAddMobs, onProjectR
                       layout={mobLayout}
                       geometryCache={geometryCache}
                       onEditTexture={() => onSelectMob(mobId)}
+                      onEditModel={() => onEditModel(mobId)}
                       onRemoveMob={() => handleRemoveMob(mobId)}
                     />
                   ))}
