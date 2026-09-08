@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 import { blockbenchModelFileName, buildBlockbenchModel } from '../src/exportBlockbench';
 import type { FaceLabels, MobGeometry } from '../src/types/baseAssets';
+import type { MobAnimation } from '../src/projectStorage';
 
 const LABELS: FaceLabels = { front: 'Frente', back: 'Atrás', top: 'Arriba', bottom: 'Abajo', left: 'Izquierda', right: 'Derecha' };
 
@@ -193,5 +194,108 @@ describe('buildBlockbenchModel -- outliner (jerarquia bone+cube)', () => {
 describe('blockbenchModelFileName', () => {
   it('produce "<mobId>.bbmodel"', () => {
     expect(blockbenchModelFileName('zombie')).toBe('zombie.bbmodel');
+  });
+});
+
+// Ticket 093 -- animaciones. Ver el comentario del módulo
+// (`exportBlockbench.ts`) para la evidencia real que fija este formato.
+describe('buildBlockbenchModel -- animations', () => {
+  it('sin animaciones (u omitidas), produce animations: [] -- mismo comportamiento del ticket 092', () => {
+    const model = buildBlockbenchModel(BIPED_GEOMETRY, { ...OPTIONS, uuid: fakeUuid() });
+    expect(model.animations).toEqual([]);
+  });
+
+  it('animators se indexa por el UUID del GRUPO (bone), NUNCA el del elemento/cubo', () => {
+    const animations: MobAnimation[] = [{ name: 'idle', loop: true, length: 2, bones: { armRight: [{ time: 0, rotation: { x: -5, y: 0, z: 0 } }] } }];
+    const model = buildBlockbenchModel(BIPED_GEOMETRY, { ...OPTIONS, animations, uuid: fakeUuid() });
+
+    const armRightGroupUuid = (model.outliner[0]!.children.find((c) => typeof c === 'object' && c.name === 'armRight') as { uuid: string }).uuid;
+    const armRightElementUuid = model.elements.find((e) => e.name === 'armRight')!.uuid;
+
+    const animators = model.animations[0]!.animators;
+    expect(Object.keys(animators)).toEqual([armRightGroupUuid]);
+    expect(Object.keys(animators)).not.toContain(armRightElementUuid);
+    expect(animators[armRightGroupUuid]!.name).toBe('armRight');
+    expect(animators[armRightGroupUuid]!.type).toBe('bone');
+  });
+
+  it('loop=true/false se traduce a "loop"/"once"', () => {
+    const looping: MobAnimation = { name: 'idle', loop: true, length: 1, bones: { body: [{ time: 0, rotation: { x: 0, y: 0, z: 0 } }] } };
+    const once: MobAnimation = { name: 'attack', loop: false, length: 0.5, bones: { body: [{ time: 0, rotation: { x: 0, y: 0, z: 0 } }] } };
+    const model = buildBlockbenchModel(BIPED_GEOMETRY, { ...OPTIONS, animations: [looping, once], uuid: fakeUuid() });
+    expect(model.animations[0]!.loop).toBe('loop');
+    expect(model.animations[1]!.loop).toBe('once');
+  });
+
+  it('length/name viajan tal cual', () => {
+    const animations: MobAnimation[] = [{ name: 'walk', loop: true, length: 0.7, bones: { body: [{ time: 0, rotation: { x: 0, y: 0, z: 0 } }] } }];
+    const model = buildBlockbenchModel(BIPED_GEOMETRY, { ...OPTIONS, animations, uuid: fakeUuid() });
+    expect(model.animations[0]!.name).toBe('walk');
+    expect(model.animations[0]!.length).toBe(0.7);
+  });
+
+  it('un AnimationKeyframe con solo rotation produce UN keyframe de Blockbench, canal "rotation", data_points como strings', () => {
+    const animations: MobAnimation[] = [{ name: 'idle', loop: true, length: 1, bones: { armRight: [{ time: 0, rotation: { x: -5, y: 0, z: 0 } }] } }];
+    const model = buildBlockbenchModel(BIPED_GEOMETRY, { ...OPTIONS, animations, uuid: fakeUuid() });
+    const groupUuid = Object.keys(model.animations[0]!.animators)[0]!;
+    const keyframes = model.animations[0]!.animators[groupUuid]!.keyframes;
+    expect(keyframes).toHaveLength(1);
+    expect(keyframes[0]).toMatchObject({ channel: 'rotation', time: 0, interpolation: 'linear' });
+    expect(keyframes[0]!.data_points).toEqual([{ x: '-5', y: '0', z: '0' }]);
+  });
+
+  it('un AnimationKeyframe con rotation+position+scale produce 3 keyframes de Blockbench en el MISMO time, un canal cada uno', () => {
+    const animations: MobAnimation[] = [
+      { name: 'spawn', loop: false, length: 1, bones: { body: [{ time: 0.5, rotation: { x: 0, y: 0, z: 0 }, position: { x: 0, y: -5, z: 0 }, scale: { x: 1, y: 1, z: 1 } }] } },
+    ];
+    const model = buildBlockbenchModel(BIPED_GEOMETRY, { ...OPTIONS, animations, uuid: fakeUuid() });
+    const groupUuid = Object.keys(model.animations[0]!.animators)[0]!;
+    const keyframes = model.animations[0]!.animators[groupUuid]!.keyframes;
+    expect(keyframes).toHaveLength(3);
+    expect(keyframes.map((k) => k.channel)).toEqual(['rotation', 'position', 'scale']);
+    expect(keyframes.every((k) => k.time === 0.5)).toBe(true);
+    expect(keyframes.find((k) => k.channel === 'position')!.data_points).toEqual([{ x: '0', y: '-5', z: '0' }]);
+  });
+
+  it('varios keyframes del mismo hueso producen varias entradas de rotation, una por tiempo', () => {
+    const animations: MobAnimation[] = [
+      {
+        name: 'walk',
+        loop: true,
+        length: 0.7,
+        bones: {
+          armRight: [
+            { time: 0, rotation: { x: -30, y: 0, z: 0 } },
+            { time: 0.35, rotation: { x: 30, y: 0, z: 0 } },
+            { time: 0.7, rotation: { x: -30, y: 0, z: 0 } },
+          ],
+        },
+      },
+    ];
+    const model = buildBlockbenchModel(BIPED_GEOMETRY, { ...OPTIONS, animations, uuid: fakeUuid() });
+    const groupUuid = Object.keys(model.animations[0]!.animators)[0]!;
+    const keyframes = model.animations[0]!.animators[groupUuid]!.keyframes;
+    expect(keyframes.map((k) => k.time)).toEqual([0, 0.35, 0.7]);
+  });
+
+  it('un hueso animado que ya no existe en la geometria se omite en silencio (geometria editada despues de animar)', () => {
+    const animations: MobAnimation[] = [{ name: 'idle', loop: true, length: 1, bones: { fantasma: [{ time: 0, rotation: { x: 0, y: 0, z: 0 } }] } }];
+    const model = buildBlockbenchModel(BIPED_GEOMETRY, { ...OPTIONS, animations, uuid: fakeUuid() });
+    expect(model.animations[0]!.animators).toEqual({});
+  });
+
+  it('campos estaticos coinciden EXACTO con el archivo real verificado (override/anim_time_update/blend_weight/etc.)', () => {
+    const animations: MobAnimation[] = [{ name: 'idle', loop: true, length: 2, bones: { body: [{ time: 0, rotation: { x: 0, y: 0, z: 0 } }] } }];
+    const model = buildBlockbenchModel(BIPED_GEOMETRY, { ...OPTIONS, animations, uuid: fakeUuid() });
+    const animation = model.animations[0]!;
+    expect(animation.override).toBe(false);
+    expect(animation.anim_time_update).toBe('');
+    expect(animation.blend_weight).toBe('1');
+    expect(animation.start_delay).toBe('');
+    expect(animation.loop_delay).toBe('');
+    expect(animation.snapping).toBe(24);
+    expect(animation.selected).toBe(false);
+    expect(animation.saved).toBe(true);
+    expect(animation.path).toBe('');
   });
 });
