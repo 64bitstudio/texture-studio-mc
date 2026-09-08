@@ -15,6 +15,7 @@ import { getSidebarCollapsed, setSidebarCollapsed } from './sidebarCollapse';
 import { fetchMobBaseAssets } from './api/baseAssets';
 import { fetchMobs } from './api/mobs';
 import { loadProject, updateMobGeometry } from './projectStorage';
+import { buildConfirmedMobEntry } from './projectSnapshot';
 import type { MobBaseAssetsResponse, MobGeometry } from './types/baseAssets';
 import type { MobSummary } from './types/mobs';
 import { TextureBuffer } from './textureBuffer';
@@ -130,6 +131,32 @@ function App() {
   // del asset del mob activo (independiente del retry del catalogo).
   const [assetRetryCount, setAssetRetryCount] = useState(0);
 
+  // Ticket 086 -- para un mob ya CONFIRMADO (`geometryStatus ===
+  // 'confirmado'`), el editor de textura usa la geometría/textura
+  // CUSTOM guardada localmente, nunca el catálogo vainilla del backend.
+  // Derivado durante el render (no un efecto que solo copie este valor
+  // a `assetState`) -- mismo criterio ya establecido arriba para
+  // `selectedMobId`, evita el patrón `react(set-state-in-effect)`. El
+  // efecto de fetch de más abajo se salta el fetch en este caso (ver
+  // ese efecto), así que `assetState` nunca llega a pisar este valor
+  // con el catálogo vainilla.
+  const confirmedMobEntry = activeProject && selectedMobId ? loadProject(activeProject.name)?.mobs[selectedMobId] : undefined;
+  const effectiveAssetState: AssetState =
+    confirmedMobEntry?.geometryStatus === 'confirmado' && confirmedMobEntry.customGeometry
+      ? {
+          status: 'ready',
+          data: {
+            geometry: confirmedMobEntry.customGeometry,
+            texture: {
+              dataUrl: confirmedMobEntry.pngDataUrl,
+              width: confirmedMobEntry.customGeometry.textureWidth,
+              height: confirmedMobEntry.customGeometry.textureHeight,
+              isPlaceholder: false,
+            },
+          },
+        }
+      : assetState;
+
   // Ticket 083 -- mob que se está modelando en 'editor-modelo' ahora
   // mismo. Estado separado de `selectedMobId` (Etapa 3, editor de
   // textura) -- ambas subvistas pueden referirse a mobs distintos del
@@ -180,6 +207,13 @@ function App() {
   // efecto -- que solo sincroniza con el fetch en si.
   useEffect(() => {
     if (selectedMobId === null) return;
+    // Ticket 086: un mob confirmado ya se resuelve via `effectiveAssetState`
+    // (derivado arriba) -- fetchear el catalogo vainilla aca seria
+    // trabajo desperdiciado (y, peor, sobreescribiria `assetState` con
+    // datos que de todas formas no se usan para renderizar, pero
+    // podrian causar una condicion de carrera confusa si algun dia se
+    // vuelven a leer).
+    if (confirmedMobEntry?.geometryStatus === 'confirmado' && confirmedMobEntry.customGeometry) return;
     let cancelled = false;
 
     fetchMobBaseAssets(selectedMobId)
@@ -198,7 +232,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedMobId, assetRetryCount]);
+  }, [selectedMobId, assetRetryCount, confirmedMobEntry]);
 
   // Ticket 083 -- fetch de geometría (SIN textura) para 'editor-modelo'.
   // Mismo patrón que el efecto de `assetState` de arriba (sin
@@ -275,12 +309,22 @@ function App() {
   // transición a "loading" se dispara aquí (evento), nunca en el
   // efecto que hace el fetch.
   function handleEditModel(mobId: string) {
+    // Ticket 086, defensa en profundidad: la UI (`MobEntryCard.tsx`)
+    // deshabilita "Editar modelo 3D" para un mob ya confirmado, pero
+    // este handler tambien lo rechaza por si acaso -- HU-6, ultimo
+    // criterio de aceptacion ("la opcion no esta disponible").
+    const mobEntry = activeProject ? loadProject(activeProject.name)?.mobs[mobId] : undefined;
+    if (mobEntry?.geometryStatus === 'confirmado') {
+      console.warn(`handleEditModel: "${mobId}" ya esta confirmado -- el editor de modelo esta bloqueado para el (duplicar el proyecto para cambiar su geometria).`);
+      return;
+    }
+
     // Ticket 084: si el mob ya tiene `customGeometry` guardada (sesion
     // de edicion anterior), se resuelve de una vez -- el efecto de
     // abajo no necesita fetchear nada, y evita el patron de
     // `setState` sincrono dentro de un efecto (regla ya establecida en
     // este archivo, ver el comentario del efecto de `assetState`).
-    const existingCustomGeometry = activeProject ? loadProject(activeProject.name)?.mobs[mobId]?.customGeometry : undefined;
+    const existingCustomGeometry = mobEntry?.customGeometry;
     setModelEditorGeometryState(existingCustomGeometry ? { status: 'ready', geometry: existingCustomGeometry } : { status: 'loading' });
     setEditingModelMobId(mobId);
     setView('editor-modelo');
@@ -296,11 +340,31 @@ function App() {
   // la transición formal a 'confirmado' (con atlas UV) es el ticket 086,
   // todavía no construido -- por eso se vuelve a 'proyecto', no a
   // 'editor' (no hay atlas con el que texturizar todavía).
-  function handleModelEditorContinue(finalGeometry: MobGeometry, hasChanges: boolean) {
+  function handleSaveDraft(finalGeometry: MobGeometry, hasChanges: boolean) {
     if (hasChanges && activeProject && editingModelMobId) {
       updateMobGeometry(activeProject.name, editingModelMobId, { geometryStatus: 'modelando', customGeometry: finalGeometry });
     }
     setView('proyecto');
+  }
+
+  // Ticket 086 -- "Confirmar modelo": cierra la Etapa 2. `confirmedGeometry`
+  // ya viene con el atlas UV aplicado (`ModelEditor3D.handleConfirm`,
+  // via `confirmModelGeometry`). Genera el PNG en blanco del tamaño del
+  // atlas (`buildConfirmedMobEntry`, projectSnapshot.ts -- async, unica
+  // razon de que este handler tambien lo sea), guarda TODO de una vez
+  // (`geometryStatus: 'confirmado'`, la geometria, el PNG) y navega
+  // directo al editor de textura -- sin pasar por `'proyecto'` primero,
+  // ahorrandole un click a quien ya termino de modelar y quiere
+  // empezar a pintar de inmediato.
+  async function handleConfirmModel(confirmedGeometry: MobGeometry) {
+    if (!activeProject || !editingModelMobId) return;
+    const mobId = editingModelMobId;
+
+    const confirmedEntry = await buildConfirmedMobEntry(confirmedGeometry);
+    updateMobGeometry(activeProject.name, mobId, confirmedEntry);
+
+    setSelectedMobIdOverride(mobId);
+    setView('editor');
   }
 
   // Ticket 038/039: fuente unica para "un proyecto quedo activo,
@@ -539,18 +603,18 @@ function App() {
             antes. */}
         {view === 'editor' && (
           <div style={{ position: 'relative', minHeight: '100%' }}>
-            {mobsState.status === 'ready' && selectedMobId && assetState.status === 'loading' && (
+            {mobsState.status === 'ready' && selectedMobId && effectiveAssetState.status === 'loading' && (
               <LoadingOverlay message="Cargando modelo…" />
             )}
 
-            {mobsState.status === 'ready' && selectedMobId && assetState.status === 'error' && (
+            {mobsState.status === 'ready' && selectedMobId && effectiveAssetState.status === 'error' && (
               <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%', minHeight: 400, gap: 12 }}>
-                <p role="alert">No se pudo cargar el modelo: {assetState.message}</p>
+                <p role="alert">No se pudo cargar el modelo: {effectiveAssetState.message}</p>
                 <Button onClick={handleRetryAsset}>Reintentar</Button>
               </div>
             )}
 
-            {mobsState.status === 'ready' && selectedMobId && assetState.status === 'ready' && selectedMobLabel && (
+            {mobsState.status === 'ready' && selectedMobId && effectiveAssetState.status === 'ready' && selectedMobLabel && (
               // `key={selectedMobId}` remonta `Editor` por completo al
               // cambiar de mob (ticket 018) -- todo su estado interno (zoom,
               // historial, simetria, parte aislada, panel de importar/pegar,
@@ -562,7 +626,7 @@ function App() {
               // visitas al mismo mob dentro de la sesion.
               <Editor
                 key={selectedMobId}
-                data={assetState.data}
+                data={effectiveAssetState.data}
                 mobId={selectedMobId}
                 mobLabel={selectedMobLabel}
                 bufferCache={bufferCache}
@@ -595,7 +659,8 @@ function App() {
                 baseGeometry={modelEditorGeometryState.geometry}
                 onBackToProjectsList={() => setView('mis-proyectos')}
                 onBackToProject={handleModelEditorBack}
-                onContinue={handleModelEditorContinue}
+                onSaveDraft={handleSaveDraft}
+                onConfirm={(geometry) => void handleConfirmModel(geometry)}
               />
             )}
           </div>

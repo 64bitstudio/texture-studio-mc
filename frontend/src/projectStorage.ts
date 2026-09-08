@@ -371,19 +371,28 @@ export function removeMobFromProject(name: string, mobId: string): void {
 }
 
 /**
- * Actualiza la geometría/estado de UN mob dentro de un proyecto (ticket
- * 083, editor de modelo 3D) -- a diferencia de `renameProject`/
- * `updateProjectDescription` (metadato, no tocan `updatedAt`), esto SÍ
- * refresca `updatedAt`: editar el modelo es trabajo real hecho sobre el
- * proyecto (mismo criterio que `saveProject`), no un cambio de
- * metadato. Lanza si el proyecto o el mob ya no existen (mismo mensaje
- * que `renameProject`/`updateProjectDescription` -- probablemente se
- * eliminó en otra pestaña).
+ * Actualiza la geometría/estado (y, desde el ticket 086, también el
+ * PNG/resolución) de UN mob dentro de un proyecto -- a diferencia de
+ * `renameProject`/`updateProjectDescription` (metadato, no tocan
+ * `updatedAt`), esto SÍ refresca `updatedAt`: editar el modelo es
+ * trabajo real hecho sobre el proyecto (mismo criterio que
+ * `saveProject`), no un cambio de metadato. Lanza si el proyecto o el
+ * mob ya no existen (mismo mensaje que `renameProject`/
+ * `updateProjectDescription` -- probablemente se eliminó en otra
+ * pestaña).
+ *
+ * Ticket 086 -- "Confirmar modelo" usa esta MISMA función para guardar
+ * de una vez `geometryStatus: 'confirmado'`, la geometría con el atlas
+ * ya aplicado, y el PNG en blanco recién generado (ver
+ * `projectSnapshot.ts`, `buildConfirmedMobEntry`) -- todos los campos
+ * son opcionales para que "guardar borrador" (ticket 083, solo
+ * geometría) y "confirmar" (ticket 086, los 4 campos) reusen la misma
+ * función sin necesitar dos funciones casi idénticas.
  */
 export function updateMobGeometry(
   name: string,
   mobId: string,
-  update: Pick<ProjectMobEntry, 'geometryStatus' | 'customGeometry'>,
+  update: Partial<Pick<ProjectMobEntry, 'geometryStatus' | 'customGeometry' | 'pngDataUrl' | 'resolution'>>,
 ): void {
   const all = readAllProjects();
   const record = all[name];

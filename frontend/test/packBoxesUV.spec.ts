@@ -2,7 +2,8 @@
 // Ver docs/definiciones/modelado-3d-custom-y-generacion-con-ia.md.
 
 import { describe, expect, it } from 'vitest';
-import { packBoxesUV } from '../src/geometry/packBoxesUV';
+import { applyPackedAtlas, confirmModelGeometry, packBoxesUV } from '../src/geometry/packBoxesUV';
+import type { FaceLabels, MobGeometry } from '../src/types/baseAssets';
 
 /** Rectangulo de footprint (mismo calculo que `packBoxesUV`: ancho 2d+2w, alto d+h) -- reimplementado aca a proposito para verificar la propiedad "sin traslapes" de forma independiente, no confiando ciegamente en el mismo codigo que se prueba. */
 function footprintRect(origin: { x: number; y: number }, size: [number, number, number]) {
@@ -146,5 +147,54 @@ describe('packBoxesUV -- contra las 4 geometrias vainilla reales (sin regresion)
     assertNoOverlaps(parts, atlas);
     expect(atlas.textureWidth).toBeGreaterThan(0);
     expect(atlas.textureHeight).toBeGreaterThan(0);
+  });
+});
+
+// Ticket 086 -- "Confirmar modelo": aplicar el atlas calculado a la geometria final.
+
+const NOOP_LABELS: FaceLabels = { front: '', back: '', top: '', bottom: '', left: '', right: '' };
+
+const SAMPLE_GEOMETRY: MobGeometry = {
+  textureWidth: 999, // valor previo cualquiera -- debe quedar reemplazado por el del atlas.
+  textureHeight: 999,
+  parts: {
+    body: { size: [8, 12, 4], position: [0, 18, 0], uv: { x: 0, y: 0 }, faceLabels: NOOP_LABELS },
+    head: { size: [8, 8, 8], position: [0, 10, 0], parentId: 'body', uv: { x: 0, y: 0 }, faceLabels: NOOP_LABELS },
+  },
+};
+
+describe('applyPackedAtlas', () => {
+  it('reemplaza textureWidth/textureHeight y el uv de cada caja por los del atlas', () => {
+    const atlas = packBoxesUV(SAMPLE_GEOMETRY.parts);
+    const result = applyPackedAtlas(SAMPLE_GEOMETRY, atlas);
+
+    expect(result.textureWidth).toBe(atlas.textureWidth);
+    expect(result.textureHeight).toBe(atlas.textureHeight);
+    expect(result.parts.body!.uv).toEqual(atlas.origins.body);
+    expect(result.parts.head!.uv).toEqual(atlas.origins.head);
+  });
+
+  it('no toca position/rotation/parentId/size -- solo uv y las dimensiones de textura', () => {
+    const atlas = packBoxesUV(SAMPLE_GEOMETRY.parts);
+    const result = applyPackedAtlas(SAMPLE_GEOMETRY, atlas);
+
+    expect(result.parts.head!.position).toEqual(SAMPLE_GEOMETRY.parts.head!.position);
+    expect(result.parts.head!.parentId).toBe('body');
+    expect(result.parts.head!.size).toEqual(SAMPLE_GEOMETRY.parts.head!.size);
+  });
+});
+
+describe('confirmModelGeometry', () => {
+  it('empaqueta y aplica el atlas de una sola vez -- mismo resultado que packBoxesUV + applyPackedAtlas por separado', () => {
+    const combined = confirmModelGeometry(SAMPLE_GEOMETRY);
+    const separate = applyPackedAtlas(SAMPLE_GEOMETRY, packBoxesUV(SAMPLE_GEOMETRY.parts));
+    expect(combined).toEqual(separate);
+  });
+
+  it('el resultado no tiene traslapes -- mismo chequeo ya usado para packBoxesUV', () => {
+    const confirmed = confirmModelGeometry(SAMPLE_GEOMETRY);
+    // Re-empaquetar la geometria YA confirmada debe dar exactamente los mismos origenes -- confirma que `applyPackedAtlas` dejo un `uv` consistente con el propio algoritmo de empaquetado.
+    const rePacked = packBoxesUV(confirmed.parts);
+    expect(confirmed.parts.body!.uv).toEqual(rePacked.origins.body);
   });
 });

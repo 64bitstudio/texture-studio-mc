@@ -1,4 +1,4 @@
-import type { BoxUvOrigin, MobBoxPart } from '../types/baseAssets';
+import type { BoxUvOrigin, MobBoxPart, MobGeometry } from '../types/baseAssets';
 
 /**
  * Empaquetado UV genérico para geometría CUSTOM (ticket 085 -- pieza
@@ -112,4 +112,26 @@ export function packBoxesUV(parts: PackableParts, maxWidth: number = DEFAULT_ATL
   }
 
   return { textureWidth: atlasWidth, textureHeight: shelfY + shelfHeight, origins };
+}
+
+/**
+ * Aplica un atlas ya calculado (`packBoxesUV`) a una geometría --
+ * reemplaza `textureWidth`/`textureHeight` por las del atlas, y el `uv`
+ * de cada caja por el origen que le asignó el empaquetado. Una caja sin
+ * origen asignado (no debería ocurrir si el atlas se calculó a partir
+ * de la misma `geometry`) conserva su `uv` anterior en vez de perderlo.
+ */
+export function applyPackedAtlas(geometry: MobGeometry, atlas: PackedUVAtlas): MobGeometry {
+  const parts = Object.fromEntries(
+    Object.entries(geometry.parts).map(([name, part]) => [name, { ...part, uv: atlas.origins[name] ?? part.uv }]),
+  );
+  return { textureWidth: atlas.textureWidth, textureHeight: atlas.textureHeight, parts };
+}
+
+/**
+ * Cierra la Etapa 2 (ticket 086, HU-6): empaqueta y aplica el atlas UV
+ * de una sola vez, a partir de la geometría final del editor de modelo.
+ */
+export function confirmModelGeometry(geometry: MobGeometry, maxWidth: number = DEFAULT_ATLAS_MAX_WIDTH): MobGeometry {
+  return applyPackedAtlas(geometry, packBoxesUV(geometry.parts, maxWidth));
 }
