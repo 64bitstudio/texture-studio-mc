@@ -113,6 +113,22 @@ describe('validateAndApplyGeometryProposal -- aceptacion', () => {
     expect(result.geometry.parts.head).toBeUndefined();
   });
 
+  // Hallazgo real de Marco ("confirmar modelo no hace nada"): la IA a
+  // veces propone tamaños fraccionarios (detalle fino, ej. un jiron de
+  // tela) -- un `size` fraccionario rompe el atlas UV al confirmar el
+  // modelo (ver `roundBoxSize` en `modelEditing.ts`). Se redondea ACA,
+  // al validar la propuesta, para que "Cajas del modelo" ya muestre el
+  // tamaño real que se va a confirmar.
+  it('redondea un "size" fraccionario a enteros (evita el bug de "confirmar modelo no hace nada")', () => {
+    const result = validateAndApplyGeometryProposal(
+      { parts: { body: { size: [8, 12, 4], position: [0, 18, 0], parentId: null }, jiron: { size: [1.25, 4.6, 0.3], position: [0, 20, 2], parentId: 'body' } } },
+      BASE_GEOMETRY,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.geometry.parts.jiron!.size).toEqual([1, 5, 1]);
+  });
+
   it('conserva textureWidth/textureHeight de la geometria base (el atlas real se calcula al confirmar, ticket 086)', () => {
     const result = validateAndApplyGeometryProposal({ parts: { body: { size: [8, 12, 4], position: [0, 0, 0], parentId: null } } }, BASE_GEOMETRY);
     expect(result.ok).toBe(true);

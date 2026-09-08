@@ -7,7 +7,7 @@ import { Button, InlineError } from '../ui';
 import { IconHand, IconModel, IconPlus, IconRefresh, IconScale, IconTrash } from '../ui/icons';
 import { computeGeometryCenter } from '../geometry/geometryBounds';
 import { applyDefaultHierarchy, getDescendants, hasAnyHierarchy, setParent } from '../geometry/hierarchy';
-import { addBox, canDeleteBox, removeBox, updateBoxTransform } from '../geometry/modelEditing';
+import { addBox, canDeleteBox, removeBox, roundBoxSize, updateBoxTransform } from '../geometry/modelEditing';
 import { confirmModelGeometry } from '../geometry/packBoxesUV';
 import type { MobBoxPart, MobGeometry } from '../types/baseAssets';
 
@@ -232,7 +232,10 @@ export function ModelEditor3D({ mobId, mobLabel, projectName, baseGeometry, onBa
     if (!currentPart) return;
     const [w, h, d] = currentPart.size;
     const { x: sx, y: sy, z: sz } = selectedObject.scale;
-    const newSize: [number, number, number] = [Math.max(0.5, w * sx), Math.max(0.5, h * sy), Math.max(0.5, d * sz)];
+    // `roundBoxSize` (no un simple `Math.max(0.5, ...)`) -- un tamaño
+    // fraccionario rompe el atlas UV al confirmar el modelo (hallazgo
+    // real, ver el comentario de `roundBoxSize` en `modelEditing.ts`).
+    const newSize = roundBoxSize([w * sx, h * sy, d * sz]);
     setGeometry((current) => updateBoxTransform(current, selectedName, { size: newSize }));
   }
 

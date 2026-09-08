@@ -1,3 +1,4 @@
+import { roundBoxSize } from './modelEditing';
 import type { BoxUvOrigin, MobBoxPart, MobGeometry } from '../types/baseAssets';
 
 /**
@@ -136,7 +137,25 @@ export function applyPackedAtlas(geometry: MobGeometry, atlas: PackedUVAtlas): M
 /**
  * Cierra la Etapa 2 (ticket 086, HU-6): empaqueta y aplica el atlas UV
  * de una sola vez, a partir de la geometría final del editor de modelo.
+ *
+ * Redondea el `size` de CADA caja a enteros (`roundBoxSize`) antes de
+ * empaquetar -- defensa final, y la que de verdad importa: aunque
+ * `ModelEditor3D`/`geometryProposal.ts` ya redondean en sus propios
+ * puntos de entrada (arrastre del gizmo, propuesta de IA), esta es la
+ * unica que tambien protege geometria YA GUARDADA con tamaños
+ * fraccionarios de una sesion anterior a ese fix (hallazgo real de
+ * Marco: "confirmar modelo no hace nada" -- ver `roundBoxSize` en
+ * `modelEditing.ts` para la causa raiz completa). Sin este redondeo, un
+ * footprint fraccionario (`2d+2w`/`d+h`) produce un atlas
+ * (`textureWidth`/`textureHeight`) fraccionario, y `new ImageData(...)`
+ * (`export.ts`) revienta con "input data length is not a multiple of 4"
+ * -- silenciosamente, porque `handleConfirmModel` (App.tsx) descarta la
+ * promesa con `void`.
  */
 export function confirmModelGeometry(geometry: MobGeometry, maxWidth: number = DEFAULT_ATLAS_MAX_WIDTH): MobGeometry {
-  return applyPackedAtlas(geometry, packBoxesUV(geometry.parts, maxWidth));
+  const roundedParts = Object.fromEntries(
+    Object.entries(geometry.parts).map(([name, part]) => [name, { ...part, size: roundBoxSize(part.size) }]),
+  );
+  const roundedGeometry: MobGeometry = { ...geometry, parts: roundedParts };
+  return applyPackedAtlas(roundedGeometry, packBoxesUV(roundedGeometry.parts, maxWidth));
 }
