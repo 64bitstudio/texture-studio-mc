@@ -42,6 +42,38 @@ describe('buildColorProposalPrompt', () => {
     const prompt = buildColorProposalPrompt(GEOMETRY, 'x');
     expect(prompt).toContain('Frente');
   });
+
+  // Hallazgo real de Marco: para partes CUSTOM (nombre y faceLabels
+  // genericos, ej. "caja1" agregada en el editor de modelo) la IA no
+  // tenia como inferir que representan -- results "muy basicos". Fix:
+  // el prompt ahora incluye tamaño/posicion/jerarquia.
+  it('incluye size y position (absoluta) de cada parte, para que la IA pueda inferir que representa una caja custom sin nombre descriptivo', () => {
+    const geometryWithCustomBox: MobGeometry = {
+      ...GEOMETRY,
+      parts: {
+        ...GEOMETRY.parts,
+        caja1: { size: [1, 4, 1], position: [0, 5, -2], parentId: 'body', uv: { x: 0, y: 24 }, faceLabels: LABELS },
+      },
+    };
+    const prompt = buildColorProposalPrompt(geometryWithCustomBox, 'x');
+    const parsed = JSON.parse(prompt.match(/\{[\s\S]*?\n\}/)![0]) as Record<string, { size: number[]; position: number[]; hijaDe?: string }>;
+    expect(parsed.caja1!.size).toEqual([1, 4, 1]);
+    // position.y de "caja1" es relativa a "body" ([0,18,0]) -> absoluta [0,23,-2].
+    expect(parsed.caja1!.position).toEqual([0, 23, -2]);
+    expect(parsed.caja1!.hijaDe).toBe('body');
+  });
+
+  it('una parte raiz (sin parentId) no trae "hijaDe"', () => {
+    const prompt = buildColorProposalPrompt(GEOMETRY, 'x');
+    const parsed = JSON.parse(prompt.match(/\{[\s\S]*?\n\}/)![0]) as Record<string, { hijaDe?: string }>;
+    expect(parsed.body!.hijaDe).toBeUndefined();
+  });
+
+  it('explica al modelo que los nombres genericos (cajaN) no tienen significado predefinido y hay que inferirlo', () => {
+    const prompt = buildColorProposalPrompt(GEOMETRY, 'x');
+    expect(prompt).toContain('caja1, caja2');
+    expect(prompt.toLowerCase()).toContain('infiere');
+  });
 });
 
 describe('validateAndApplyColorProposal -- rechazos', () => {

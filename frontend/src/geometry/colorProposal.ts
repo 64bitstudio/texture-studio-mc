@@ -15,6 +15,7 @@
 // existentes.
 
 import { computeBoxFaceRects, type BoxFaceRects } from './applyBoxUV';
+import { computeAbsolutePosition } from './hierarchy';
 import { groupPartsBySharedUV } from './packBoxesUV';
 import type { MobGeometry } from '../types/baseAssets';
 import type { PixelSource } from '../textureBuffer';
@@ -39,19 +40,46 @@ export interface ColorProposal {
  * grupo de UV compartido (`groupPartsBySharedUV`, ticket 085) con sus
  * `faceLabels` legibles -- pedirle a la IA un color para `armLeft`
  * además de `armRight` sería redundante (misma región de pixeles).
+ *
+ * **Hallazgo real de Marco, corregido acá**: para un modelo CUSTOM
+ * (cajas agregadas en el editor de modelo, ticket 083), el nombre de
+ * parte es genérico (`caja1`, `caja2`, ver `generateNewPartName` en
+ * `modelEditing.ts`) y sus `faceLabels` TAMBIÉN son genéricos
+ * (`GENERIC_FACE_LABELS`, sin significado anatómico) -- la versión
+ * anterior de este prompt solo mandaba esos dos datos, así que para
+ * cualquier caja agregada por el usuario la IA no tenía CÓMO saber qué
+ * representa (¿un cuerno?, ¿una cola?), y devolvía colores genéricos
+ * ("resultados muy básicos", reporte real). Fix: se agrega `size`
+ * (proporciones -- una caja larga y angosta sugiere cuerno/cola, una
+ * ancha y plana sugiere una placa/aleta) y `position` en espacio
+ * ABSOLUTO (`computeAbsolutePosition`, ya resuelve la cadena de padres)
+ * más de qué parte cuelga (`hijaDe`) -- toda la información geométrica
+ * que ya usa `buildGeometryProposalPrompt` (ticket 088) para razonar
+ * sobre forma, ahora también disponible acá para razonar sobre color.
+ * Las partes vainilla (`body`/`head`/etc.) ya tenían nombres
+ * descriptivos y seguían dando buenos resultados -- este fix beneficia
+ * sobre todo a los modelos con geometría custom.
  */
 export function buildColorProposalPrompt(geometry: MobGeometry, description: string): string {
   const groups = groupPartsBySharedUV(geometry.parts);
-  const partsForPrompt: Record<string, { caras: Record<FaceKey, string> }> = {};
+  const partsForPrompt: Record<string, { size: [number, number, number]; position: [number, number, number]; hijaDe?: string; caras: Record<FaceKey, string> }> = {};
   for (const { members } of groups.values()) {
     const representativeName = members[0]!;
     const part = geometry.parts[representativeName]!;
-    partsForPrompt[representativeName] = { caras: part.faceLabels };
+    const entry: (typeof partsForPrompt)[string] = {
+      size: part.size,
+      position: computeAbsolutePosition(geometry, representativeName),
+      caras: part.faceLabels,
+    };
+    if (part.parentId) entry.hijaDe = part.parentId;
+    partsForPrompt[representativeName] = entry;
   }
 
-  return `Tienes un modelo 3D estilo Minecraft con estas partes y sus caras (nombre de parte -> etiqueta legible de cada cara):
+  return `Tienes un modelo 3D estilo Minecraft con estas partes (tamaño y posición en unidades tipo Minecraft, posición ya en espacio absoluto -- mayor "y" es más arriba; "hijaDe" indica de qué otra parte cuelga esta caja):
 
 ${JSON.stringify(partsForPrompt, null, 2)}
+
+Partes con nombre descriptivo (body/head/armRight/etc.) son de la geometría base de un mob vainilla de Minecraft. Partes con nombre genérico (caja1, caja2, ...) fueron agregadas a mano por el usuario en el editor de modelo -- NO tienen un significado predefinido, así que infiere qué representan a partir de su tamaño, posición y de qué parte cuelgan (ej. una caja larga y angosta que cuelga de la cabeza probablemente es un cuerno o una oreja; una caja alargada que cuelga del cuerpo hacia atrás probablemente es una cola) antes de proponerles un color coherente con el resto del modelo.
 
 Propon una primera pasada de color para lograr este estilo: "${description}"
 
