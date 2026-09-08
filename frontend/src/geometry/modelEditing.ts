@@ -11,7 +11,7 @@ import { computeGeometryBounds } from './geometryBounds';
 export const DEFAULT_NEW_BOX_SIZE: [number, number, number] = [4, 4, 4];
 
 /** Sin lateralidad ni nombre de parte especifico -- una caja agregada a mano no tiene todavia una region UV "real" (eso lo resuelve `packBoxesUV` al confirmar el modelo, ticket 086), asi que sus etiquetas de cara son genericas. */
-const GENERIC_FACE_LABELS: FaceLabels = {
+export const GENERIC_FACE_LABELS: FaceLabels = {
   front: 'Frente',
   back: 'Atrás',
   top: 'Arriba',
@@ -21,7 +21,7 @@ const GENERIC_FACE_LABELS: FaceLabels = {
 };
 
 /** UV placeholder -- una caja nueva no tiene region propia hasta que `packBoxesUV` (ticket 086) le asigne una real; el tipo `MobBoxPart.uv` es requerido, asi que necesita ALGUN valor mientras tanto. */
-const PLACEHOLDER_UV = { x: 0, y: 0 };
+export const PLACEHOLDER_UV = { x: 0, y: 0 };
 
 /** Primer nombre libre de la forma "cajaN" dentro de `geometry.parts` -- determinista, nunca colisiona con partes ya existentes (vainilla o agregadas antes). */
 export function generateNewPartName(geometry: MobGeometry): string {
