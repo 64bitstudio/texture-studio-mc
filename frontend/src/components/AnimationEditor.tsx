@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Viewer3D } from './Viewer3D';
+import { AIPresetParamsAssist } from './AIPresetParamsAssist';
+import { AIFreeAnimationAssist } from './AIFreeAnimationAssist';
 import { applyDefaultHierarchy, hasAnyHierarchy } from '../geometry/hierarchy';
 import { resolveLoopedTime, sampleAnimationAtTime, sampleBoneAtTime } from '../animation/interpolation';
-import { DEFAULT_PRESET_PARAMS, generatePresetAnimation, type PresetParams } from '../animation/presets';
+import { DEFAULT_PRESET_PARAMS, generatePresetAnimation, PRESET_PARAMS_RANGE, type PresetParams } from '../animation/presets';
 import { addKeyframe, checkWalkRequiresIdle, createEmptyAnimation, isRecognizedAnimationName, moveKeyframe, removeKeyframe, RECOGNIZED_ANIMATION_NAMES, updateKeyframeValue, ZERO_ROTATION, type RecognizedAnimationName } from '../animation/timelineEditing';
 import { decodePngDataUrlToImageData } from '../decodeTexture';
 import { TextureBuffer } from '../textureBuffer';
@@ -154,6 +156,16 @@ export function AnimationEditor({ mobId, mobLabel, projectName, geometry, textur
     }
     setAnimationsList((current) => [...current.filter((a) => a.name !== presetName), result.animation]);
     handleSelectAnimation(presetName);
+  }
+
+  // HU-12 (ticket 091) -- una propuesta de animación libre ya
+  // confirmada por el usuario (`AIFreeAnimationAssist` maneja su propio
+  // flujo de aplicar/descartar) reemplaza cualquier animación con el
+  // MISMO nombre, sin tocar las demás -- mismo criterio que
+  // `handleGeneratePreset`.
+  function handleApplyFreeAnimation(animation: MobAnimation) {
+    setAnimationsList((current) => [...current.filter((a) => a.name !== animation.name), animation]);
+    handleSelectAnimation(animation.name);
   }
 
   function handleAddKeyframeHere() {
@@ -335,17 +347,20 @@ export function AnimationEditor({ mobId, mobLabel, projectName, geometry, textur
                 </Select>
               </FormField>
               <FormField label={`Velocidad (${presetParams.speed.toFixed(2)})`}>
-                <input type="range" aria-label="Velocidad del preset" min={0.25} max={3} step={0.05} value={presetParams.speed} onChange={(e) => setPresetParams((p) => ({ ...p, speed: Number(e.target.value) }))} />
+                <input type="range" aria-label="Velocidad del preset" min={PRESET_PARAMS_RANGE.speed.min} max={PRESET_PARAMS_RANGE.speed.max} step={0.05} value={presetParams.speed} onChange={(e) => setPresetParams((p) => ({ ...p, speed: Number(e.target.value) }))} />
               </FormField>
               <FormField label={`Amplitud (${presetParams.amplitude.toFixed(0)}°)`}>
-                <input type="range" aria-label="Amplitud del preset" min={5} max={60} step={1} value={presetParams.amplitude} onChange={(e) => setPresetParams((p) => ({ ...p, amplitude: Number(e.target.value) }))} />
+                <input type="range" aria-label="Amplitud del preset" min={PRESET_PARAMS_RANGE.amplitude.min} max={PRESET_PARAMS_RANGE.amplitude.max} step={1} value={presetParams.amplitude} onChange={(e) => setPresetParams((p) => ({ ...p, amplitude: Number(e.target.value) }))} />
               </FormField>
               <Button variant="primary" onClick={handleGeneratePreset}>
                 Generar «{presetName}»
               </Button>
               {presetError && <InlineError message={presetError} />}
+              <AIPresetParamsAssist preset={presetName} onApply={(params) => setPresetParams(params)} />
             </div>
           </Section>
+
+          <AIFreeAnimationAssist geometry={hierarchicalGeometry} onApply={handleApplyFreeAnimation} />
 
           <Section title="Nueva animación vacía">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
