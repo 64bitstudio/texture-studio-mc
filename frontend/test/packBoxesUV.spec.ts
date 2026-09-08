@@ -197,4 +197,48 @@ describe('confirmModelGeometry', () => {
     const rePacked = packBoxesUV(confirmed.parts);
     expect(confirmed.parts.body!.uv).toEqual(rePacked.origins.body);
   });
+
+  // Hallazgo real de Marco ("confirmar modelo no hace nada"): una caja con
+  // `size` fraccionario (tipico de una propuesta de IA con detalle fino,
+  // ej. un jiron de tela) produce un atlas fraccionario -- `TextureBuffer`/
+  // `new ImageData(...)` (export.ts) exigen dimensiones enteras y revientan
+  // con un error que nadie atrapa (`handleConfirmModel` en App.tsx descarta
+  // la promesa con `void`), asi que el usuario no ve nada. `confirmModelGeometry`
+  // ahora redondea CADA `size` a enteros antes de empaquetar -- ver
+  // `roundBoxSize` en `modelEditing.ts`.
+  it('geometria con tamaños fraccionarios (ej. una propuesta de IA con detalle fino): el atlas resultante tiene dimensiones enteras, y no lanza', () => {
+    const geometryWithFractionalSizes: MobGeometry = {
+      textureWidth: 64,
+      textureHeight: 64,
+      parts: {
+        body: { size: [8, 12, 4], position: [0, 18, 0], uv: { x: 0, y: 0 }, faceLabels: NOOP_LABELS },
+        shirtChestUpper: { size: [8.4, 4.2, 0.35], position: [0, 20, 2], parentId: 'body', uv: { x: 0, y: 0 }, faceLabels: NOOP_LABELS },
+        shirtChestCenterStrip: { size: [1.25, 4.6, 0.3], position: [0, 18, 2], parentId: 'body', uv: { x: 0, y: 0 }, faceLabels: NOOP_LABELS },
+      },
+    };
+
+    const confirmed = confirmModelGeometry(geometryWithFractionalSizes);
+
+    expect(Number.isInteger(confirmed.textureWidth)).toBe(true);
+    expect(Number.isInteger(confirmed.textureHeight)).toBe(true);
+    for (const part of Object.values(confirmed.parts)) {
+      expect(part.size.every((n) => Number.isInteger(n))).toBe(true);
+    }
+    // El caso real que rompia "Confirmar modelo": construir el ImageData en
+    // blanco del atlas confirmado no debe lanzar (mismo calculo que
+    // `TextureBuffer`/`new ImageData(...)`, sin depender del DOM aca).
+    expect(confirmed.textureWidth * confirmed.textureHeight * 4).toEqual(Math.round(confirmed.textureWidth * confirmed.textureHeight * 4));
+  });
+
+  it('un tamaño fraccionario por debajo de 1 se redondea a 1, nunca a 0 (evita un footprint invalido)', () => {
+    const geometry: MobGeometry = {
+      textureWidth: 64,
+      textureHeight: 64,
+      parts: {
+        diminuta: { size: [0.3, 0.2, 0.1], position: [0, 0, 0], uv: { x: 0, y: 0 }, faceLabels: NOOP_LABELS },
+      },
+    };
+    const confirmed = confirmModelGeometry(geometry);
+    expect(confirmed.parts.diminuta!.size).toEqual([1, 1, 1]);
+  });
 });

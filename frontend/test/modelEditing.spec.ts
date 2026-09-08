@@ -9,6 +9,7 @@ import {
   findNonOverlappingPosition,
   generateNewPartName,
   removeBox,
+  roundBoxSize,
   updateBoxTransform,
 } from '../src/geometry/modelEditing';
 import type { FaceLabels, MobGeometry } from '../src/types/baseAssets';
@@ -107,5 +108,23 @@ describe('canDeleteBox', () => {
   it('permite eliminar una caja agregada durante la edicion', () => {
     const original = new Set(['head', 'body']);
     expect(canDeleteBox('caja1', original)).toBe(true);
+  });
+});
+
+// Hallazgo real de Marco ("confirmar modelo no hace nada"): ver el
+// comentario de `roundBoxSize` en `src/geometry/modelEditing.ts` para la
+// causa raiz completa (un tamaño fraccionario rompe el atlas UV al
+// confirmar el modelo).
+describe('roundBoxSize', () => {
+  it('redondea cada componente al entero mas cercano', () => {
+    expect(roundBoxSize([8.4, 4.2, 3.5])).toEqual([8, 4, 4]);
+  });
+
+  it('un valor menor a 0.5 se redondea a 1, nunca a 0', () => {
+    expect(roundBoxSize([0.3, 0.49, 0.1])).toEqual([1, 1, 1]);
+  });
+
+  it('un tamaño ya entero queda igual', () => {
+    expect(roundBoxSize([4, 8, 2])).toEqual([4, 8, 2]);
   });
 });

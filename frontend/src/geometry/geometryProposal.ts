@@ -10,7 +10,7 @@
 // ticket 087) -- una vez que el JSON llega, se valida y se aplica
 // exactamente igual sin importar su origen.
 
-import { GENERIC_FACE_LABELS, PLACEHOLDER_UV } from './modelEditing';
+import { GENERIC_FACE_LABELS, PLACEHOLDER_UV, roundBoxSize } from './modelEditing';
 import { wouldCreateCycle } from './hierarchy';
 import type { MobGeometry } from '../types/baseAssets';
 
@@ -113,7 +113,12 @@ export function validateAndApplyGeometryProposal(raw: unknown, baseGeometry: Mob
       return { ok: false, error: `La caja "${name}" tiene un "rotation" invalido (deben ser 3 numeros).` };
     }
 
-    const entry: ProposedBoxPart = { size, position, parentId: typeof parentId === 'string' ? parentId : null };
+    // Hallazgo real de Marco: la IA a veces propone tamaños fraccionarios
+    // (ej. un jiron de tela de `[1.25, 4.6, 0.3]`) -- se redondean acá,
+    // ANTES de que la caja entre al modelo, para que lo que se ve en
+    // "Cajas del modelo" ya sea lo mismo que se confirma despues (ver
+    // `roundBoxSize` en `modelEditing.ts` para el porque).
+    const entry: ProposedBoxPart = { size: roundBoxSize(size), position, parentId: typeof parentId === 'string' ? parentId : null };
     if (rotation) entry.rotation = rotation as [number, number, number];
     proposedParts[name] = entry;
   }

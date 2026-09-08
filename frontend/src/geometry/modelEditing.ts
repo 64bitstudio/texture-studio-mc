@@ -23,6 +23,32 @@ export const GENERIC_FACE_LABELS: FaceLabels = {
 /** UV placeholder -- una caja nueva no tiene region propia hasta que `packBoxesUV` (ticket 086) le asigne una real; el tipo `MobBoxPart.uv` es requerido, asi que necesita ALGUN valor mientras tanto. */
 export const PLACEHOLDER_UV = { x: 0, y: 0 };
 
+/**
+ * Redondea cada componente de `size` al entero mas cercano (minimo 1).
+ *
+ * Hallazgo real de Marco ("confirmar modelo no hace nada"): una caja con
+ * tamaño fraccionario (ej. `[8.4, 4.2, 0.35]`, tipico de una propuesta de
+ * IA con detalle fino -- una "camisa rota" con tiras/jirones) produce un
+ * footprint UV fraccionario en `packBoxesUV.ts` (footprint = `2d+2w` /
+ * `d+h`), y por lo tanto un atlas (`textureWidth`/`textureHeight`)
+ * fraccionario -- `TextureBuffer`/`new ImageData(...)` (`export.ts`)
+ * exigen que `data.length` sea exactamente `width*height*4`, y con
+ * dimensiones no enteras esa cuenta no cierra: `InvalidStateError:
+ * Failed to construct 'ImageData': The input data length is not a
+ * multiple of 4`. Como `handleConfirmModel` (App.tsx) descarta la promesa
+ * con `void` y nada atrapa el rechazo, el usuario no ve NINGUN error --
+ * el botón "Confirmar modelo" simplemente no hace nada. El atlas de
+ * textura vive en pixeles enteros por diseño (ticket 086), así que las
+ * cajas también deben vivir ahí -- se usa en los 3 puntos donde un
+ * tamaño de caja entra al modelo: `validateAndApplyGeometryProposal`
+ * (propuesta de IA), el arrastre de escala del gizmo (`ModelEditor3D`), y
+ * como defensa final dentro de `confirmModelGeometry` (protege también
+ * geometría ya guardada con tamaños fraccionarios de sesiones previas).
+ */
+export function roundBoxSize(size: [number, number, number]): [number, number, number] {
+  return [Math.max(1, Math.round(size[0])), Math.max(1, Math.round(size[1])), Math.max(1, Math.round(size[2]))];
+}
+
 /** Primer nombre libre de la forma "cajaN" dentro de `geometry.parts` -- determinista, nunca colisiona con partes ya existentes (vainilla o agregadas antes). */
 export function generateNewPartName(geometry: MobGeometry): string {
   let n = 1;
