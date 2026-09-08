@@ -48,6 +48,17 @@ export interface MobBoxPart {
   /** Ticket 024 -- ver `backend/src/types/baseAssets.ts` para la justificacion completa (espejo exacto). */
   pivot?: [number, number, number];
   rotation?: [number, number, number];
+  /**
+   * Ticket 082 -- nombre de la caja "padre" de esta caja dentro de
+   * `MobGeometry.parts` (jerarquia de huesos, ver
+   * docs/definiciones/modelado-3d-custom-y-generacion-con-ia.md). Opcional:
+   * sin `parentId`, la caja no tiene padre (raiz de su propia rama) --
+   * mismo comportamiento que antes de este ticket para los 4 mobs
+   * vainilla, que todavia no tienen jerarquia poblada (eso es el ticket
+   * 084). Ver `backend/src/types/baseAssets.ts` para la justificacion
+   * completa (espejo exacto).
+   */
+  parentId?: string;
 }
 
 export interface MobGeometry {

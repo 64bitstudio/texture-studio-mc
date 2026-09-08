@@ -27,10 +27,67 @@
 // funciones, sin necesitar jsdom ni cambiar el `environment` del
 // proyecto completo solo por este modulo.
 
-/** Entrada de un mob dentro de un proyecto guardado -- PNG comprimido (base64) + resolucion de trabajo con la que se guardo. */
+import type { MobGeometry } from './types/baseAssets';
+
+/**
+ * Estado de la geometria de un mob dentro de un proyecto (ticket 082,
+ * Etapas 1-2 de docs/definiciones/modelado-3d-custom-y-generacion-con-ia.md):
+ * - `'vanilla'`: usa la geometria fija del catalogo (`MOB_REGISTRY`), sin
+ *   personalizar -- comportamiento de siempre, sin cambios.
+ * - `'modelando'`: el usuario esta editando su geometria custom en el
+ *   editor de modelo (Etapa 1), todavia no confirmada.
+ * - `'confirmado'`: la geometria custom quedo fija (Etapa 2, atlas UV ya
+ *   generado) -- a partir de aqui el editor de modelo para este mob se
+ *   bloquea (ticket 086).
+ */
+export type GeometryStatus = 'vanilla' | 'modelando' | 'confirmado';
+
+/** Un keyframe de rotacion de un hueso en un momento dado (segundos), ver "Diseño técnico" del documento de definicion. */
+export interface AnimationKeyframe {
+  time: number;
+  rotation: { x: number; y: number; z: number };
+}
+
+/**
+ * Una animacion nombrada de un mob (Etapa 4). `bones` mapea el nombre de
+ * cada caja/hueso (mismas claves que `MobGeometry.parts`) a su lista de
+ * keyframes -- un hueso ausente del mapa simplemente no se anima. Mismo
+ * formato ya validado en el spike del ticket 081 (ver
+ * `done/081-assets/generate_and_validate.py`), tanto para presets
+ * parametricos como para propuestas de IA o edicion manual del timeline.
+ */
+export interface MobAnimation {
+  name: string;
+  loop: boolean;
+  length: number;
+  bones: Record<string, AnimationKeyframe[]>;
+}
+
+/**
+ * Entrada de un mob dentro de un proyecto guardado -- PNG comprimido
+ * (base64) + resolucion de trabajo con la que se guardo.
+ *
+ * `geometryStatus`/`customGeometry`/`animations` (ticket 082): ADITIVOS y
+ * opcionales, mismo criterio ya establecido en este archivo para
+ * `description`/`coverImageDataUrl` (ver `ProjectRecord`) -- un proyecto
+ * guardado ANTES de este ticket simplemente no los tiene, y se trata
+ * como un mob `'vanilla'` sin geometria custom ni animaciones, no como un
+ * dato faltante que haya que migrar. Usar `getMobGeometryStatus` en vez
+ * de leer `geometryStatus` directamente para no repetir ese `?? 'vanilla'`
+ * en cada consumidor.
+ */
 export interface ProjectMobEntry {
   resolution: number;
   pngDataUrl: string;
+  geometryStatus?: GeometryStatus;
+  /** Solo tiene sentido cuando `geometryStatus !== 'vanilla'` -- la geometria custom de este mob, con jerarquia (`parentId` por caja, ver `MobBoxPart`). */
+  customGeometry?: MobGeometry;
+  animations?: MobAnimation[];
+}
+
+/** Estado real de la geometria de un mob -- ausente en el registro ('vanilla') sin que cada consumidor repita el default. Ver `ProjectMobEntry`. */
+export function getMobGeometryStatus(entry: ProjectMobEntry): GeometryStatus {
+  return entry.geometryStatus ?? 'vanilla';
 }
 
 /** Un proyecto guardado completo -- uno o mas mobs, ver HU-3 ("varios mobs a la vez"). */
