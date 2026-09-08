@@ -516,3 +516,13 @@ Primer ticket del epic de modelado 3D custom con IA (ver `docs/definiciones/mode
 ### Ticket 085 -- Empaquetado UV genérico para geometría custom
 
 - **`geometry/packBoxesUV.ts`** (nuevo, puro) — `packBoxesUV(parts, maxWidth?)`: shelf packing del "cross" UV de un conjunto arbitrario de cajas (mismo cálculo de footprint que `computeBoxFaceRects`: ancho `2d+2w`, alto `d+h`). Dedupe por `group` (mismo campo que ya usa `regionLabels.ts`) -- cajas del mismo grupo comparten un solo origen. `maxWidth` por defecto 64 (mismo ancho que los 4 mobs vainilla); una sola caja más ancha que eso hace crecer el atlas en vez de truncarla. Exclusivo de geometría CUSTOM (Etapa 1) -- los 4 mobs vainilla siguen usando su `uv` fijo de siempre, nunca pasan por aquí. Con tests en `test/packBoxesUV.spec.ts` (casos sintéticos + verificación de "sin traslapes" contra la geometría real de los 4 mobs vainilla).
+
+### Ticket 087 -- Endpoint backend proxy para asistencia de IA (Gemini)
+
+Backend, primera vez que hace algo más que servir estáticos y el catálogo de mobs (cambio de alcance señalado explícitamente en `docs/definiciones/modelado-3d-custom-y-generacion-con-ia.md`).
+
+- **`services/aiAssist.ts`** (nuevo) — `requestAiJsonProposal(prompt, options?)`: llama a la API de Gemini (`GEMINI_API_KEY`/`GEMINI_MODEL` por env var, default `gemini-3.6-flash`) pidiendo `responseMimeType: "application/json"`, con reintentos y backoff exponencial (hasta 3 intentos, base configurable vía `AI_ASSIST_RETRY_BASE_MS` -- hallazgo del spike del ticket 081: el free tier falla ~20% incluso con reintentos). Errores no transitorios (prompt vacío, API key ausente, 4xx de Gemini salvo 429) no reintentan.
+- **`routes/aiAssist.ts`** (nuevo) — `POST /api/ai/propose-geometry`/`propose-color`/`propose-animation`, mismo mecanismo genérico (ver `docs/API.md`). Log server-side (`console.warn`) de cualquier fallo antes de responder al cliente.
+- **`app.ts`** — nuevo `express.json({ limit: '256kb' })` (primera ruta de este backend que necesita parsear un body).
+- **`deploy/.env.{dev,qa,prod}.example`** — documentan `GEMINI_API_KEY`/`GEMINI_MODEL`. **Señalado explícitamente**: el Jenkinsfile sigue con `skipVaultSecrets: true` -- migrar este secreto a Vault es trabajo de DevOps fuera del alcance de este ticket (sin acceso a Vault desde aquí); mientras tanto, quien despliegue a mano debe poblar la variable en el `.env` real de la VM.
+- Con tests en `test/aiAssist.spec.ts` (unit del servicio con `delayFn` inyectado + integración vía `supertest` contra las 3 rutas, incluyendo el caso de cuota excedida agotando reintentos).
