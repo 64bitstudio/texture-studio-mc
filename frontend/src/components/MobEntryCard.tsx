@@ -5,7 +5,7 @@ import { useMobGeometry } from '../hooks/useMobGeometry';
 import { useMobSnapshot3D } from '../hooks/useMobSnapshot3D';
 import { fetchMobBaseAssets } from '../api/baseAssets';
 import { exportMobBlockbench } from '../export';
-import type { GeometryStatus } from '../projectStorage';
+import type { GeometryStatus, MobAnimation } from '../projectStorage';
 import type { MobGeometry } from '../types/baseAssets';
 import type { ToggleLayout } from '../ui';
 
@@ -37,6 +37,8 @@ export interface MobEntryCardProps {
    * forma equivocada.
    */
   customGeometry?: MobGeometry;
+  /** Animaciones ya creadas de este mob (ticket 093, `ProjectMobEntry.animations`) -- se incluyen en el `.bbmodel` exportado tal cual; un mob sin ninguna sigue exportando con `animations: []`. */
+  animations?: MobAnimation[];
   /** Menú "⋮" -> "Eliminar" (ticket 058) -- confirmado con inline, sin diálogo nativo. El padre (`Proyecto.tsx`) hace la escritura real (`removeMobFromProject`) y refresca la lista. */
   onRemoveMob: () => void;
 }
@@ -129,7 +131,7 @@ function MobPreviewModal({ label, snapshotUrl, onClose }: { label: string; snaps
  * compacto + "Editar textura", y un menú "⋮" con "Eliminar mob del
  * proyecto" (confirmación inline, ticket 058).
  */
-export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geometryCache, geometryStatus, onEditTexture, onEditModel, onEditAnimations, customGeometry, onRemoveMob }: MobEntryCardProps) {
+export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geometryCache, geometryStatus, onEditTexture, onEditModel, onEditAnimations, customGeometry, animations, onRemoveMob }: MobEntryCardProps) {
   const geometry = useMobGeometry(mobId, geometryCache);
   const [showPreview, setShowPreview] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -149,20 +151,21 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
   // ella misma con `fetchMobBaseAssets` (mismo mecanismo que
   // `useMobGeometry`, pero SIN cachearla en `geometryCache` -- esa cache
   // es para miniaturas, no para exportar, y no vale la pena acoplar
-  // ambos usos).
+  // ambos usos). Ticket 093: `animations` (si el mob tiene alguna) viaja
+  // tal cual -- `exportMobBlockbench` ya maneja el caso sin ninguna.
   const handleExportBlockbench = useCallback(async () => {
     setExportError(null);
     setExporting(true);
     try {
       const exportGeometry = customGeometry ?? (await fetchMobBaseAssets(mobId)).geometry;
-      await exportMobBlockbench(mobId, exportGeometry, { pngDataUrl });
+      await exportMobBlockbench(mobId, exportGeometry, { pngDataUrl, animations });
     } catch (err) {
       console.error(`MobEntryCard.handleExportBlockbench: fallo exportando "${mobId}".`, err);
       setExportError(err instanceof Error ? err.message : 'No se pudo exportar el modelo.');
     } finally {
       setExporting(false);
     }
-  }, [customGeometry, mobId, pngDataUrl]);
+  }, [customGeometry, mobId, pngDataUrl, animations]);
 
   const isList = layout === 'list';
   const dimensions = geometry ? `${geometry.textureWidth * resolution}×${geometry.textureHeight * resolution} px` : '—';
