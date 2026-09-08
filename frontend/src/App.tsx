@@ -4,6 +4,7 @@ import { MisProyectos } from './components/MisProyectos';
 import { Proyecto } from './components/Proyecto';
 import { AgregarMobModal } from './components/AgregarMobModal';
 import { ModelEditor3D } from './components/ModelEditor3D';
+import { AnimationEditor } from './components/AnimationEditor';
 import { EditorProjectSidebar } from './components/EditorProjectSidebar';
 import { AppShell } from './components/AppShell';
 import type { NavView } from './components/Sidebar';
@@ -14,7 +15,7 @@ import { getTheme, type Theme } from './theme';
 import { getSidebarCollapsed, setSidebarCollapsed } from './sidebarCollapse';
 import { fetchMobBaseAssets } from './api/baseAssets';
 import { fetchMobs } from './api/mobs';
-import { loadProject, updateMobGeometry } from './projectStorage';
+import { loadProject, updateMobGeometry, type MobAnimation } from './projectStorage';
 import { buildConfirmedMobEntry } from './projectSnapshot';
 import type { MobBaseAssetsResponse, MobGeometry } from './types/baseAssets';
 import type { MobSummary } from './types/mobs';
@@ -47,7 +48,13 @@ import { Button, LoadingOverlay } from './ui';
 // `Proyecto.tsx` ("Editar modelo 3D"), no desde el flujo principal de
 // "agregar mob" -- ver la decisión de alcance documentada en
 // `ModelEditor3D.tsx`.
-type View = 'nuevo-proyecto' | 'mis-proyectos' | 'proyecto' | 'editor' | 'editor-modelo' | 'configuracion';
+// Ticket 090 -- 'editor-animacion' (Etapa 4): igual que 'editor-modelo',
+// nueva subvista alcanzada desde el menú "⋮" de una tarjeta de mob
+// ("Editar animaciones"). A diferencia de 'editor-modelo', SÍ reusa el
+// `AssetState`/`effectiveAssetState` existente (geometría + textura ya
+// pintada) en vez de un fetch propio -- animar no necesita nada que la
+// Etapa 3 no haya cargado ya.
+type View = 'nuevo-proyecto' | 'mis-proyectos' | 'proyecto' | 'editor' | 'editor-modelo' | 'editor-animacion' | 'configuracion';
 
 type MobsState =
   | { status: 'loading' }
@@ -302,6 +309,25 @@ function App() {
       setSelectedMobIdOverride(mobId);
     }
     setView('editor');
+  }
+
+  // Ticket 090 -- "Editar animaciones" (menú "⋮" de una tarjeta de mob).
+  // Mismo mecanismo EXACTO que `handleSelectMob`: activa este mob (si
+  // hace falta) y navega -- reusa el mismo `effectiveAssetState` que ya
+  // trae geometría+textura para 'editor', sin fetch propio (animar no
+  // necesita nada que la Etapa 3 no haya cargado ya).
+  function handleEditAnimations(mobId: string) {
+    if (mobId !== selectedMobId) {
+      setAssetState({ status: 'loading' });
+      setSelectedMobIdOverride(mobId);
+    }
+    setView('editor-animacion');
+  }
+
+  function handleSaveAnimations(animations: MobAnimation[]) {
+    if (!activeProject || !selectedMobId) return;
+    updateMobGeometry(activeProject.name, selectedMobId, { animations });
+    setView('proyecto');
   }
 
   // Ticket 083 -- "Editar modelo 3D" (menú "⋮" de una tarjeta de mob en
@@ -583,6 +609,7 @@ function App() {
             mobs={mobsState.mobs}
             onSelectMob={handleSelectMob}
             onEditModel={handleEditModel}
+            onEditAnimations={handleEditAnimations}
             onAddMobs={handleAddMobs}
             onProjectRenamed={handleProjectRenamed}
             onProjectDeleted={handleProjectDeleted}
@@ -661,6 +688,35 @@ function App() {
                 onBackToProject={handleModelEditorBack}
                 onSaveDraft={handleSaveDraft}
                 onConfirm={(geometry) => void handleConfirmModel(geometry)}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Ticket 090 -- editor de animación (Etapa 4). A diferencia de 'editor-modelo', reusa `effectiveAssetState` (geometría+textura ya cargadas para 'editor') en vez de un fetch propio. */}
+        {view === 'editor-animacion' && activeProject && selectedMobId && (
+          <div style={{ position: 'relative', minHeight: '100%' }}>
+            {mobsState.status === 'ready' && effectiveAssetState.status === 'loading' && <LoadingOverlay message="Cargando modelo…" />}
+
+            {mobsState.status === 'ready' && effectiveAssetState.status === 'error' && (
+              <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%', minHeight: 400, gap: 12 }}>
+                <p role="alert">No se pudo cargar el modelo: {effectiveAssetState.message}</p>
+                <Button onClick={handleRetryAsset}>Reintentar</Button>
+              </div>
+            )}
+
+            {mobsState.status === 'ready' && effectiveAssetState.status === 'ready' && selectedMobLabel && (
+              <AnimationEditor
+                key={selectedMobId}
+                mobId={selectedMobId}
+                mobLabel={selectedMobLabel}
+                projectName={activeProject.name}
+                geometry={effectiveAssetState.data.geometry}
+                texture={effectiveAssetState.data.texture}
+                animations={loadProject(activeProject.name)?.mobs[selectedMobId]?.animations ?? []}
+                onBackToProjectsList={() => setView('mis-proyectos')}
+                onBackToProject={() => setView('proyecto')}
+                onSaveAnimations={handleSaveAnimations}
               />
             )}
           </div>

@@ -15,6 +15,8 @@ export interface ProyectoProps {
   onSelectMob: (mobId: string) => void;
   /** Menú "⋮" -> "Editar modelo 3D" (ticket 083) -- navega a `'editor-modelo'` para ese mob. */
   onEditModel: (mobId: string) => void;
+  /** Menú "⋮" -> "Editar animaciones" (ticket 090) -- navega a `'editor-animacion'` para ese mob. */
+  onEditAnimations: (mobId: string) => void;
   /** Navega a `'agregar-mobs'` (ticket 042). */
   onAddMobs: () => void;
   /** El proyecto activo cambió de nombre -- `App.tsx` actualiza `activeProject.name`. */
@@ -62,7 +64,7 @@ function mobLabelFor(mobId: string, mobs: MobSummary[]): string {
  * texturas (`Editor.tsx`, con su visor 3D en vivo) -- `onSelectMob`
  * navega exactamente igual que siempre.
  */
-export function Proyecto({ projectName, mobs, onSelectMob, onEditModel, onAddMobs, onProjectRenamed, onProjectDeleted, onMobRemoved, onBackToList }: ProyectoProps) {
+export function Proyecto({ projectName, mobs, onSelectMob, onEditModel, onEditAnimations, onAddMobs, onProjectRenamed, onProjectDeleted, onMobRemoved, onBackToList }: ProyectoProps) {
   const [geometryCache] = useState(() => new Map<string, MobGeometry>());
   const { actionError, exporting, rename, duplicate, exportZip, remove, clearError } = useProjectActions(projectName);
 
@@ -387,6 +389,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onEditModel, onAddMob
                       geometryStatus={getMobGeometryStatus(record.mobs[mobId]!)}
                       onEditTexture={() => onSelectMob(mobId)}
                       onEditModel={() => onEditModel(mobId)}
+                      onEditAnimations={() => onEditAnimations(mobId)}
                       onRemoveMob={() => handleRemoveMob(mobId)}
                     />
                   ))}

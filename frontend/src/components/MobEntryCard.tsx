@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Menu } from '../ui';
-import { IconDocument, IconDots, IconEye, IconMaximize, IconModel, IconPencil, IconScale, IconTrash, IconX } from '../ui/icons';
+import { IconDocument, IconDots, IconEye, IconMaximize, IconModel, IconPencil, IconRefresh, IconScale, IconTrash, IconX } from '../ui/icons';
 import { useMobGeometry } from '../hooks/useMobGeometry';
 import { useMobSnapshot3D } from '../hooks/useMobSnapshot3D';
 import type { GeometryStatus } from '../projectStorage';
@@ -21,6 +21,8 @@ export interface MobEntryCardProps {
   onEditTexture: () => void;
   /** Menú "⋮" -> "Editar modelo 3D" (ticket 083) -- navega al editor de modelo (`ModelEditor3D.tsx`) para este mob. Ver ese componente para la decisión de alcance de por qué esto vive en el menú y no en el flujo principal de "agregar mob". Deshabilitado si `geometryStatus === 'confirmado'` (ticket 086, HU-6). */
   onEditModel: () => void;
+  /** Menú "⋮" -> "Editar animaciones" (ticket 090) -- navega al editor de animación (`AnimationEditor.tsx`) para este mob. Disponible siempre (vainilla o custom, confirmado o no) -- a diferencia de "Editar modelo 3D", animar no modifica geometría/UV, así que no hay nada que bloquear. */
+  onEditAnimations: () => void;
   /** Menú "⋮" -> "Eliminar" (ticket 058) -- confirmado con inline, sin diálogo nativo. El padre (`Proyecto.tsx`) hace la escritura real (`removeMobFromProject`) y refresca la lista. */
   onRemoveMob: () => void;
 }
@@ -113,7 +115,7 @@ function MobPreviewModal({ label, snapshotUrl, onClose }: { label: string; snaps
  * compacto + "Editar textura", y un menú "⋮" con "Eliminar mob del
  * proyecto" (confirmación inline, ticket 058).
  */
-export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geometryCache, geometryStatus, onEditTexture, onEditModel, onRemoveMob }: MobEntryCardProps) {
+export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geometryCache, geometryStatus, onEditTexture, onEditModel, onEditAnimations, onRemoveMob }: MobEntryCardProps) {
   const geometry = useMobGeometry(mobId, geometryCache);
   const [showPreview, setShowPreview] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -169,6 +171,9 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
                 Modelo confirmado -- duplica el proyecto para cambiar la geometría.
               </p>
             )}
+            <button type="button" className="ui-menu__item" onClick={onEditAnimations}>
+              <IconRefresh size={16} /> Editar animaciones
+            </button>
             <button type="button" className="ui-menu__item" style={{ color: 'var(--danger)' }} onClick={() => setConfirmRemove(true)}>
               <IconTrash size={16} /> Eliminar
             </button>

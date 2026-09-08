@@ -42,10 +42,21 @@ import type { MobGeometry } from './types/baseAssets';
  */
 export type GeometryStatus = 'vanilla' | 'modelando' | 'confirmado';
 
-/** Un keyframe de rotacion de un hueso en un momento dado (segundos), ver "Diseño técnico" del documento de definicion. */
+/**
+ * Un keyframe de un hueso en un momento dado (segundos), ver "Diseño
+ * técnico" del documento de definicion. `rotation` es requerida (todo
+ * keyframe define una pose de rotación -- mismo formato ya validado en
+ * el spike del ticket 081); `position`/`scale` (ticket 090, HU-10:
+ * "keyframes de posición/rotación/escala") son ADITIVOS y opcionales --
+ * un keyframe que no las trae simplemente no anima esos canales para
+ * ese hueso (el interpolador, ver `animation/interpolation.ts`, solo
+ * interpola un canal si AMBOS keyframes vecinos lo traen).
+ */
 export interface AnimationKeyframe {
   time: number;
   rotation: { x: number; y: number; z: number };
+  position?: { x: number; y: number; z: number };
+  scale?: { x: number; y: number; z: number };
 }
 
 /**
@@ -388,11 +399,15 @@ export function removeMobFromProject(name: string, mobId: string): void {
  * son opcionales para que "guardar borrador" (ticket 083, solo
  * geometría) y "confirmar" (ticket 086, los 4 campos) reusen la misma
  * función sin necesitar dos funciones casi idénticas.
+ *
+ * Ticket 090 -- el editor de animación (Etapa 4) guarda `animations`
+ * con esta MISMA función (mismo criterio: reusar en vez de duplicar un
+ * "actualiza un campo de un mob dentro de un proyecto" casi idéntico).
  */
 export function updateMobGeometry(
   name: string,
   mobId: string,
-  update: Partial<Pick<ProjectMobEntry, 'geometryStatus' | 'customGeometry' | 'pngDataUrl' | 'resolution'>>,
+  update: Partial<Pick<ProjectMobEntry, 'geometryStatus' | 'customGeometry' | 'pngDataUrl' | 'resolution' | 'animations'>>,
 ): void {
   const all = readAllProjects();
   const record = all[name];
