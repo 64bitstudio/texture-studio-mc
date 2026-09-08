@@ -3,6 +3,7 @@ import { Editor } from './components/Editor';
 import { MisProyectos } from './components/MisProyectos';
 import { Proyecto } from './components/Proyecto';
 import { AgregarMobModal } from './components/AgregarMobModal';
+import { ModelEditor3D } from './components/ModelEditor3D';
 import { EditorProjectSidebar } from './components/EditorProjectSidebar';
 import { AppShell } from './components/AppShell';
 import type { NavView } from './components/Sidebar';
@@ -13,7 +14,8 @@ import { getTheme, type Theme } from './theme';
 import { getSidebarCollapsed, setSidebarCollapsed } from './sidebarCollapse';
 import { fetchMobBaseAssets } from './api/baseAssets';
 import { fetchMobs } from './api/mobs';
-import type { MobBaseAssetsResponse } from './types/baseAssets';
+import { updateMobGeometry } from './projectStorage';
+import type { MobBaseAssetsResponse, MobGeometry } from './types/baseAssets';
 import type { MobSummary } from './types/mobs';
 import { TextureBuffer } from './textureBuffer';
 import { Button, LoadingOverlay } from './ui';
@@ -38,7 +40,13 @@ import { Button, LoadingOverlay } from './ui';
 // Pedido de Marco: "Recientes" se retira por completo -- deja de ser un
 // destino navegable (`Recientes.tsx` se elimina del repo, sin
 // consumidores).
-type View = 'nuevo-proyecto' | 'mis-proyectos' | 'proyecto' | 'editor' | 'configuracion';
+// Ticket 083 -- 'editor-modelo' (Etapa 1 del epic de modelado 3D, ver
+// docs/definiciones/modelado-3d-custom-y-generacion-con-ia.md): nueva
+// subvista alcanzada desde el menú "⋮" de una tarjeta de mob en
+// `Proyecto.tsx` ("Editar modelo 3D"), no desde el flujo principal de
+// "agregar mob" -- ver la decisión de alcance documentada en
+// `ModelEditor3D.tsx`.
+type View = 'nuevo-proyecto' | 'mis-proyectos' | 'proyecto' | 'editor' | 'editor-modelo' | 'configuracion';
 
 type MobsState =
   | { status: 'loading' }
@@ -49,6 +57,12 @@ type AssetState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; data: MobBaseAssetsResponse };
+
+/** Estado del fetch de geometría para `'editor-modelo'` -- deliberadamente separado de `AssetState` (que trae textura+geometría del mob de la Etapa 3): la Etapa 1 no necesita textura (ver `ModelEditor3D.tsx`). */
+type ModelEditorGeometryState =
+  | { status: 'loading' }
+  | { status: 'error'; message: string }
+  | { status: 'ready'; geometry: MobGeometry };
 
 function App() {
   // Ticket 037: arranca en 'nuevo-proyecto' (primer destino del
@@ -116,6 +130,13 @@ function App() {
   // del asset del mob activo (independiente del retry del catalogo).
   const [assetRetryCount, setAssetRetryCount] = useState(0);
 
+  // Ticket 083 -- mob que se está modelando en 'editor-modelo' ahora
+  // mismo. Estado separado de `selectedMobId` (Etapa 3, editor de
+  // textura) -- ambas subvistas pueden referirse a mobs distintos del
+  // mismo proyecto sin pisarse.
+  const [editingModelMobId, setEditingModelMobId] = useState<string | null>(null);
+  const [modelEditorGeometryState, setModelEditorGeometryState] = useState<ModelEditorGeometryState>({ status: 'loading' });
+
   // Ticket 018 (HU-2, "el trabajo del primer mob debe seguir ahi"):
   // cache de `TextureBuffer` por mob VISITADO EN LA SESION. Vive en
   // `useState` con inicializador perezoso (nunca se vuelve a asignar --
@@ -179,6 +200,31 @@ function App() {
     };
   }, [selectedMobId, assetRetryCount]);
 
+  // Ticket 083 -- fetch de geometría (SIN textura) para 'editor-modelo'.
+  // Mismo patrón que el efecto de `assetState` de arriba (sin
+  // `setModelEditorGeometryState({status: 'loading'})` síncrono en el
+  // cuerpo del efecto -- la transición a "loading" la dispara
+  // `handleEditModel`, no este efecto).
+  useEffect(() => {
+    if (editingModelMobId === null) return;
+    let cancelled = false;
+
+    fetchMobBaseAssets(editingModelMobId)
+      .then((data) => {
+        if (!cancelled) setModelEditorGeometryState({ status: 'ready', geometry: data.geometry });
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : 'Error desconocido cargando la geometría.';
+          setModelEditorGeometryState({ status: 'error', message });
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editingModelMobId]);
+
   function handleRetryMobs() {
     setMobsState({ status: 'loading' });
     setMobsRetryCount((c) => c + 1);
@@ -209,6 +255,33 @@ function App() {
       setSelectedMobIdOverride(mobId);
     }
     setView('editor');
+  }
+
+  // Ticket 083 -- "Editar modelo 3D" (menú "⋮" de una tarjeta de mob en
+  // `Proyecto.tsx`). Mismo criterio que `handleSelectMob`: la
+  // transición a "loading" se dispara aquí (evento), nunca en el
+  // efecto que hace el fetch.
+  function handleEditModel(mobId: string) {
+    setModelEditorGeometryState({ status: 'loading' });
+    setEditingModelMobId(mobId);
+    setView('editor-modelo');
+  }
+
+  function handleModelEditorBack() {
+    setView('proyecto');
+  }
+
+  // "Continuar" del editor de modelo -- sin cambios reales, no escribe
+  // nada (el mob sigue siendo 'vanilla', sin efecto alguno). Con
+  // cambios, persiste geometryStatus='modelando' + la geometría final;
+  // la transición formal a 'confirmado' (con atlas UV) es el ticket 086,
+  // todavía no construido -- por eso se vuelve a 'proyecto', no a
+  // 'editor' (no hay atlas con el que texturizar todavía).
+  function handleModelEditorContinue(finalGeometry: MobGeometry, hasChanges: boolean) {
+    if (hasChanges && activeProject && editingModelMobId) {
+      updateMobGeometry(activeProject.name, editingModelMobId, { geometryStatus: 'modelando', customGeometry: finalGeometry });
+    }
+    setView('proyecto');
   }
 
   // Ticket 038/039: fuente unica para "un proyecto quedo activo,
@@ -426,6 +499,7 @@ function App() {
             projectName={activeProject.name}
             mobs={mobsState.mobs}
             onSelectMob={handleSelectMob}
+            onEditModel={handleEditModel}
             onAddMobs={handleAddMobs}
             onProjectRenamed={handleProjectRenamed}
             onProjectDeleted={handleProjectDeleted}
@@ -480,6 +554,33 @@ function App() {
             )}
           </div>
         )}
+
+        {/* Ticket 083 -- editor de modelo 3D (Etapa 1). Sin `bufferCache`/textura, a diferencia de 'editor' -- ver `ModelEditor3D.tsx`. */}
+        {view === 'editor-modelo' && activeProject && editingModelMobId && (
+          <div style={{ position: 'relative', minHeight: '100%' }}>
+            {modelEditorGeometryState.status === 'loading' && <LoadingOverlay message="Cargando geometría…" />}
+
+            {modelEditorGeometryState.status === 'error' && (
+              <div style={{ display: 'grid', placeItems: 'center', width: '100%', height: '100%', minHeight: 400, gap: 12 }}>
+                <p role="alert">No se pudo cargar la geometría: {modelEditorGeometryState.message}</p>
+                <Button onClick={handleModelEditorBack}>Volver</Button>
+              </div>
+            )}
+
+            {modelEditorGeometryState.status === 'ready' && (
+              <ModelEditor3D
+                key={editingModelMobId}
+                mobLabel={mobsState.status === 'ready' ? (mobsState.mobs.find((m) => m.id === editingModelMobId)?.label ?? editingModelMobId) : editingModelMobId}
+                projectName={activeProject.name}
+                baseGeometry={modelEditorGeometryState.geometry}
+                onBackToProjectsList={() => setView('mis-proyectos')}
+                onBackToProject={handleModelEditorBack}
+                onContinue={handleModelEditorContinue}
+              />
+            )}
+          </div>
+        )}
+
         {/* Ticket 071 (pedido de Marco, con imagen de referencia): "Agregar mob" es un modal sobre "Proyecto", ya no una vista aparte (retira `AgregarMobs.tsx`, ticket 042) -- también se abre desde el editor (sidebar, `editorSidebarExtra`). */}
         {addMobModal}
       </AppShell>

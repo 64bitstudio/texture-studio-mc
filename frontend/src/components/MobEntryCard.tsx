@@ -16,6 +16,8 @@ export interface MobEntryCardProps {
   geometryCache: Map<string, MobGeometry>;
   /** "Editar textura" -- mismo `onSelectMob` que ya usa `Proyecto.tsx`, navega al editor actual SIN NINGÚN CAMBIO (confirmado explícito con Marco). */
   onEditTexture: () => void;
+  /** Menú "⋮" -> "Editar modelo 3D" (ticket 083) -- navega al editor de modelo (`ModelEditor3D.tsx`) para este mob. Ver ese componente para la decisión de alcance de por qué esto vive en el menú y no en el flujo principal de "agregar mob". */
+  onEditModel: () => void;
   /** Menú "⋮" -> "Eliminar" (ticket 058) -- confirmado con inline, sin diálogo nativo. El padre (`Proyecto.tsx`) hace la escritura real (`removeMobFromProject`) y refresca la lista. */
   onRemoveMob: () => void;
 }
@@ -108,7 +110,7 @@ function MobPreviewModal({ label, snapshotUrl, onClose }: { label: string; snaps
  * compacto + "Editar textura", y un menú "⋮" con "Eliminar mob del
  * proyecto" (confirmación inline, ticket 058).
  */
-export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geometryCache, onEditTexture, onRemoveMob }: MobEntryCardProps) {
+export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geometryCache, onEditTexture, onEditModel, onRemoveMob }: MobEntryCardProps) {
   const geometry = useMobGeometry(mobId, geometryCache);
   const [showPreview, setShowPreview] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -149,9 +151,14 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
             </div>
           </div>
         ) : (
-          <button type="button" className="ui-menu__item" style={{ color: 'var(--danger)' }} onClick={() => setConfirmRemove(true)}>
-            <IconTrash size={16} /> Eliminar
-          </button>
+          <>
+            <button type="button" className="ui-menu__item" onClick={onEditModel}>
+              <IconModel size={16} /> Editar modelo 3D
+            </button>
+            <button type="button" className="ui-menu__item" style={{ color: 'var(--danger)' }} onClick={() => setConfirmRemove(true)}>
+              <IconTrash size={16} /> Eliminar
+            </button>
+          </>
         )}
       </div>
     </Menu>
