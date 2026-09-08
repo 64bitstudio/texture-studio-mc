@@ -34,6 +34,29 @@ export interface PresetParams {
 
 export const DEFAULT_PRESET_PARAMS: PresetParams = { speed: 1, amplitude: 20 };
 
+/**
+ * Rango válido de cada parámetro -- única fuente de verdad para los
+ * sliders de `AnimationEditor.tsx` Y para `clampPresetParams` (ticket
+ * 091, HU-11: "los parámetros devueltos por la IA fuera de rango se
+ * recortan a los límites válidos, sin error visible").
+ */
+export const PRESET_PARAMS_RANGE = {
+  speed: { min: 0.25, max: 3 },
+  amplitude: { min: 5, max: 60 },
+} as const;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+/** Recorta `params` a `PRESET_PARAMS_RANGE` -- usado tanto por una propuesta de IA (ticket 091) como defensivamente por cualquier otro llamador que reciba parámetros de origen externo. */
+export function clampPresetParams(params: PresetParams): PresetParams {
+  return {
+    speed: clamp(params.speed, PRESET_PARAMS_RANGE.speed.min, PRESET_PARAMS_RANGE.speed.max),
+    amplitude: clamp(params.amplitude, PRESET_PARAMS_RANGE.amplitude.min, PRESET_PARAMS_RANGE.amplitude.max),
+  };
+}
+
 /** Qué hueso de la geometría juega cada rol anatómico, por `mobId` -- ver comentario del módulo. `legs` alterna de a pares consecutivos (0/1 en contra-fase, 2/3 en contra-fase, ...) -- simplificación deliberada del paso de las 8 patas de la Araña (no persigue un gait tripode biológicamente exacto, ver "Diseño técnico" del documento de definición: los presets son una PRIMERA pasada, el timeline manual permite afinar). */
 export interface PresetRoleBones {
   root: string;
