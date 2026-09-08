@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import { Grid, OrbitControls, TransformControls } from '@react-three/drei';
-import { Button } from '../ui';
+import { Button, InlineError } from '../ui';
 import { IconHand, IconModel, IconPlus, IconRefresh, IconScale, IconTrash } from '../ui/icons';
 import { computeGeometryCenter } from '../geometry/geometryBounds';
+import { applyDefaultHierarchy, getDescendants, setParent } from '../geometry/hierarchy';
 import { addBox, canDeleteBox, removeBox, updateBoxTransform } from '../geometry/modelEditing';
 import type { MobBoxPart, MobGeometry } from '../types/baseAssets';
 
@@ -26,100 +27,135 @@ const FLOOR_GRID_PROPS = {
 
 type TransformMode = 'translate' | 'rotate' | 'scale';
 
-interface EditableBoxProps {
+interface EditableBoxGroupProps {
   name: string;
   part: MobBoxPart;
   selected: boolean;
   onSelect: (name: string, object: THREE.Object3D) => void;
+  registerRef: (name: string, object: THREE.Object3D | null) => void;
+  children?: React.ReactNode;
 }
 
 /**
- * Una caja editable del modelo -- SIN textura ni mapeo UV (a diferencia
- * de `Viewer3D.tsx`/`MobPartMesh`): la Etapa 1 (modelado) ocurre ANTES
- * de pintar (Etapa 3), así que no hay nada que texturizar todavía. Un
- * color plano (resaltado si está seleccionada) es suficiente para ver
- * la forma mientras se modela.
+ * Una caja editable del modelo, como un `<group>` que representa su
+ * propio "hueso" (ticket 084) -- las hijas se pasan como `children` de
+ * REACT, anidadas DENTRO de este mismo `<group>` de three.js. Por
+ * construcción del scene graph, mover/rotar este grupo (via el gizmo)
+ * arrastra automáticamente a todos los grupos hijos anidados adentro,
+ * sin lógica de sincronización manual -- ver `hierarchy.ts` para la
+ * decisión de que `position`/`rotation` de una caja con `parentId` son
+ * relativos a su padre (no absolutos), que es justo lo que hace que
+ * esto funcione: el `position` de three.js de un objeto anidado YA es
+ * relativo a su padre en el scene graph por definición.
  *
- * A diferencia de `MobPartMesh` (que solo aplica `rotation` cuando hay
- * `pivot`, ver ese componente), acá SÍ se aplica `rotation` directo
- * sobre la propia caja sin pivote -- una caja recién creada en este
- * editor gira alrededor de su propio centro (no hay jerarquía de huesos
- * todavía, eso es el ticket 084).
+ * SIN textura ni mapeo UV (a diferencia de `Viewer3D.tsx`/`MobPartMesh`):
+ * la Etapa 1 (modelado) ocurre ANTES de pintar (Etapa 3).
+ *
+ * El click usa `event.eventObject` (el objeto que TIENE el handler --
+ * este `<group>`), no `event.object` (el objeto realmente intersectado,
+ * que sería el `<mesh>` interior) -- necesitamos el GRUPO para que
+ * `TransformControls` mueva/rote el hueso completo (con sus hijos), no
+ * solo la caja visual.
  */
-function EditableBox({ name, part, selected, onSelect }: EditableBoxProps) {
+function EditableBoxGroup({ name, part, selected, onSelect, registerRef, children }: EditableBoxGroupProps) {
   const [rx = 0, ry = 0, rz = 0] = part.rotation ?? [0, 0, 0];
 
   const handleClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
-    onSelect(name, event.object);
+    onSelect(name, event.eventObject);
   };
 
   return (
-    <mesh
+    <group
+      ref={(object) => registerRef(name, object)}
       position={part.position}
       rotation={[rx * DEG_TO_RAD, ry * DEG_TO_RAD, rz * DEG_TO_RAD]}
       scale={[1, 1, 1]}
       onClick={handleClick}
       userData={{ partName: name }}
     >
-      <boxGeometry args={part.size} />
-      <meshStandardMaterial color={selected ? '#4ade80' : '#4b6b58'} />
-    </mesh>
+      <mesh>
+        <boxGeometry args={part.size} />
+        <meshStandardMaterial color={selected ? '#4ade80' : '#4b6b58'} />
+      </mesh>
+      {children}
+    </group>
+  );
+}
+
+interface BoxTreeProps {
+  geometry: MobGeometry;
+  parentId: string | undefined;
+  selectedName: string | null;
+  onSelect: (name: string, object: THREE.Object3D) => void;
+  registerRef: (name: string, object: THREE.Object3D | null) => void;
+}
+
+/** Renderiza recursivamente las cajas cuyo `parentId` sea `parentId` (raíz = `undefined`), anidando sus propias hijas adentro -- ver `EditableBoxGroup`. */
+function BoxTree({ geometry, parentId, selectedName, onSelect, registerRef }: BoxTreeProps) {
+  const children = Object.entries(geometry.parts).filter(([, part]) => part.parentId === parentId);
+  return (
+    <>
+      {children.map(([name, part]) => (
+        <EditableBoxGroup key={name} name={name} part={part} selected={name === selectedName} onSelect={onSelect} registerRef={registerRef}>
+          <BoxTree geometry={geometry} parentId={name} selectedName={selectedName} onSelect={onSelect} registerRef={registerRef} />
+        </EditableBoxGroup>
+      ))}
+    </>
   );
 }
 
 export interface ModelEditor3DProps {
+  mobId: string;
   mobLabel: string;
   projectName: string;
-  /** Geometría de partida (vainilla, ver ticket 083 HU-1) -- este componente nunca la muta, solo la usa como estado inicial. */
+  /** Geometría de partida -- este componente nunca la muta, solo la usa como estado inicial. Si ninguna caja tiene `parentId` (mob vainilla recién cargado, nunca modelado antes), se le aplica la jerarquía por defecto de `mobId` al montar (ticket 084, HU-3). */
   baseGeometry: MobGeometry;
-  /** "Mis proyectos" en el breadcrumb. */
   onBackToProjectsList: () => void;
-  /** Nombre del proyecto en el breadcrumb / "Volver sin guardar". */
   onBackToProject: () => void;
-  /**
-   * "Continuar" -- entrega la geometría final y si hubo cambios reales
-   * respecto a `baseGeometry` (App.tsx decide qué hacer: sin cambios,
-   * no persiste nada; con cambios, guarda como `'modelando'` -- la
-   * transición formal a `'confirmado'` con atlas UV es el ticket 086,
-   * todavía no construido).
-   */
   onContinue: (finalGeometry: MobGeometry, hasChanges: boolean) => void;
 }
 
+function hasAnyHierarchy(geometry: MobGeometry): boolean {
+  return Object.values(geometry.parts).some((part) => part.parentId !== undefined);
+}
+
 /**
- * Editor de modelo 3D manual (ticket 083, Etapa 1 del epic de modelado
- * 3D -- ver docs/definiciones/modelado-3d-custom-y-generacion-con-ia.md).
- * Agregar/mover/redimensionar/rotar/eliminar cajas sobre una geometría
- * base, con gizmos en el visor 3D (drei `TransformControls`).
- *
- * DECISIÓN DE ALCANCE de este ticket, señalada explícitamente (no
- * asumida en silencio): la entrada a este editor vive en el menú "⋮" de
- * cada tarjeta de mob en `Proyecto.tsx` ("Editar modelo 3D"), NO
- * inyectada en el flujo principal de "agregar mob" (que seguiría
- * exactamente igual que hoy para cualquiera que no toque esta opción
- * nueva). Forzar a TODOS los usuarios a pasar por un editor de modelo
- * cuyo siguiente paso natural (confirmar + generar atlas UV, ticket
- * 086) todavía no existe habría sido una regresión de UX real -- este
- * enfoque dejar la funcionalidad disponible y probable hoy, sin romper
- * el flujo por defecto mientras el resto del epic (084/086) se termina
- * de construir.
+ * Editor de modelo 3D manual (ticket 083) con jerarquía de huesos
+ * (ticket 084) -- ver docs/definiciones/modelado-3d-custom-y-generacion-con-ia.md.
+ * Decisión de alcance sobre dónde vive la entrada a este editor: ver
+ * comentario completo en el ticket 083 (`docs/COMPONENTES.md`).
  */
-export function ModelEditor3D({ mobLabel, projectName, baseGeometry, onBackToProjectsList, onBackToProject, onContinue }: ModelEditor3DProps) {
-  const [geometry, setGeometry] = useState<MobGeometry>(baseGeometry);
+export function ModelEditor3D({ mobId, mobLabel, projectName, baseGeometry, onBackToProjectsList, onBackToProject, onContinue }: ModelEditor3DProps) {
+  const [geometry, setGeometry] = useState<MobGeometry>(() => (hasAnyHierarchy(baseGeometry) ? baseGeometry : applyDefaultHierarchy(baseGeometry, mobId)));
   const [originalPartNames] = useState<Set<string>>(() => new Set(Object.keys(baseGeometry.parts)));
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [selectedObject, setSelectedObject] = useState<THREE.Object3D | null>(null);
   const [mode, setMode] = useState<TransformMode>('translate');
   const [isDragging, setIsDragging] = useState(false);
+  const [hierarchyError, setHierarchyError] = useState<string | null>(null);
+  const boxRefs = useRef<Map<string, THREE.Object3D>>(new Map());
 
   const hasChanges = geometry !== baseGeometry;
   const canDeleteSelected = selectedName !== null && canDeleteBox(selectedName, originalPartNames);
   const cameraTarget = useMemo(() => computeGeometryCenter(geometry), [geometry]);
 
+  function registerBoxRef(name: string, object: THREE.Object3D | null) {
+    if (object) {
+      boxRefs.current.set(name, object);
+    } else {
+      boxRefs.current.delete(name);
+    }
+  }
+
   function handleSelect(name: string, object: THREE.Object3D) {
     setSelectedName(name);
     setSelectedObject(object);
+  }
+
+  function handleSelectFromList(name: string) {
+    setSelectedName(name);
+    setSelectedObject(boxRefs.current.get(name) ?? null);
   }
 
   function handlePointerMissed() {
@@ -139,6 +175,23 @@ export function ModelEditor3D({ mobLabel, projectName, baseGeometry, onBackToPro
     setGeometry((current) => removeBox(current, selectedName));
     setSelectedName(null);
     setSelectedObject(null);
+  }
+
+  function handleSetParent(name: string, parentId: string | null) {
+    const result = setParent(geometry, name, parentId);
+    if (!result.ok) {
+      setHierarchyError(result.error);
+      return;
+    }
+    setHierarchyError(null);
+    setGeometry(result.geometry);
+    // El objeto tres.js de `name` cambia de grupo padre en el scene graph
+    // -- se re-selecciona por nombre (no por referencia vieja) para que
+    // el gizmo, si estaba activo, no quede apuntando a un objeto que ya
+    // no cuelga de donde antes.
+    if (selectedName === name) {
+      setSelectedObject(boxRefs.current.get(name) ?? null);
+    }
   }
 
   function handleTransformCommit() {
@@ -161,11 +214,13 @@ export function ModelEditor3D({ mobLabel, projectName, baseGeometry, onBackToPro
       return;
     }
 
-    // mode === 'scale': el gizmo escala el `Object3D`, no la geometria
-    // -- se convierte a un tamaño absoluto nuevo (tamaño actual * factor
-    // de escala acumulado en este arrastre) y se resetea el `scale` del
+    // mode === 'scale': el gizmo escala el `Object3D` (el grupo del
+    // hueso completo, incluidas sus hijas mientras se arrastra -- efecto
+    // secundario visual aceptado, se autocorrige al soltar) -- se
+    // convierte a un tamaño absoluto nuevo (tamaño actual * factor de
+    // escala acumulado en este arrastre) y se resetea el `scale` del
     // objeto a 1 (la caja siempre se renderiza con `scale={[1, 1, 1]}`
-    // explicito, ver `EditableBox` -- el proximo arrastre de escala
+    // explicito, ver `EditableBoxGroup` -- el proximo arrastre de escala
     // vuelve a partir de 1, sin acumular error entre sesiones).
     const currentPart = geometry.parts[selectedName];
     if (!currentPart) return;
@@ -227,10 +282,12 @@ export function ModelEditor3D({ mobLabel, projectName, baseGeometry, onBackToPro
         </Button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 220px', gap: 16, flex: 1, minHeight: 420 }}>
+      {hierarchyError && <InlineError message={hierarchyError} />}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 260px', gap: 16, flex: 1, minHeight: 420 }}>
         <div
           role="img"
-          aria-label={`Editor de modelo 3D del ${mobLabel} -- agregar, mover, redimensionar y rotar cajas`}
+          aria-label={`Editor de modelo 3D del ${mobLabel} -- agregar, mover, redimensionar y rotar cajas, con jerarquía de huesos`}
           style={{ borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--border)' }}
         >
           <Canvas camera={{ position: [45, 40, 65], fov: 40, near: 0.1, far: 1000 }} onPointerMissed={handlePointerMissed}>
@@ -239,9 +296,7 @@ export function ModelEditor3D({ mobLabel, projectName, baseGeometry, onBackToPro
             <directionalLight position={[40, 60, 40]} intensity={0.6} />
             <Grid position={[0, 0, 0]} args={[300, 300]} {...FLOOR_GRID_PROPS} />
 
-            {Object.entries(geometry.parts).map(([name, part]) => (
-              <EditableBox key={name} name={name} part={part} selected={name === selectedName} onSelect={handleSelect} />
-            ))}
+            <BoxTree geometry={geometry} parentId={undefined} selectedName={selectedName} onSelect={handleSelect} registerRef={registerBoxRef} />
 
             {selectedObject && (
               <TransformControls
@@ -256,30 +311,51 @@ export function ModelEditor3D({ mobLabel, projectName, baseGeometry, onBackToPro
           </Canvas>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
           <h3 style={{ margin: '0 0 4px', fontSize: 'var(--font-sm)', color: 'var(--text-dim)' }}>Cajas del modelo</h3>
-          {Object.keys(geometry.parts).map((name) => {
+          {Object.entries(geometry.parts).map(([name, part]) => {
             const isOriginal = originalPartNames.has(name);
             const isSelected = name === selectedName;
+            const descendants = getDescendants(geometry, name);
+            const parentOptions = Object.keys(geometry.parts).filter((candidate) => candidate !== name && !descendants.has(candidate));
+
             return (
-              <button
+              <div
                 key={name}
-                type="button"
-                onClick={() => setSelectedName(name)}
                 style={{
-                  textAlign: 'left',
                   padding: '8px 10px',
                   borderRadius: 'var(--radius-md)',
                   border: `1px solid ${isSelected ? 'var(--accent)' : 'var(--border)'}`,
                   background: isSelected ? 'var(--chip-bg)' : 'var(--surface-raised)',
-                  color: 'var(--text)',
-                  cursor: 'pointer',
-                  fontSize: 'var(--font-sm)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 4,
                 }}
               >
-                {name}
-                {isOriginal && <span style={{ color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}> (vainilla)</span>}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleSelectFromList(name)}
+                  style={{ textAlign: 'left', background: 'none', border: 'none', padding: 0, color: 'var(--text)', cursor: 'pointer', fontSize: 'var(--font-sm)' }}
+                >
+                  {name}
+                  {isOriginal && <span style={{ color: 'var(--text-dim)', fontSize: 'var(--font-xs)' }}> (vainilla)</span>}
+                </button>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--font-xs)', color: 'var(--text-dim)' }}>
+                  Padre:
+                  <select
+                    value={part.parentId ?? ''}
+                    onChange={(e) => handleSetParent(name, e.target.value === '' ? null : e.target.value)}
+                    style={{ flex: 1, background: 'var(--surface)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '2px 4px' }}
+                  >
+                    <option value="">Ninguno (raíz)</option>
+                    {parentOptions.map((candidate) => (
+                      <option key={candidate} value={candidate}>
+                        {candidate}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             );
           })}
         </div>

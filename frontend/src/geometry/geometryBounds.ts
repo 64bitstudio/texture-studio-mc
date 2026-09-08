@@ -1,4 +1,5 @@
 import type { MobBoxPart, MobGeometry } from '../types/baseAssets';
+import { computeAbsolutePosition } from './hierarchy';
 
 const DEG_TO_RAD = Math.PI / 180;
 
@@ -83,10 +84,24 @@ function boxCornersWorld(part: MobBoxPart): [number, number, number][] {
  */
 export function computeAllPartCorners(geometry: MobGeometry): [number, number, number][] {
   const corners: [number, number, number][] = [];
-  for (const part of Object.values(geometry.parts)) {
-    corners.push(...boxCornersWorld(part));
+  for (const [name, part] of Object.entries(geometry.parts)) {
+    corners.push(...boxCornersWorld(worldSpacePart(geometry, name, part)));
   }
   return corners;
+}
+
+/**
+ * Copia de `part` con `position` resuelta a espacio mundo (ticket 084)
+ * -- una caja sin `parentId` ya es absoluta (`computeAbsolutePosition`
+ * la devuelve tal cual, cero cambio para los 4 mobs vainilla ni ningun
+ * otro consumidor existente); una caja CON `parentId` (jerarquia del
+ * editor de modelo) resuelve su cadena completa de padres primero, para
+ * que el bounding box/encuadre de camara no se calcule mal sobre una
+ * posicion relativa como si fuera absoluta.
+ */
+function worldSpacePart(geometry: MobGeometry, name: string, part: MobBoxPart): MobBoxPart {
+  if (!part.parentId) return part;
+  return { ...part, position: computeAbsolutePosition(geometry, name) };
 }
 
 // Centro del bounding box 3D de un `MobGeometry` (ticket 020, hallazgo
@@ -148,8 +163,8 @@ export interface GeometryBounds {
  * `docs/ARQUITECTURA.md` para el porque.
  */
 export function computeGeometryBounds(geometry: MobGeometry): GeometryBounds | null {
-  const parts = Object.values(geometry.parts);
-  if (parts.length === 0) return null;
+  const entries = Object.entries(geometry.parts);
+  if (entries.length === 0) return null;
 
   let minX = Infinity;
   let maxX = -Infinity;
@@ -158,8 +173,8 @@ export function computeGeometryBounds(geometry: MobGeometry): GeometryBounds | n
   let minZ = Infinity;
   let maxZ = -Infinity;
 
-  for (const part of parts) {
-    for (const [x, y, z] of boxCornersWorld(part)) {
+  for (const [name, part] of entries) {
+    for (const [x, y, z] of boxCornersWorld(worldSpacePart(geometry, name, part))) {
       minX = Math.min(minX, x);
       maxX = Math.max(maxX, x);
       minY = Math.min(minY, y);
