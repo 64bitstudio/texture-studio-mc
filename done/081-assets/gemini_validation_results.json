@@ -1,0 +1,46 @@
+[
+  {
+    "description": "Caminata normal, natural, brazos y piernas alternados.",
+    "reliability_error": null,
+    "schema_ok": true,
+    "errors": [],
+    "warnings": []
+  },
+  {
+    "description": "Caminata arrastrando los pies, cansado, pasos cortos.",
+    "reliability_error": "HTTP Error 503: Service Unavailable",
+    "schema_ok": null,
+    "errors": [],
+    "warnings": []
+  },
+  {
+    "description": "Trote rapido y ligero.",
+    "reliability_error": null,
+    "schema_ok": true,
+    "errors": [],
+    "warnings": [
+      "'legRight' t=0->0.15: 40 grados en 0.15s (267 g/s)",
+      "'legRight' t=0.15->0.3: 40 grados en 0.15s (267 g/s)",
+      "'legRight' t=0.3->0.45: 40 grados en 0.15s (267 g/s)",
+      "'legRight' t=0.45->0.6: 40 grados en 0.15s (267 g/s)",
+      "'legLeft' t=0->0.15: 40 grados en 0.15s (267 g/s)",
+      "'legLeft' t=0.15->0.3: 40 grados en 0.15s (267 g/s)",
+      "'legLeft' t=0.3->0.45: 40 grados en 0.15s (267 g/s)",
+      "'legLeft' t=0.45->0.6: 40 grados en 0.15s (267 g/s)"
+    ]
+  },
+  {
+    "description": "Caminata robotica, movimientos rigidos y mecanicos.",
+    "reliability_error": null,
+    "schema_ok": true,
+    "errors": [],
+    "warnings": []
+  },
+  {
+    "description": "Caminata cojeando, favoreciendo la pierna derecha (le duele).",
+    "reliability_error": null,
+    "schema_ok": true,
+    "errors": [],
+    "warnings": []
+  }
+]
