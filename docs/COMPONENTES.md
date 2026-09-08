@@ -505,3 +505,10 @@ Reemplaza el motor de miniaturas del ticket 055 -- ver `docs/ARQUITECTURA.md`, "
 - **`components/AppShell.tsx`** — nuevos props `sidebarCollapsed`/`onToggleSidebarCollapsed`, pasados a `Sidebar.tsx`.
 - **`components/Sidebar.tsx`** — ancho `272px`/`76px` (expandido/colapsado); colapsado oculta `extraContent` y las etiquetas de texto (via `.sr-only`, con `title` de tooltip); nuevo botón circular de colapsar/expandir, vive en un wrapper `<div>` hermano del `<nav>` (no dentro, para no heredar su `overflow-y: auto` -- ver `docs/ARQUITECTURA.md`, "Ticket 079"); radio de los botones de navegación de `--radius-lg` a `--radius-md`.
 - **`ui/icons.tsx`** — nuevo `IconChevronLeft` (rotado 180° por CSS según el estado).
+
+### Ticket 082 -- Modelo de datos: geometría custom, jerarquía de huesos y animaciones por mob
+
+Primer ticket del epic de modelado 3D custom con IA (ver `docs/definiciones/modelado-3d-custom-y-generacion-con-ia.md`, VoBo dado) -- solo modelo de datos, sin UI todavía (la construyen los tickets 083 en adelante).
+
+- **`types/baseAssets.ts`** (frontend y backend, espejo exacto) — `MobBoxPart` gana `parentId?: string` (nombre de la caja "padre" dentro de `MobGeometry.parts`, jerarquía de huesos). Opcional y aditivo: los 4 mobs vainilla no la usan todavía (queda en `undefined`) -- poblarla es el ticket 084.
+- **`projectStorage.ts`** — nuevos tipos `GeometryStatus` (`'vanilla' | 'modelando' | 'confirmado'`), `AnimationKeyframe`, `MobAnimation`. `ProjectMobEntry` gana `geometryStatus?`/`customGeometry?: MobGeometry`/`animations?: MobAnimation[]` (opcionales, aditivos -- mismo criterio ya usado para `description`/`coverImageDataUrl` de `ProjectRecord`, ticket 056). Nueva `getMobGeometryStatus(entry)` (default `'vanilla'` si el campo no existe) para que ningún consumidor repita ese `?? 'vanilla'`. Con tests en `test/projectStorage.spec.ts` (compatibilidad con mobs guardados antes de este ticket, geometría custom con jerarquía, animaciones, y proyectos con mobs mixtos vanilla/custom).

@@ -15,6 +15,7 @@ import {
   deleteAllProjects,
   deleteProject,
   duplicateProject,
+  getMobGeometryStatus,
   listProjects,
   loadProject,
   projectExists,
@@ -24,6 +25,7 @@ import {
   updateProjectCover,
   updateProjectDescription,
 } from '../src/projectStorage';
+import type { MobGeometry } from '../src/types/baseAssets';
 
 class MockStorage implements Storage {
   private store = new Map<string, string>();
@@ -400,5 +402,87 @@ describe('lectura defensiva de un valor corrupto en localStorage', () => {
 
     expect(listProjects()).toEqual([]);
     expect(loadProject('cualquiera')).toBeNull();
+  });
+});
+
+// Ticket 082 -- geometryStatus / customGeometry (con jerarquia) / animations
+// por mob. Ver docs/definiciones/modelado-3d-custom-y-generacion-con-ia.md.
+
+const FACE_LABELS = { front: 'Frente', back: 'Espalda', top: 'Arriba', bottom: 'Abajo', left: 'Izquierda', right: 'Derecha' };
+
+const SAMPLE_CUSTOM_GEOMETRY: MobGeometry = {
+  textureWidth: 64,
+  textureHeight: 64,
+  parts: {
+    body: { size: [8, 12, 4], position: [0, 12, 0], uv: { x: 16, y: 16 }, faceLabels: FACE_LABELS },
+    head: { size: [8, 8, 8], position: [0, 24, 0], uv: { x: 0, y: 0 }, faceLabels: FACE_LABELS, parentId: 'body' },
+  },
+};
+
+const SAMPLE_ANIMATIONS = [
+  {
+    name: 'idle',
+    loop: true,
+    length: 1,
+    bones: { body: [{ time: 0, rotation: { x: 0, y: 0, z: 0 } }, { time: 1, rotation: { x: 0, y: 0, z: 0 } }] },
+  },
+];
+
+describe('ProjectMobEntry -- geometryStatus/customGeometry/animations (ticket 082)', () => {
+  it('compatibilidad: un mob guardado antes de este ticket (sin geometryStatus) se trata como "vanilla"', () => {
+    expect(getMobGeometryStatus(SAMPLE_MOBS.skeleton)).toBe('vanilla');
+  });
+
+  it('guarda y recupera un mob con geometria custom (con parentId), animaciones y estado "confirmado" sin perder datos', () => {
+    const mobs = {
+      zombie: {
+        resolution: 1,
+        pngDataUrl: 'data:image/png;base64,AAA',
+        geometryStatus: 'confirmado' as const,
+        customGeometry: SAMPLE_CUSTOM_GEOMETRY,
+        animations: SAMPLE_ANIMATIONS,
+      },
+    };
+
+    saveProject('proyecto-custom', mobs);
+    const loaded = loadProject('proyecto-custom')!;
+
+    expect(getMobGeometryStatus(loaded.mobs.zombie!)).toBe('confirmado');
+    expect(loaded.mobs.zombie!.customGeometry).toEqual(SAMPLE_CUSTOM_GEOMETRY);
+    expect(loaded.mobs.zombie!.customGeometry!.parts.head!.parentId).toBe('body');
+    expect(loaded.mobs.zombie!.animations).toEqual(SAMPLE_ANIMATIONS);
+  });
+
+  it('un mob en estado "modelando" (geometria en edicion, sin confirmar) tambien persiste correctamente', () => {
+    const mobs = {
+      creeper: {
+        resolution: 1,
+        pngDataUrl: 'data:image/png;base64,BBB',
+        geometryStatus: 'modelando' as const,
+        customGeometry: SAMPLE_CUSTOM_GEOMETRY,
+      },
+    };
+
+    saveProject('proyecto-en-progreso', mobs);
+    expect(getMobGeometryStatus(loadProject('proyecto-en-progreso')!.mobs.creeper!)).toBe('modelando');
+  });
+
+  it('un proyecto con mobs mixtos (uno vanilla de siempre, otro custom) guarda cada uno con su propio estado', () => {
+    const mobs = {
+      skeleton: { resolution: 1, pngDataUrl: 'data:image/png;base64,SSS' },
+      zombie: {
+        resolution: 1,
+        pngDataUrl: 'data:image/png;base64,ZZZ',
+        geometryStatus: 'confirmado' as const,
+        customGeometry: SAMPLE_CUSTOM_GEOMETRY,
+      },
+    };
+
+    saveProject('proyecto-mixto', mobs);
+    const loaded = loadProject('proyecto-mixto')!;
+
+    expect(getMobGeometryStatus(loaded.mobs.skeleton!)).toBe('vanilla');
+    expect(loaded.mobs.skeleton!.customGeometry).toBeUndefined();
+    expect(getMobGeometryStatus(loaded.mobs.zombie!)).toBe('confirmado');
   });
 });

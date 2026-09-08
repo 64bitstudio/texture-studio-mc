@@ -123,6 +123,18 @@ export interface MobBoxPart {
   pivot?: [number, number, number];
   /** Rotacion en grados (orden XYZ), aplicada alrededor de `pivot`. Ignorado si `pivot` no esta presente. */
   rotation?: [number, number, number];
+  /**
+   * Ticket 082 -- nombre de la caja "padre" de esta caja dentro de
+   * `MobGeometry.parts` (jerarquia de huesos para el editor de modelo 3D
+   * y su export a `.bbmodel`, ver docs/definiciones/
+   * modelado-3d-custom-y-generacion-con-ia.md). Opcional: sin `parentId`,
+   * la caja no tiene padre. Los 4 mobs vainilla de este backend todavia
+   * no la usan (queda en `undefined` para todos) -- poblarla con una
+   * jerarquia por defecto razonable es el ticket 084, este ticket solo
+   * agrega el campo al contrato. Espejo exacto en
+   * `frontend/src/types/baseAssets.ts`.
+   */
+  parentId?: string;
 }
 
 /**
