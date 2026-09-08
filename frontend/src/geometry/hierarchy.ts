@@ -142,14 +142,45 @@ export function getDefaultParentMap(mobId: string): Readonly<Record<string, stri
  * sin jerarquia conocida, o partes que no coinciden con los nombres
  * esperados (geometria ya editada con nombres distintos), simplemente
  * no agrega esa relacion -- nunca lanza.
+ *
+ * **Hallazgo real (ticket 090, investigando el visor 3D animado)**: una
+ * caja con `pivot` (ticket 024 -- hoy, solo las 8 patas de la Araña)
+ * define su `position` como un punto de referencia PRE-rotacion
+ * respecto a su propio `pivot` (ver `Viewer3D.tsx`/`geometryBounds.ts`),
+ * no como su posicion final en el mundo -- convertirla a "relativa al
+ * padre" via `setParent` (que SI trata `position` como si fuera
+ * absoluta) corrompe esa referencia y produce una pata mal ubicada. Se
+ * excluye deliberadamente a cualquier caja con `pivot` de la jerarquia
+ * automatica (se queda sin `parentId`, exactamente como antes de este
+ * ticket -- cero cambio de comportamiento para ella) hasta que la
+ * matematica de `pivot`+jerarquia se reconcilie explicitamente (fuera
+ * de alcance de este ticket, señalado en el "Hecho"). `setParent` en si
+ * (la API de bajo nivel que usa el selector "Padre" manual del editor
+ * de modelo) NO se toca -- un usuario que asigne un padre a mano a una
+ * caja con pivot sigue pudiendo hacerlo, solo que este helper
+ * AUTOMATICO ya no se lo impone por default.
  */
 export function applyDefaultHierarchy(geometry: MobGeometry, mobId: string): MobGeometry {
   const parentMap = getDefaultParentMap(mobId);
   let result = geometry;
   for (const [childName, parentName] of Object.entries(parentMap)) {
     if (!(childName in result.parts) || !(parentName in result.parts)) continue;
+    if (result.parts[childName]?.pivot) continue;
     const outcome = setParent(result, childName, parentName);
     if (outcome.ok) result = outcome.geometry;
   }
   return result;
+}
+
+/**
+ * `true` si al menos una caja ya tiene `parentId` -- criterio para
+ * decidir si hace falta llamar a `applyDefaultHierarchy` (una geometria
+ * vainilla recien cargada nunca lo tiene; una ya editada, o ya
+ * confirmada con jerarquia, si). `export` desde el ticket 090 --
+ * antes vivia privada en `ModelEditor3D.tsx` (ticket 084), ahora la
+ * reusa tambien `AnimationEditor.tsx` (mismo criterio "aplicar
+ * jerarquia por defecto la primera vez que hace falta").
+ */
+export function hasAnyHierarchy(geometry: MobGeometry): boolean {
+  return Object.values(geometry.parts).some((part) => part.parentId !== undefined);
 }

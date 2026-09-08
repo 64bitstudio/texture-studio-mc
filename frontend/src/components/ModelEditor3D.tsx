@@ -6,7 +6,7 @@ import { AIGeometryAssist } from './AIGeometryAssist';
 import { Button, InlineError } from '../ui';
 import { IconHand, IconModel, IconPlus, IconRefresh, IconScale, IconTrash } from '../ui/icons';
 import { computeGeometryCenter } from '../geometry/geometryBounds';
-import { applyDefaultHierarchy, getDescendants, setParent } from '../geometry/hierarchy';
+import { applyDefaultHierarchy, getDescendants, hasAnyHierarchy, setParent } from '../geometry/hierarchy';
 import { addBox, canDeleteBox, removeBox, updateBoxTransform } from '../geometry/modelEditing';
 import { confirmModelGeometry } from '../geometry/packBoxesUV';
 import type { MobBoxPart, MobGeometry } from '../types/baseAssets';
@@ -124,10 +124,6 @@ export interface ModelEditor3DProps {
    * 'confirmado'`) y App.tsx navega directo al editor de textura.
    */
   onConfirm: (confirmedGeometry: MobGeometry) => void;
-}
-
-function hasAnyHierarchy(geometry: MobGeometry): boolean {
-  return Object.values(geometry.parts).some((part) => part.parentId !== undefined);
 }
 
 /**

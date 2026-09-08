@@ -7,6 +7,7 @@ import {
   computeAbsolutePosition,
   getDefaultParentMap,
   getDescendants,
+  hasAnyHierarchy,
   setParent,
   wouldCreateCycle,
 } from '../src/geometry/hierarchy';
@@ -141,5 +142,32 @@ describe('getDefaultParentMap / applyDefaultHierarchy', () => {
   it('no lanza si faltan partes del mapa esperado (geometria custom, editada)', () => {
     const partial: MobGeometry = { ...BIPED_GEOMETRY, parts: { body: BIPED_GEOMETRY.parts.body! } };
     expect(() => applyDefaultHierarchy(partial, 'skeleton')).not.toThrow();
+  });
+
+  it('hallazgo real (ticket 090): una caja con "pivot" (patas de la Araña) NO recibe parentId automatico -- `position` seria interpretada mal al convertirla a relativa (ver comentario de la funcion)', () => {
+    const spiderLike: MobGeometry = {
+      textureWidth: 64,
+      textureHeight: 32,
+      parts: {
+        thorax: { size: [6, 6, 6], position: [0, 9, 0], uv: { x: 0, y: 0 }, faceLabels: NOOP_LABELS },
+        head: { size: [8, 8, 8], position: [0, 9, -7], uv: { x: 32, y: 4 }, faceLabels: NOOP_LABELS },
+        leg1Right: { size: [16, 2, 2], position: [-11, 9, -1], uv: { x: 18, y: 0 }, faceLabels: NOOP_LABELS, pivot: [-4, 9, -1], rotation: [0, -45, 45] },
+      },
+    };
+    const withHierarchy = applyDefaultHierarchy(spiderLike, 'spider');
+
+    expect(withHierarchy.parts.head!.parentId).toBe('thorax');
+    // La pata queda EXACTAMENTE como antes -- ni parentId ni position tocados.
+    expect(withHierarchy.parts.leg1Right).toEqual(spiderLike.parts.leg1Right);
+  });
+});
+
+describe('hasAnyHierarchy', () => {
+  it('false para una geometria vainilla recien cargada (ninguna caja tiene parentId)', () => {
+    expect(hasAnyHierarchy(BIPED_GEOMETRY)).toBe(false);
+  });
+
+  it('true si al menos una caja tiene parentId', () => {
+    expect(hasAnyHierarchy(applyDefaultHierarchy(BIPED_GEOMETRY, 'skeleton'))).toBe(true);
   });
 });
