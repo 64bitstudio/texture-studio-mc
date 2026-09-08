@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Canvas, type ThreeEvent } from '@react-three/fiber';
 import { Grid, OrbitControls, TransformControls } from '@react-three/drei';
+import { AIGeometryAssist } from './AIGeometryAssist';
 import { Button, InlineError } from '../ui';
 import { IconHand, IconModel, IconPlus, IconRefresh, IconScale, IconTrash } from '../ui/icons';
 import { computeGeometryCenter } from '../geometry/geometryBounds';
@@ -243,6 +244,17 @@ export function ModelEditor3D({ mobId, mobLabel, projectName, baseGeometry, onBa
     onConfirm(confirmModelGeometry(geometry));
   }
 
+  // La propuesta de IA reemplaza `parts` por completo (ver
+  // `validateAndApplyGeometryProposal`) -- una caja seleccionada puede
+  // ya no existir (o haber cambiado de identidad), así que se
+  // deselecciona en vez de arriesgar un `selectedObject` apuntando a un
+  // nombre que ya no está en la geometría nueva.
+  function handleApplyAiProposal(nextGeometry: MobGeometry) {
+    setGeometry(nextGeometry);
+    setSelectedName(null);
+    setSelectedObject(null);
+  }
+
   return (
     <div className="ts-fade-in" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20, height: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -327,7 +339,8 @@ export function ModelEditor3D({ mobId, mobLabel, projectName, baseGeometry, onBa
           </Canvas>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
+          <AIGeometryAssist baseGeometry={geometry} onApply={handleApplyAiProposal} />
           <h3 style={{ margin: '0 0 4px', fontSize: 'var(--font-sm)', color: 'var(--text-dim)' }}>Cajas del modelo</h3>
           {Object.entries(geometry.parts).map(([name, part]) => {
             const isOriginal = originalPartNames.has(name);
