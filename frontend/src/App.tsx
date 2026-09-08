@@ -14,7 +14,7 @@ import { getTheme, type Theme } from './theme';
 import { getSidebarCollapsed, setSidebarCollapsed } from './sidebarCollapse';
 import { fetchMobBaseAssets } from './api/baseAssets';
 import { fetchMobs } from './api/mobs';
-import { updateMobGeometry } from './projectStorage';
+import { loadProject, updateMobGeometry } from './projectStorage';
 import type { MobBaseAssetsResponse, MobGeometry } from './types/baseAssets';
 import type { MobSummary } from './types/mobs';
 import { TextureBuffer } from './textureBuffer';
@@ -205,8 +205,21 @@ function App() {
   // `setModelEditorGeometryState({status: 'loading'})` síncrono en el
   // cuerpo del efecto -- la transición a "loading" la dispara
   // `handleEditModel`, no este efecto).
+  //
+  // Ticket 084 (hallazgo real, encontrado extendiendo este ticket):
+  // esto ANTES siempre pedía la geometría vainilla del catálogo, sin
+  // importar si el mob ya tenía `customGeometry` guardada de una
+  // sesión de edición anterior -- reabrir "Editar modelo 3D" descartaba
+  // en silencio cualquier jerarquía/caja agregada antes. Fix: si el
+  // proyecto ya tiene `customGeometry` para este mob, `handleEditModel`
+  // ya la resolvió de forma síncrona (sin pasar por "loading") -- este
+  // efecto repite la MISMA verificación (barata, pura) para no
+  // fetchear nada en ese caso, en vez de guardar esa decisión en un
+  // estado aparte solo para comunicarla entre el handler y el efecto.
   useEffect(() => {
-    if (editingModelMobId === null) return;
+    if (editingModelMobId === null || !activeProject) return;
+    if (loadProject(activeProject.name)?.mobs[editingModelMobId]?.customGeometry) return;
+
     let cancelled = false;
 
     fetchMobBaseAssets(editingModelMobId)
@@ -223,7 +236,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [editingModelMobId]);
+  }, [editingModelMobId, activeProject]);
 
   function handleRetryMobs() {
     setMobsState({ status: 'loading' });
@@ -262,7 +275,13 @@ function App() {
   // transición a "loading" se dispara aquí (evento), nunca en el
   // efecto que hace el fetch.
   function handleEditModel(mobId: string) {
-    setModelEditorGeometryState({ status: 'loading' });
+    // Ticket 084: si el mob ya tiene `customGeometry` guardada (sesion
+    // de edicion anterior), se resuelve de una vez -- el efecto de
+    // abajo no necesita fetchear nada, y evita el patron de
+    // `setState` sincrono dentro de un efecto (regla ya establecida en
+    // este archivo, ver el comentario del efecto de `assetState`).
+    const existingCustomGeometry = activeProject ? loadProject(activeProject.name)?.mobs[mobId]?.customGeometry : undefined;
+    setModelEditorGeometryState(existingCustomGeometry ? { status: 'ready', geometry: existingCustomGeometry } : { status: 'loading' });
     setEditingModelMobId(mobId);
     setView('editor-modelo');
   }
@@ -570,6 +589,7 @@ function App() {
             {modelEditorGeometryState.status === 'ready' && (
               <ModelEditor3D
                 key={editingModelMobId}
+                mobId={editingModelMobId}
                 mobLabel={mobsState.status === 'ready' ? (mobsState.mobs.find((m) => m.id === editingModelMobId)?.label ?? editingModelMobId) : editingModelMobId}
                 projectName={activeProject.name}
                 baseGeometry={modelEditorGeometryState.geometry}
