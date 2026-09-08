@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, type ChangeEvent } from 'react';
 import { Button, FormField, InlineError, Section, SearchSortToggleBar, type ToggleLayout } from '../ui';
 import { IconClock, IconDocument, IconDuplicate, IconExport, IconFolder, IconModel, IconPencil, IconPlus, IconTrash } from '../ui/icons';
-import { loadProject, removeMobFromProject, updateProjectCover, updateProjectDescription } from '../projectStorage';
+import { getMobGeometryStatus, loadProject, removeMobFromProject, updateProjectCover, updateProjectDescription } from '../projectStorage';
 import { useProjectActions } from '../hooks/useProjectActions';
 import { filterAndSortProjectMobs } from '../projectMobFilter';
 import { MobEntryCard } from './MobEntryCard';
@@ -384,6 +384,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onEditModel, onAddMob
                       resolution={record.mobs[mobId]!.resolution}
                       layout={mobLayout}
                       geometryCache={geometryCache}
+                      geometryStatus={getMobGeometryStatus(record.mobs[mobId]!)}
                       onEditTexture={() => onSelectMob(mobId)}
                       onEditModel={() => onEditModel(mobId)}
                       onRemoveMob={() => handleRemoveMob(mobId)}

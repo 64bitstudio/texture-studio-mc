@@ -7,6 +7,7 @@ import { IconHand, IconModel, IconPlus, IconRefresh, IconScale, IconTrash } from
 import { computeGeometryCenter } from '../geometry/geometryBounds';
 import { applyDefaultHierarchy, getDescendants, setParent } from '../geometry/hierarchy';
 import { addBox, canDeleteBox, removeBox, updateBoxTransform } from '../geometry/modelEditing';
+import { confirmModelGeometry } from '../geometry/packBoxesUV';
 import type { MobBoxPart, MobGeometry } from '../types/baseAssets';
 
 const DEG_TO_RAD = Math.PI / 180;
@@ -113,7 +114,15 @@ export interface ModelEditor3DProps {
   baseGeometry: MobGeometry;
   onBackToProjectsList: () => void;
   onBackToProject: () => void;
-  onContinue: (finalGeometry: MobGeometry, hasChanges: boolean) => void;
+  /** "Guardar borrador" (ticket 083) -- sin atlas, sin bloquear nada; el mob sigue en `'modelando'` (o `'vanilla'` si `hasChanges` es `false`) y se puede reabrir este editor despues. */
+  onSaveDraft: (finalGeometry: MobGeometry, hasChanges: boolean) => void;
+  /**
+   * "Confirmar modelo" (ticket 086, HU-6) -- cierra la Etapa 2: la
+   * geometria ya viene con el atlas UV aplicado (`confirmModelGeometry`).
+   * Bloquea permanentemente este editor para este mob (`geometryStatus:
+   * 'confirmado'`) y App.tsx navega directo al editor de textura.
+   */
+  onConfirm: (confirmedGeometry: MobGeometry) => void;
 }
 
 function hasAnyHierarchy(geometry: MobGeometry): boolean {
@@ -126,7 +135,7 @@ function hasAnyHierarchy(geometry: MobGeometry): boolean {
  * Decisión de alcance sobre dónde vive la entrada a este editor: ver
  * comentario completo en el ticket 083 (`docs/COMPONENTES.md`).
  */
-export function ModelEditor3D({ mobId, mobLabel, projectName, baseGeometry, onBackToProjectsList, onBackToProject, onContinue }: ModelEditor3DProps) {
+export function ModelEditor3D({ mobId, mobLabel, projectName, baseGeometry, onBackToProjectsList, onBackToProject, onSaveDraft, onConfirm }: ModelEditor3DProps) {
   const [geometry, setGeometry] = useState<MobGeometry>(() => (hasAnyHierarchy(baseGeometry) ? baseGeometry : applyDefaultHierarchy(baseGeometry, mobId)));
   const [originalPartNames] = useState<Set<string>>(() => new Set(Object.keys(baseGeometry.parts)));
   const [selectedName, setSelectedName] = useState<string | null>(null);
@@ -230,6 +239,10 @@ export function ModelEditor3D({ mobId, mobLabel, projectName, baseGeometry, onBa
     setGeometry((current) => updateBoxTransform(current, selectedName, { size: newSize }));
   }
 
+  function handleConfirm() {
+    onConfirm(confirmModelGeometry(geometry));
+  }
+
   return (
     <div className="ts-fade-in" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20, height: '100%' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
@@ -247,8 +260,11 @@ export function ModelEditor3D({ mobId, mobLabel, projectName, baseGeometry, onBa
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <Button onClick={onBackToProject}>Volver sin guardar</Button>
-          <Button variant="primary" onClick={() => onContinue(geometry, hasChanges)}>
-            Continuar
+          <Button onClick={() => onSaveDraft(geometry, hasChanges)} title="Guarda el modelo tal como está, sin generar el atlas de textura -- puedes seguir editándolo después.">
+            Guardar borrador
+          </Button>
+          <Button variant="primary" onClick={handleConfirm} title="Genera el atlas de textura y pasa al editor de textura -- después de esto, la geometría de este mob queda bloqueada.">
+            Confirmar modelo
           </Button>
         </div>
       </div>

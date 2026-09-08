@@ -3,6 +3,7 @@ import { Button, Menu } from '../ui';
 import { IconDocument, IconDots, IconEye, IconMaximize, IconModel, IconPencil, IconScale, IconTrash, IconX } from '../ui/icons';
 import { useMobGeometry } from '../hooks/useMobGeometry';
 import { useMobSnapshot3D } from '../hooks/useMobSnapshot3D';
+import type { GeometryStatus } from '../projectStorage';
 import type { MobGeometry } from '../types/baseAssets';
 import type { ToggleLayout } from '../ui';
 
@@ -14,9 +15,11 @@ export interface MobEntryCardProps {
   layout: ToggleLayout;
   /** Cache de geometrías COMPARTIDA entre todas las tarjetas de esta pantalla -- mismo criterio ya establecido en el ticket 055 (`Proyecto.tsx`, `MobThumbnail2D`, retirado en el ticket 057). */
   geometryCache: Map<string, MobGeometry>;
+  /** Ticket 086 -- `'confirmado'` bloquea "Editar modelo 3D" (ver el botón, más abajo). */
+  geometryStatus: GeometryStatus;
   /** "Editar textura" -- mismo `onSelectMob` que ya usa `Proyecto.tsx`, navega al editor actual SIN NINGÚN CAMBIO (confirmado explícito con Marco). */
   onEditTexture: () => void;
-  /** Menú "⋮" -> "Editar modelo 3D" (ticket 083) -- navega al editor de modelo (`ModelEditor3D.tsx`) para este mob. Ver ese componente para la decisión de alcance de por qué esto vive en el menú y no en el flujo principal de "agregar mob". */
+  /** Menú "⋮" -> "Editar modelo 3D" (ticket 083) -- navega al editor de modelo (`ModelEditor3D.tsx`) para este mob. Ver ese componente para la decisión de alcance de por qué esto vive en el menú y no en el flujo principal de "agregar mob". Deshabilitado si `geometryStatus === 'confirmado'` (ticket 086, HU-6). */
   onEditModel: () => void;
   /** Menú "⋮" -> "Eliminar" (ticket 058) -- confirmado con inline, sin diálogo nativo. El padre (`Proyecto.tsx`) hace la escritura real (`removeMobFromProject`) y refresca la lista. */
   onRemoveMob: () => void;
@@ -110,7 +113,7 @@ function MobPreviewModal({ label, snapshotUrl, onClose }: { label: string; snaps
  * compacto + "Editar textura", y un menú "⋮" con "Eliminar mob del
  * proyecto" (confirmación inline, ticket 058).
  */
-export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geometryCache, onEditTexture, onEditModel, onRemoveMob }: MobEntryCardProps) {
+export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geometryCache, geometryStatus, onEditTexture, onEditModel, onRemoveMob }: MobEntryCardProps) {
   const geometry = useMobGeometry(mobId, geometryCache);
   const [showPreview, setShowPreview] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -152,9 +155,20 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
           </div>
         ) : (
           <>
-            <button type="button" className="ui-menu__item" onClick={onEditModel}>
+            <button
+              type="button"
+              className="ui-menu__item"
+              onClick={onEditModel}
+              disabled={geometryStatus === 'confirmado'}
+              title={geometryStatus === 'confirmado' ? 'Ya confirmaste este modelo -- para cambiar la geometría, duplica el proyecto.' : undefined}
+            >
               <IconModel size={16} /> Editar modelo 3D
             </button>
+            {geometryStatus === 'confirmado' && (
+              <p style={{ margin: '0 8px 4px', fontSize: 'var(--font-xs)', color: 'var(--text-dim)' }}>
+                Modelo confirmado -- duplica el proyecto para cambiar la geometría.
+              </p>
+            )}
             <button type="button" className="ui-menu__item" style={{ color: 'var(--danger)' }} onClick={() => setConfirmRemove(true)}>
               <IconTrash size={16} /> Eliminar
             </button>

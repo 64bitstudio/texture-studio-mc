@@ -523,4 +523,21 @@ describe('updateMobGeometry (ticket 083)', () => {
     saveProject('proyecto-modelo-3', SAMPLE_MOBS);
     expect(() => updateMobGeometry('proyecto-modelo-3', 'zombie', { geometryStatus: 'modelando' })).toThrow(/ya no existe/);
   });
+
+  it('ticket 086: "confirmar" guarda de una vez geometryStatus/customGeometry/pngDataUrl/resolution', () => {
+    saveProject('proyecto-confirmar', SAMPLE_MOBS);
+
+    updateMobGeometry('proyecto-confirmar', 'skeleton', {
+      geometryStatus: 'confirmado',
+      customGeometry: SAMPLE_CUSTOM_GEOMETRY,
+      pngDataUrl: 'data:image/png;base64,BLANCO',
+      resolution: 1,
+    });
+
+    const loaded = loadProject('proyecto-confirmar')!.mobs.skeleton!;
+    expect(getMobGeometryStatus(loaded)).toBe('confirmado');
+    expect(loaded.customGeometry).toEqual(SAMPLE_CUSTOM_GEOMETRY);
+    expect(loaded.pngDataUrl).toBe('data:image/png;base64,BLANCO');
+    expect(loaded.resolution).toBe(1);
+  });
 });

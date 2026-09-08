@@ -105,6 +105,25 @@ export async function buildProjectSnapshot(
  * dimensiones reales se derivan directo del PNG decodificado, no
  * recalculandolas desde `resolution * nativeWidth`.
  */
+/**
+ * Arma el `ProjectMobEntry` de un mob recién CONFIRMADO (ticket 086,
+ * cierre de la Etapa 2) -- `geometry` ya viene con el atlas UV aplicado
+ * (`confirmModelGeometry`, `packBoxesUV.ts`). El PNG es un lienzo en
+ * blanco/transparente del tamaño exacto del atlas: la Etapa 3 (pintar)
+ * arranca desde cero sobre esa geometría, no hay textura previa que
+ * conservar (a diferencia de un mob vainilla, que sí trae su textura
+ * real del catálogo). `encodeBufferToPngBlob(buffer, [])` -- sin cajas
+ * UV que enmascarar -- es un no-op sobre un buffer que ya es 100%
+ * transparente, se reusa en vez de escribir un segundo camino de
+ * codificación PNG solo para este caso.
+ */
+export async function buildConfirmedMobEntry(geometry: MobGeometry): Promise<ProjectMobEntry> {
+  const buffer = new TextureBuffer(geometry.textureWidth, geometry.textureHeight);
+  const pngBlob = await encodeBufferToPngBlob(buffer, []);
+  const pngDataUrl = await blobToDataUrl(pngBlob);
+  return { resolution: 1, pngDataUrl, geometryStatus: 'confirmado', customGeometry: geometry };
+}
+
 export async function restoreProjectBuffers(mobs: Record<string, ProjectMobEntry>): Promise<Map<string, TextureBuffer>> {
   const restored = new Map<string, TextureBuffer>();
 

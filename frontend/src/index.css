@@ -680,6 +680,16 @@ body {
   outline: none;
 }
 
+/* Ticket 086 -- "Editar modelo 3D" deshabilitado para un mob ya confirmado. Mismo criterio que `.ui-button:disabled` (index.css). */
+.ui-menu__item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ui-menu__item:disabled:hover {
+  background: transparent;
+}
+
 .ui-loading-overlay {
   position: absolute;
   inset: 0;
