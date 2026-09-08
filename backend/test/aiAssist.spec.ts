@@ -44,6 +44,21 @@ describe('requestAiJsonProposal (unit -- retries con backoff inyectable)', () =>
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('usa el modelo por defecto si GEMINI_MODEL llega como string vacio, no solo ausente (hallazgo real: asi llega desde docker-compose sin valor en el .env)', async () => {
+    const ORIGINAL_MODEL = process.env.GEMINI_MODEL;
+    process.env.GEMINI_MODEL = '';
+    const fetchMock = vi.fn().mockResolvedValue(geminiSuccessResponse({ ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      await requestAiJsonProposal('describe una animacion de caminar');
+      const calledUrl = fetchMock.mock.calls[0]![0] as string;
+      expect(calledUrl).toContain('/models/gemini-3.6-flash:generateContent');
+    } finally {
+      process.env.GEMINI_MODEL = ORIGINAL_MODEL;
+    }
+  });
+
   it('reintenta ante un 503 (transitorio, ver hallazgo del spike 081) y se recupera en el segundo intento', async () => {
     const fetchMock = vi
       .fn()

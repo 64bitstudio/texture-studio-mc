@@ -29,6 +29,16 @@ services:
     restart: unless-stopped
     environment:
       PORT: "3000"
+      # Ticket 087 -- hallazgo real señalado explícitamente: hasta ahora
+      # el .env.dev de la VM documentaba estas 2 variables, pero NINGÚN
+      # docker-compose.*.yml las pasaba al contenedor (`--env-file` solo
+      # las deja disponibles para sustitución `${...}` DENTRO de este
+      # archivo, nunca las inyecta solas). GEMINI_MODEL vacío (si no se
+      # puebla en el .env) llega al backend como string vacío, no
+      # ausente -- `services/aiAssist.ts` ya lo trata como "usar el
+      # default" (`||`, no `??`, mismo hallazgo).
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL}
     ports:
       - "8087:3000"
     volumes:

@@ -114,7 +114,12 @@ export async function requestAiJsonProposal(
   // publica que consumen las rutas.
   const retryBaseMs = Number(process.env.AI_ASSIST_RETRY_BASE_MS) || 500;
   const delay = options.delayFn ?? realSleep;
-  const model = process.env.GEMINI_MODEL ?? DEFAULT_GEMINI_MODEL;
+  // `||`, no `??`: un despliegue real (docker-compose `environment:
+  // GEMINI_MODEL: ${GEMINI_MODEL}` sin valor en el .env) deja la
+  // variable como STRING VACIO, no ausente -- `??` no cae al default en
+  // ese caso (hallazgo real, encontrado configurando el despliegue de
+  // dev), rompiendo la llamada a Gemini con un nombre de modelo vacio.
+  const model = process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
   const requestBody = JSON.stringify({
     contents: [{ parts: [{ text: prompt }] }],
