@@ -43,8 +43,13 @@ type PackableParts = Record<string, Pick<MobBoxPart, 'size' | 'group'>>;
  * sin `group` son su propio grupo (una región UV propia). Cajas del
  * mismo grupo comparten UN solo origen -- mismo ahorro de espacio que
  * ya usa el formato vainilla.
+ *
+ * `export` desde el ticket 089 -- `geometry/colorProposal.ts` la reusa
+ * para no pedirle a la IA un color por cada parte de un grupo (ej.
+ * `armRight`/`armLeft`) cuando comparten exactamente la misma región de
+ * pixeles.
  */
-function groupPartsBySharedUV(parts: PackableParts): Map<string, { size: [number, number, number]; members: string[] }> {
+export function groupPartsBySharedUV(parts: PackableParts): Map<string, { size: [number, number, number]; members: string[] }> {
   const groups = new Map<string, { size: [number, number, number]; members: string[] }>();
   for (const [name, part] of Object.entries(parts)) {
     const key = part.group ?? name;

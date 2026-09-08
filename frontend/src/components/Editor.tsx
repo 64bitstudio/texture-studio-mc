@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Viewer3D } from './Viewer3D';
 import { TextureEditor } from './TextureEditor';
+import { AIColorAssist } from './AIColorAssist';
 import { HsvColorPicker } from './HsvColorPicker';
 import { ZoomControls } from './ZoomControls';
 import { ImportTextureControl } from './ImportTextureControl';
@@ -820,6 +821,34 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
     [buffer, history, uvBoxes],
   );
 
+  // Asistencia de IA para color (ticket 089, HU-8): `handleGetCurrentPixels`
+  // le da a `AIColorAssist` una lectura FRESCA del buffer justo al validar
+  // una propuesta (nunca una snapshot vieja capturada en un render
+  // anterior); `handleApplyColorProposal` reusa el MISMO mecanismo de
+  // "reemplazo completo como una sola unidad de undo" que
+  // `handleImportFile` de arriba (`computeFullReplaceDiff` +
+  // `beginStroke`/`recordChange`/`commitStroke`) -- la propuesta de color
+  // ya llega validada y confirmada por el usuario (ver el flujo de
+  // confirmacion en el propio `AIColorAssist`), este handler solo la
+  // integra al historial de deshacer.
+  const handleGetCurrentPixels = useCallback((): PixelSource => ({ width: buffer.width, height: buffer.height, data: buffer.getRawData() }), [buffer]);
+
+  const handleApplyColorProposal = useCallback(
+    (pixels: PixelSource) => {
+      const currentSnapshot: PixelSource = { width: buffer.width, height: buffer.height, data: buffer.getRawData() };
+      const changes = computeFullReplaceDiff(currentSnapshot, pixels);
+      if (changes.length === 0) return;
+
+      buffer.loadFromImageData(pixels);
+      history.beginStroke();
+      changes.forEach((c) => history.recordChange(c.x, c.y, c.before, c.after));
+      history.commitStroke();
+      setVersion((v) => v + 1);
+      setHistoryTick((t) => t + 1);
+    },
+    [buffer, history],
+  );
+
   // Pegar/insertar imagen sobre una region UV (ticket 005, HU-9).
   // `startPendingPaste` es el punto de entrada -- el evento `paste` del
   // portapapeles (listener a nivel de `window` mas abajo, mismo patron
@@ -1366,6 +1395,10 @@ export function Editor({ data, mobId, mobLabel, bufferCache, projectName, onBack
         <Section title="Selector de color" style={{ width: 260, flexShrink: 0 }}>
           <HsvColorPicker color={color} onChange={handleColorChange} recentColors={recentColors} />
         </Section>
+
+        <div style={{ width: 260, flexShrink: 0 }}>
+          <AIColorAssist geometry={geometry} scale={resolution} getCurrentPixels={handleGetCurrentPixels} onApply={handleApplyColorProposal} />
+        </div>
 
         {/* Ocupa TODAS las columnas del grid (`gridColumn: '1 / -1'`) --
             a diferencia del resto de secciones (controles compactos),
