@@ -12,9 +12,12 @@
 import JSZip from 'jszip';
 import type { TextureBuffer } from './textureBuffer';
 import { buildResourcePackFiles, DEFAULT_PACK_DESCRIPTION, dataUrlToBytes, projectZipFilename } from './exportPack';
+import { blockbenchModelFileName, buildBlockbenchModel } from './exportBlockbench';
+import { applyDefaultHierarchy, hasAnyHierarchy } from './geometry/hierarchy';
 import type { UVBoxRect } from './symmetry';
 import { maskPixelsOutsideUVBoxes } from './uvBoxCleanup';
 import type { ProjectMobEntry } from './projectStorage';
+import type { MobGeometry } from './types/baseAssets';
 
 /** Nombre de archivo fijo pedido por el ticket (HU-10). */
 export const EXPORTED_PNG_FILENAME = 'skeleton.png';
@@ -132,4 +135,29 @@ export async function exportProjectZip(
 
   const zipBlob = await zip.generateAsync({ type: 'blob' });
   triggerBlobDownload(zipBlob, projectZipFilename(projectName));
+}
+
+/**
+ * Exporta un `.bbmodel` (Blockbench) de UN mob -- ticket 092, geometría +
+ * jerarquía + textura ya pintada, sin animaciones todavía (ticket 093).
+ * Disponible para CUALQUIER mob (vainilla o custom, confirmado o no) --
+ * mismo criterio ya establecido por `AnimationEditor.tsx` (ticket 090):
+ * si la geometría todavía no tiene jerarquía de huesos, se le aplica la
+ * jerarquía por defecto de `mobId` antes de exportar, para que el
+ * `outliner` del archivo SIEMPRE refleje una jerarquía real (nunca N
+ * cajas sueltas sin padre).
+ *
+ * `entry.pngDataUrl` ya es el PNG final (limpio de zonas fuera de las
+ * cajas UV, ver `buildProjectSnapshot`) -- se embebe tal cual en
+ * `textures[0].source`, mismo criterio que `exportProjectZip`.
+ */
+export async function exportMobBlockbench(mobId: string, geometry: MobGeometry, entry: Pick<ProjectMobEntry, 'pngDataUrl'>): Promise<void> {
+  const hierarchicalGeometry = hasAnyHierarchy(geometry) ? geometry : applyDefaultHierarchy(geometry, mobId);
+  const model = buildBlockbenchModel(hierarchicalGeometry, {
+    modelName: mobId,
+    textureFileName: `${mobId}.png`,
+    textureDataUrl: entry.pngDataUrl,
+  });
+  const blob = new Blob([JSON.stringify(model, null, 2)], { type: 'application/json' });
+  triggerBlobDownload(blob, blockbenchModelFileName(mobId));
 }

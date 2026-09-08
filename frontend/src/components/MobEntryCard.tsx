@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Menu } from '../ui';
-import { IconDocument, IconDots, IconEye, IconMaximize, IconModel, IconPencil, IconRefresh, IconScale, IconTrash, IconX } from '../ui/icons';
+import { Button, InlineError, Menu } from '../ui';
+import { IconDocument, IconDots, IconExport, IconEye, IconMaximize, IconModel, IconPencil, IconRefresh, IconScale, IconTrash, IconX } from '../ui/icons';
 import { useMobGeometry } from '../hooks/useMobGeometry';
 import { useMobSnapshot3D } from '../hooks/useMobSnapshot3D';
+import { fetchMobBaseAssets } from '../api/baseAssets';
+import { exportMobBlockbench } from '../export';
 import type { GeometryStatus } from '../projectStorage';
 import type { MobGeometry } from '../types/baseAssets';
 import type { ToggleLayout } from '../ui';
@@ -23,6 +25,18 @@ export interface MobEntryCardProps {
   onEditModel: () => void;
   /** Menú "⋮" -> "Editar animaciones" (ticket 090) -- navega al editor de animación (`AnimationEditor.tsx`) para este mob. Disponible siempre (vainilla o custom, confirmado o no) -- a diferencia de "Editar modelo 3D", animar no modifica geometría/UV, así que no hay nada que bloquear. */
   onEditAnimations: () => void;
+  /**
+   * Geometría custom ya confirmada de este mob (ticket 092, `ProjectMobEntry.customGeometry`)
+   * -- si existe, "Exportar .bbmodel" la usa DIRECTO (sin fetch, síncrono).
+   * Si no existe (mob todavía `'vanilla'`), el propio menú la busca con
+   * `fetchMobBaseAssets` al exportar. Deliberadamente separado de la
+   * `geometry` que ya resuelve `useMobGeometry` para la miniatura 3D de
+   * esta tarjeta -- esa SIEMPRE trae la forma vainilla (gap preexistente,
+   * fuera de alcance de este ticket, ver `useMobGeometry.ts`), y
+   * exportar con esa geometría para un mob confirmado exportaría la
+   * forma equivocada.
+   */
+  customGeometry?: MobGeometry;
   /** Menú "⋮" -> "Eliminar" (ticket 058) -- confirmado con inline, sin diálogo nativo. El padre (`Proyecto.tsx`) hace la escritura real (`removeMobFromProject`) y refresca la lista. */
   onRemoveMob: () => void;
 }
@@ -115,10 +129,12 @@ function MobPreviewModal({ label, snapshotUrl, onClose }: { label: string; snaps
  * compacto + "Editar textura", y un menú "⋮" con "Eliminar mob del
  * proyecto" (confirmación inline, ticket 058).
  */
-export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geometryCache, geometryStatus, onEditTexture, onEditModel, onEditAnimations, onRemoveMob }: MobEntryCardProps) {
+export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geometryCache, geometryStatus, onEditTexture, onEditModel, onEditAnimations, customGeometry, onRemoveMob }: MobEntryCardProps) {
   const geometry = useMobGeometry(mobId, geometryCache);
   const [showPreview, setShowPreview] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const snapshotUrl = useMobSnapshot3D(geometry, pngDataUrl);
   const handleOpenPreview = useCallback(() => setShowPreview(true), []);
@@ -127,6 +143,26 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
     setConfirmRemove(false);
     onRemoveMob();
   }, [onRemoveMob]);
+
+  // Ticket 092 -- "Exportar .bbmodel". Usa `customGeometry` si ya está
+  // confirmada (síncrono); si el mob sigue siendo vainilla, la busca
+  // ella misma con `fetchMobBaseAssets` (mismo mecanismo que
+  // `useMobGeometry`, pero SIN cachearla en `geometryCache` -- esa cache
+  // es para miniaturas, no para exportar, y no vale la pena acoplar
+  // ambos usos).
+  const handleExportBlockbench = useCallback(async () => {
+    setExportError(null);
+    setExporting(true);
+    try {
+      const exportGeometry = customGeometry ?? (await fetchMobBaseAssets(mobId)).geometry;
+      await exportMobBlockbench(mobId, exportGeometry, { pngDataUrl });
+    } catch (err) {
+      console.error(`MobEntryCard.handleExportBlockbench: fallo exportando "${mobId}".`, err);
+      setExportError(err instanceof Error ? err.message : 'No se pudo exportar el modelo.');
+    } finally {
+      setExporting(false);
+    }
+  }, [customGeometry, mobId, pngDataUrl]);
 
   const isList = layout === 'list';
   const dimensions = geometry ? `${geometry.textureWidth * resolution}×${geometry.textureHeight * resolution} px` : '—';
@@ -174,6 +210,14 @@ export function MobEntryCard({ mobId, label, pngDataUrl, resolution, layout, geo
             <button type="button" className="ui-menu__item" onClick={onEditAnimations}>
               <IconRefresh size={16} /> Editar animaciones
             </button>
+            <button type="button" className="ui-menu__item" onClick={() => void handleExportBlockbench()} disabled={exporting}>
+              <IconExport size={16} /> {exporting ? 'Exportando…' : 'Exportar .bbmodel'}
+            </button>
+            {exportError && (
+              <div style={{ padding: '0 8px 4px' }}>
+                <InlineError message={exportError} />
+              </div>
+            )}
             <button type="button" className="ui-menu__item" style={{ color: 'var(--danger)' }} onClick={() => setConfirmRemove(true)}>
               <IconTrash size={16} /> Eliminar
             </button>

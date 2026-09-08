@@ -390,6 +390,7 @@ export function Proyecto({ projectName, mobs, onSelectMob, onEditModel, onEditAn
                       onEditTexture={() => onSelectMob(mobId)}
                       onEditModel={() => onEditModel(mobId)}
                       onEditAnimations={() => onEditAnimations(mobId)}
+                      customGeometry={record.mobs[mobId]!.customGeometry}
                       onRemoveMob={() => handleRemoveMob(mobId)}
                     />
                   ))}
