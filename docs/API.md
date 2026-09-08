@@ -160,6 +160,25 @@ Segunda anatomía no-biped: solo `head` + `body` (sin torso/tórax/abdomen separ
 - Ningún campo `mirrorX` en ninguna pata — a diferencia de la Araña, el `.geo.json` oficial del Creeper NO declara mirror para ninguna de sus 4 patas (verificado, no asumido por simetría visual).
 - Las 4 patas comparten `group: "creeperLeg"` (misma región UV, mismo comportamiento de "pintar una pinta las 4" que `spiderLeg`).
 
+## `POST /api/ai/propose-geometry` / `POST /api/ai/propose-color` / `POST /api/ai/propose-animation` (ticket 087)
+
+Proxy mínimo hacia la API gratuita de Gemini para el modo automático de asistencia de IA (Etapas 1/3/4 del epic de modelado 3D, ver `docs/definiciones/modelado-3d-custom-y-generacion-con-ia.md`). Las 3 rutas se comportan idéntico -- el prompt ya viene armado desde el frontend (mismo texto que usaría el modo puente manual), este backend solo lo reenvía a Gemini resguardando la API key (`GEMINI_API_KEY`, variable de entorno del servidor, nunca llega al cliente).
+
+**Request:**
+```jsonc
+{ "prompt": "texto completo del prompt, ya armado por el frontend" }
+```
+
+**Response 200:**
+```jsonc
+{ "result": /* el JSON que devolvió Gemini, ya parseado -- forma depende de que pidió el prompt */ }
+```
+
+**Errores:**
+- `400` -- `prompt` ausente o vacío.
+- `500` -- el servidor no tiene `GEMINI_API_KEY` configurada (ver `deploy/.env.dev.example`, "Ticket 087" -- pendiente de migrar a Vault, ver ese comentario).
+- `502` -- la API de Gemini falló persistentemente (se reintenta hasta 3 veces con backoff ante errores transitorios -- 429/500/502/503/504 o fallos de red -- antes de responder esto; ver `backend/src/services/aiAssist.ts`). El mensaje siempre sugiere usar el modo puente manual como respaldo.
+
 ## `GET /*` (catch-all SPA)
 
 Sirve `index.html` del build del frontend para cualquier ruta no reconocida arriba (necesario para el enrutamiento client-side de React, aunque el MVP de este ticket todavía no tiene rutas propias). En dev local (`npm run dev` de Vite aparte) esta ruta del backend normalmente no se usa — ver `docs/README.md`.
